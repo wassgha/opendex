@@ -27,7 +27,7 @@ function createWindow() {
     height: 760,
     minWidth: 760,
     minHeight: 560,
-    backgroundColor: "#050816",
+    backgroundColor: "#0a0a0a",
     title: "OpenDex",
     show: false,
     webPreferences: {

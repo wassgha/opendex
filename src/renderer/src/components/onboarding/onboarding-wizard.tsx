@@ -179,14 +179,14 @@ export function OnboardingWizard({
   const isLast = stepIndex === steps.length - 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050816] p-6">
-      <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-white/10 bg-[#0a0f1f] p-7 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a] p-6">
+      <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-white/10 bg-[#0e0e0e] p-7 shadow-2xl">
         <div className="flex gap-1.5">
           {steps.map((s, i) => (
             <div
               key={s.key}
               className={`h-1 flex-1 rounded-full transition ${
-                i <= stepIndex ? "bg-cyan-400" : "bg-white/10"
+                i <= stepIndex ? "bg-white" : "bg-white/10"
               }`}
             />
           ))}
@@ -211,7 +211,7 @@ export function OnboardingWizard({
           <button
             type="button"
             onClick={() => (isLast ? onComplete() : setStepIndex((i) => i + 1))}
-            className="rounded-full bg-cyan-400 px-6 py-2 text-sm font-medium text-slate-950 transition hover:bg-cyan-300"
+            className="rounded-full bg-white px-6 py-2 text-sm font-medium text-black transition hover:bg-white/90"
           >
             {isLast ? "Start using OpenDex" : "Continue"}
           </button>

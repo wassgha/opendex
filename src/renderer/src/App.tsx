@@ -137,7 +137,7 @@ function MainExperience({
                   aria-pressed={bargeInEnabled}
                   className={`rounded-full px-5 py-2 text-sm transition ${
                     bargeInEnabled
-                      ? "border border-cyan-400/50 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20"
+                      ? "border border-white/40 bg-white/15 text-white hover:bg-white/20"
                       : "border border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
                   }`}
                   title="Allow interrupting mid-reply. Requires headphones to avoid echo loops."
@@ -165,10 +165,10 @@ function MainExperience({
         <button
           type="button"
           onClick={unlockAudio}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-slate-950/90 backdrop-blur-sm text-white"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/90 backdrop-blur-sm text-white"
           aria-label="Tap to enable audio"
         >
-          <div className="font-mono text-xs uppercase tracking-[0.4em] text-cyan-300">
+          <div className="font-mono text-xs uppercase tracking-[0.4em] text-white/60">
             Audio paused
           </div>
           <div className="text-2xl font-light">Tap anywhere to enable audio</div>

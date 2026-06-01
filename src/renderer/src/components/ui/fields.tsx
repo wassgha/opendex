@@ -19,7 +19,7 @@ export function Field({
 }
 
 const inputClass =
-  "w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400/50";
+  "w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none transition focus:border-white/40";
 
 export function TextField({
   label,
@@ -125,9 +125,9 @@ export function SecretField({
   if (present && !editing) {
     return (
       <Field label={label} hint={hint}>
-        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/40 px-3 py-2">
-          <span className="flex items-center gap-2 text-sm text-emerald-300/90">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+          <span className="flex items-center gap-2 text-sm text-white/70">
+            <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
             Saved
           </span>
           <div className="flex gap-2">
@@ -169,7 +169,7 @@ export function SecretField({
             setValue("");
             setEditing(false);
           }}
-          className="shrink-0 rounded-lg bg-cyan-400 px-4 text-sm font-medium text-slate-950 transition enabled:hover:bg-cyan-300 disabled:opacity-40"
+          className="shrink-0 rounded-lg bg-white px-4 text-sm font-medium text-black transition enabled:hover:bg-white/90 disabled:opacity-30"
         >
           Save
         </button>
@@ -196,7 +196,7 @@ export function SegmentedControl<T extends string>({
           onClick={() => onChange(o.value)}
           className={`rounded-md px-3 py-1.5 text-sm transition ${
             value === o.value
-              ? "bg-cyan-400/20 text-cyan-100"
+              ? "bg-white/15 text-white"
               : "text-white/50 hover:text-white/80"
           }`}
         >

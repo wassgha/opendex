@@ -34,7 +34,7 @@ export function Transcript({
           className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed ${
             turn.role === "user"
               ? "self-end bg-white/10 text-white"
-              : "self-start bg-cyan-500/10 text-cyan-50 border border-cyan-400/20"
+              : "self-start border border-white/10 bg-white/[0.03] text-white/90"
           }`}
         >
           {turn.content || (turn.role === "assistant" ? "…" : "")}

@@ -12,7 +12,7 @@ import { useSystemVoices } from "@/lib/use-system-voices";
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4 border-b border-white/5 py-6">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/70">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
         {title}
       </h3>
       {children}
@@ -40,10 +40,10 @@ export function SettingsPanel({
       onClick={onClose}
     >
       <div
-        className="h-full w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[#0a0f1f] px-6 shadow-2xl"
+        className="h-full w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[#0e0e0e] px-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-[#0a0f1f]/95 py-5 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-[#0e0e0e]/95 py-5 backdrop-blur">
           <h2 className="text-lg font-semibold text-white">Settings</h2>
           <button
             onClick={onClose}

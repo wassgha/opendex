@@ -6,10 +6,9 @@
 
 body {
   background:
-    radial-gradient(ellipse at top, rgba(56, 189, 248, 0.08), transparent 55%),
-    radial-gradient(ellipse at bottom, rgba(99, 102, 241, 0.06), transparent 55%),
-    #050816;
-  color: #e2e8f0;
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.04), transparent 55%),
+    #0a0a0a;
+  color: #ededed;
   font-family:
     system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-user-select: none;
