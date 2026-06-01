@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at top, rgba(56, 189, 248, 0.08), transparent 55%),
+    radial-gradient(ellipse at bottom, rgba(99, 102, 241, 0.06), transparent 55%),
+    #050816;
+  color: #e2e8f0;
+  font-family:
+    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  overflow: hidden;
+}
+
+@theme inline {
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+
+  --animate-jarvis-breath: jarvis-breath 4s ease-in-out infinite;
+  --animate-jarvis-pulse: jarvis-pulse 1.4s ease-in-out infinite;
+  --animate-jarvis-spin: jarvis-spin 6s linear infinite;
+}
+
+@keyframes jarvis-breath {
+  0%, 100% { transform: scale(1); opacity: 0.92; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+
+@keyframes jarvis-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes jarvis-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.bg-gradient-radial {
+  background-image: radial-gradient(circle at center, var(--tw-gradient-stops));
+}

@@ -13,12 +13,10 @@
 # testing
 /coverage
 
-# next.js
-/.next/
+# electron-vite build output + electron-builder packages
 /out/
-
-# production
-/build
+/dist/
+/release/
 
 # misc
 .DS_Store
@@ -33,9 +31,5 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
-next-env.d.ts

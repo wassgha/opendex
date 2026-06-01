@@ -1,68 +1,57 @@
-# Jarvis
+# OpenDex
 
-A voice-first agentic assistant. Wake word ("Jarvis") triggers active listening; an LLM agent with tools (time, weather, web search) generates a reply that streams back through an ElevenLabs British voice.
+An open-source, **voice-first agentic harness** for the desktop. Wake it, speak, and a tool-using LLM agent replies aloud — with everything (LLM, voice, visualization theme, greeting, skills) configurable. Built on Electron.
+
+> Status: **Phase 1 of 7** complete — the Electron shell + secure agent/TTS-over-IPC architecture. See `docs`/`AGENTS.md` for the roadmap (config & onboarding → voice-viz themes → pluggable wake/STT → skills + MCP → computer-use → signed releases).
 
 ## Stack
 
-- **Next.js 16** + React 19 + Tailwind CSS 4 (Turbopack)
-- **Vercel AI SDK v6** with the Vercel AI Gateway — defaults to `anthropic/claude-sonnet-4-6`
-- **ElevenLabs** streaming TTS (`eleven_turbo_v2_5`, defaults to the "George" voice)
-- **Web Speech API** for wake-word + speech-to-text (Chrome / Edge / Safari only)
+- **Electron** + **electron-vite** (main / preload / renderer)
+- **React 19** + **Tailwind CSS 4** renderer
+- **Vercel AI SDK v6** agent loop in the main process (defaults to `anthropic/claude-sonnet-4-6` via the AI Gateway)
+- **ElevenLabs** streaming TTS (`eleven_turbo_v2_5`, "George" voice by default)
+- API keys live only in the main process — never in the renderer.
+
+## Architecture
+
+```
+Renderer (React) ──window.opendex──▶ Preload (contextBridge) ──IPC──▶ Main (Node)
+  state machine, UI                    typed bridge                   agent loop · TTS · keys
+```
+
+The renderer asks the main process to `chat()` (streamed text deltas) and `synthesize()` (MP3 bytes); secrets stay in main. See `AGENTS.md` for the process model and how to add IPC channels.
 
 ## Quick start
 
 ```bash
-cp .env.local.example .env.local
-# fill in ELEVENLABS_API_KEY, AI_GATEWAY_API_KEY, optionally TAVILY_API_KEY
-
+cp .env.local.example .env       # fill in keys (see below)
 pnpm install
-pnpm dev
+pnpm dev                         # launches the OpenDex desktop window
 ```
 
-Open <http://localhost:3000>, click **Engage**, grant microphone permission, then say:
-
-> Jarvis, what's the weather in London?
-
-## How it works
-
-The client (`lib/jarvis/use-jarvis.ts`) owns a small state machine:
-
-```
-idle → listening_wake → active_listening → thinking → speaking → listening_wake
-```
-
-- `listening_wake`: continuous `SpeechRecognition` scanning for `/\bjarvis\b/i`.
-- `active_listening`: single-shot recognition with silence + hard timeouts. If the user spoke the command in the same breath as the wake word, that flow is short-circuited.
-- `thinking`: posts the running message history to `/api/chat` (server-side `streamText` with tools). Text deltas stream back as plain text.
-- `speaking`: tokens are fed into `sentence-buffer.ts` which flushes on sentence boundaries to `/api/tts` for ElevenLabs synthesis. Audio clips play in FIFO order via `tts-player.ts`.
-
-## Tools available to the agent
-
-Defined in `lib/ai/tools.ts`:
-
-- `getCurrentTime({ timezone })` — IANA timezone, defaults to UTC
-- `getWeather({ location })` — Open-Meteo (no API key)
-- `webSearch({ query })` — Tavily (requires `TAVILY_API_KEY`)
-
-## Environment variables
+Environment (`.env`, dev only — Phase 2 moves keys to the OS keychain):
 
 | Var | Required | Default |
 |---|---|---|
-| `ELEVENLABS_API_KEY` | yes | — |
+| `ELEVENLABS_API_KEY` | yes (for TTS) | — |
 | `ELEVENLABS_VOICE_ID` | no | `JBFqnCBsd6RMkjVDRZzb` (George) |
-| `ELEVENLABS_MODEL_ID` | no | `eleven_turbo_v2_5` |
-| `AI_GATEWAY_API_KEY` | yes (locally) | uses Vercel OIDC when deployed |
-| `JARVIS_MODEL` | no | `anthropic/claude-sonnet-4-6` |
-| `TAVILY_API_KEY` | no | web search disabled if absent |
+| `AI_GATEWAY_API_KEY` | yes | — |
+| `OPENDEX_MODEL` | no | `anthropic/claude-sonnet-4-6` |
+| `TAVILY_API_KEY` | no | web-search tool disabled if absent |
 
-## Browser support
+## Scripts
 
-Web Speech API is required. Works in Chrome, Edge, and recent Safari. Firefox is unsupported — the UI surfaces a clear notice.
+- `pnpm dev` — run the app with HMR
+- `pnpm build` — build main/preload/renderer into `out/`
+- `pnpm start` — run the built app
+- `pnpm dist` — package installers via electron-builder (mac/win/linux)
+- `pnpm typecheck` — `tsc --noEmit`
+- `pnpm smoke:chat [briefing]` — exercise the main-process agent without Electron
 
-## Deploy
+## Known limitation (Phase 1)
 
-```bash
-pnpm dlx vercel deploy
-```
+Wake-word + speech-to-text currently use the browser **Web Speech API**, which depends on a remote service that is **unavailable inside Electron** — so voice input surfaces as "unsupported" for now. The pluggable local wake/STT engines (Picovoice + Whisper) land in a later phase. The agent and TTS pipeline are fully functional today (verify with `pnpm smoke:chat`).
 
-Set the env vars above in the Vercel project. Next.js is auto-detected and `vercel.ts` is applied.
+## License
+
+MIT (see `LICENSE`).
