@@ -18,6 +18,11 @@ const TONES: Record<JarvisStatus, { ring: string; glow: string; pulse: string }>
     glow: "shadow-[0_0_120px_rgba(34,211,238,0.6)]",
     pulse: "animate-jarvis-pulse",
   },
+  follow_up_listening: {
+    ring: "from-teal-300/70 via-cyan-400/25 to-transparent",
+    glow: "shadow-[0_0_100px_rgba(45,212,191,0.5)]",
+    pulse: "animate-jarvis-breath",
+  },
   thinking: {
     ring: "from-indigo-400/60 via-violet-400/20 to-transparent",
     glow: "shadow-[0_0_100px_rgba(129,140,248,0.55)]",

@@ -6,6 +6,7 @@ const DOT: Record<JarvisStatus, string> = {
   idle: "bg-slate-400",
   listening_wake: "bg-sky-400 animate-pulse",
   active_listening: "bg-cyan-300 animate-pulse",
+  follow_up_listening: "bg-teal-300 animate-pulse",
   thinking: "bg-indigo-400 animate-pulse",
   speaking: "bg-amber-300 animate-pulse",
   muted: "bg-zinc-500",

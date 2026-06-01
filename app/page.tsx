@@ -6,10 +6,18 @@ import { Transcript } from "@/components/transcript";
 import { useJarvis } from "@/lib/jarvis/use-jarvis";
 
 export default function Home() {
-  const { status, transcript, liveCaption, engage, stop, toggleMute, isMuted } =
-    useJarvis();
+  const {
+    status,
+    transcript,
+    liveCaption,
+    toggleMute,
+    isMuted,
+    audioBlocked,
+    unlockAudio,
+    bargeInEnabled,
+    toggleBargeIn,
+  } = useJarvis();
 
-  const isEngaged = status !== "idle" && status !== "unsupported";
   const unsupported = status === "unsupported";
 
   return (
@@ -26,19 +34,12 @@ export default function Home() {
 
         {unsupported ? (
           <p className="max-w-sm text-center text-sm text-white/60">
-            Voice recognition isn’t supported in this browser. Please use a recent
-            version of Chrome, Edge, or Safari on desktop.
+            Voice recognition isn’t supported in this browser. Please use a
+            recent version of Chrome, Edge, or Safari on desktop.
           </p>
         ) : (
           <div className="flex flex-col items-center gap-4">
-            {!isEngaged ? (
-              <button
-                onClick={() => void engage()}
-                className="rounded-full bg-cyan-400 px-8 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 active:scale-95"
-              >
-                Engage
-              </button>
-            ) : (
+            {status !== "error" && (
               <div className="flex items-center gap-3">
                 <button
                   onClick={toggleMute}
@@ -47,17 +48,23 @@ export default function Home() {
                   {isMuted ? "Unmute" : "Mute"}
                 </button>
                 <button
-                  onClick={stop}
-                  className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm text-white/80 transition hover:bg-rose-500/20 hover:text-rose-200"
+                  onClick={toggleBargeIn}
+                  aria-pressed={bargeInEnabled}
+                  className={`rounded-full px-5 py-2 text-sm transition ${
+                    bargeInEnabled
+                      ? "border border-cyan-400/50 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20"
+                      : "border border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
+                  }`}
+                  title="Allow interrupting Jarvis mid-reply. Requires headphones to avoid echo loops."
                 >
-                  Stand down
+                  Interrupt: {bargeInEnabled ? "on" : "off"}
                 </button>
               </div>
             )}
             <p className="max-w-md text-center text-xs text-white/40">
               {status === "error"
-                ? "Microphone access was denied or an unexpected error occurred. Refresh and try again."
-                : "Say “Jarvis” to wake the assistant. Speak naturally — it will reply aloud."}
+                ? "Microphone access was denied. Refresh the page to try again."
+                : "Say “Jarvis” to begin. After a reply, ask follow-ups freely. Interrupt is off by default — enable only with headphones."}
             </p>
           </div>
         )}
@@ -68,6 +75,24 @@ export default function Home() {
           <Transcript turns={transcript} liveCaption={liveCaption} />
         </div>
       </section>
+
+      {audioBlocked && (
+        <button
+          type="button"
+          onClick={unlockAudio}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-slate-950/90 backdrop-blur-sm text-white"
+          aria-label="Tap to enable audio"
+        >
+          <div className="font-mono text-xs uppercase tracking-[0.4em] text-cyan-300">
+            Audio paused
+          </div>
+          <div className="text-2xl font-light">Tap anywhere to enable audio</div>
+          <div className="max-w-sm text-center text-xs text-white/50">
+            Your browser requires a tap before playing sound. Once enabled, Jarvis
+            will speak automatically from here on.
+          </div>
+        </button>
+      )}
     </main>
   );
 }
