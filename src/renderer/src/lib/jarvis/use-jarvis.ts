@@ -6,10 +6,23 @@ import {
   type SpeechRecognitionInstance,
 } from "./speech-recognition";
 import { createSentenceBuffer } from "./sentence-buffer";
-import { TtsPlayer } from "./tts-player";
+import {
+  createSpeechEngine,
+  type SpeechEngine,
+  type SpeechEngineKind,
+  type SystemVoiceOptions,
+} from "./speech-engine";
 import type { JarvisStatus, TranscriptTurn } from "./state";
 
-const WAKE_WORD = /\bjarvis\b/i;
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildWakeRegex(word: string): RegExp {
+  const cleaned = word.trim() || "jarvis";
+  return new RegExp(`\\b${escapeRegExp(cleaned)}\\b`, "i");
+}
+
 const COMMAND_SILENCE_MS = 6000;
 const FOLLOW_UP_SILENCE_MS = 10000;
 const COMMAND_HARD_TIMEOUT_MS = 15000;
@@ -34,6 +47,17 @@ interface RunningCommand {
   getPartialReply: () => string;
 }
 
+export interface UseJarvisOptions {
+  /** Wake word that triggers active listening. */
+  wakeWord: string;
+  /** Whether a proactive greeting fires on the first wake. */
+  greetingEnabled: boolean;
+  /** Which speech engine to use for spoken output. */
+  ttsEngine: SpeechEngineKind;
+  /** System-TTS voice settings (used when ttsEngine === "system"). */
+  systemVoice: SystemVoiceOptions;
+}
+
 export interface UseJarvisResult {
   status: JarvisStatus;
   transcript: TranscriptTurn[];
@@ -48,7 +72,10 @@ export interface UseJarvisResult {
   toggleBargeIn: () => void;
 }
 
-export function useJarvis(): UseJarvisResult {
+export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
+  // Latest options, readable from event handlers without re-binding them.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const [status, setStatus] = useState<JarvisStatus>("idle");
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [liveCaption, setLiveCaption] = useState("");
@@ -60,7 +87,7 @@ export function useJarvis(): UseJarvisResult {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const bargeRef = useRef<SpeechRecognitionInstance | null>(null);
   const modeRef = useRef<Mode>("off");
-  const ttsRef = useRef<TtsPlayer | null>(null);
+  const ttsRef = useRef<SpeechEngine | null>(null);
   const messagesRef = useRef<
     Array<{ role: "user" | "assistant"; content: string }>
   >([]);
@@ -415,18 +442,16 @@ export function useJarvis(): UseJarvisResult {
           // Any successful result means the engine is reachable — reset the
           // failure backoff.
           wakeNetworkFailuresRef.current = 0;
-          const match = combined.match(WAKE_WORD);
+          const match = combined.match(buildWakeRegex(optionsRef.current.wakeWord));
           if (match && match.index !== undefined) {
             const trailing = combined.slice(match.index + match[0].length).trim();
             resultBaseline = event.results.length;
-            // The very first time the operator wakes Jarvis, deliver the
-            // proactive morning briefing instead of listening for a command.
-            if (!hasBriefedRef.current) {
+            // The first time the operator wakes the assistant, deliver the
+            // proactive greeting (if enabled) instead of listening for a command.
+            if (!hasBriefedRef.current && optionsRef.current.greetingEnabled) {
               hasBriefedRef.current = true;
               stopRecognition();
-              void runCommand("Give me my morning briefing on how CoreViz is doing.", {
-                mode: "briefing",
-              });
+              void runCommand("Give me my briefing.", { mode: "briefing" });
             } else if (trailing.length >= 3) {
               stopRecognition();
               void runCommand(trailing);
@@ -604,19 +629,31 @@ export function useJarvis(): UseJarvisResult {
 
   startModeRef.current = startMode;
 
+  const ttsKindRef = useRef<SpeechEngineKind | null>(null);
   const ensureTts = useCallback(() => {
+    const { ttsEngine, systemVoice } = optionsRef.current;
+    // Recreate the engine if the configured kind changed (e.g. via settings).
+    if (ttsRef.current && ttsKindRef.current !== ttsEngine) {
+      ttsRef.current.stop();
+      ttsRef.current = null;
+    }
     if (!ttsRef.current) {
-      ttsRef.current = new TtsPlayer({
-        onStateChange: (speaking) => {
-          if (speaking) {
-            setStatus("speaking");
-            bargeOnSpeakingRef.current?.();
-          }
-          // Note: the "speaking=false" transition is handled in runCommand's
-          // waitForDrain, which is responsible for the next status.
+      ttsRef.current = createSpeechEngine({
+        kind: ttsEngine,
+        system: systemVoice,
+        callbacks: {
+          onStateChange: (speaking) => {
+            if (speaking) {
+              setStatus("speaking");
+              bargeOnSpeakingRef.current?.();
+            }
+            // The "speaking=false" transition is handled in runCommand's
+            // waitForDrain, which is responsible for the next status.
+          },
+          onAudioBlocked: () => setAudioBlocked(true),
         },
-        onAudioBlocked: () => setAudioBlocked(true),
       });
+      ttsKindRef.current = ttsEngine;
     }
     return ttsRef.current;
   }, []);

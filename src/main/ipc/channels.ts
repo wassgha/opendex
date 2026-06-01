@@ -12,6 +12,11 @@ export const IPC = {
   chatDone: (id: string) => `chat:done:${id}`,
   chatError: (id: string) => `chat:error:${id}`,
   ttsSynthesize: "tts:synthesize",
+  // Config
+  configGet: "config:get",
+  configSet: "config:set",
+  secretSet: "secret:set",
+  onboardingComplete: "onboarding:complete",
 } as const;
 
 export interface ChatStartPayload {

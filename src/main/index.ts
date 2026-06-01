@@ -3,10 +3,20 @@ import { config as loadEnv } from "dotenv";
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { IPC, type ChatStartPayload } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
+import { buildSystemPrompt } from "./agent/system-prompt";
 import { synthesizeSpeech } from "./tts/elevenlabs";
+import {
+  completeOnboarding,
+  getConfig,
+  getPublicConfig,
+  initConfig,
+  setSecret,
+  updateConfig,
+} from "./config/store";
+import type { DeepPartial, OpenDexConfig, SecretName } from "./config/schema";
 
-// Phase 1: load API keys from .env for the dev demo. Phase 2 replaces this with
-// secure config (electron-store + safeStorage).
+// Load a dev .env first; initConfig() then layers the user's saved config on
+// top (config values win; .env remains a fallback for unset secrets).
 loadEnv();
 
 const isDev = !app.isPackaged;
@@ -30,7 +40,6 @@ function createWindow() {
 
   win.once("ready-to-show", () => win.show());
 
-  // Open external links in the user's browser, never in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };
@@ -45,7 +54,6 @@ function createWindow() {
 }
 
 function registerIpc() {
-  // Track in-flight chat requests so the renderer can cancel (barge-in / stop).
   const inFlight = new Map<string, AbortController>();
 
   ipcMain.on(IPC.chatStart, async (event, payload: ChatStartPayload) => {
@@ -53,8 +61,17 @@ function registerIpc() {
     const ac = new AbortController();
     inFlight.set(requestId, ac);
     const sender = event.sender;
+    const config = getConfig();
+    const briefing = mode === "briefing";
+    const system = buildSystemPrompt({ config, briefing });
     try {
-      for await (const delta of streamChat({ messages, mode, signal: ac.signal })) {
+      for await (const delta of streamChat({
+        messages,
+        system,
+        model: config.llm.model,
+        briefing,
+        signal: ac.signal,
+      })) {
         if (ac.signal.aborted || sender.isDestroyed()) break;
         sender.send(IPC.chatDelta(requestId), delta);
       }
@@ -74,16 +91,29 @@ function registerIpc() {
 
   ipcMain.handle(IPC.ttsSynthesize, async (_event, text: string) => {
     const buffer = await synthesizeSpeech(text);
-    // Return a clean ArrayBuffer (sliced to the exact view) so the renderer can
-    // wrap it directly in a Blob.
     return buffer.buffer.slice(
       buffer.byteOffset,
       buffer.byteOffset + buffer.byteLength,
     ) as ArrayBuffer;
   });
+
+  // Config / secrets ---------------------------------------------------------
+  ipcMain.handle(IPC.configGet, () => getPublicConfig());
+
+  ipcMain.handle(IPC.configSet, (_event, patch: DeepPartial<OpenDexConfig>) =>
+    updateConfig(patch),
+  );
+
+  ipcMain.handle(
+    IPC.secretSet,
+    (_event, name: SecretName, value: string) => setSecret(name, value),
+  );
+
+  ipcMain.handle(IPC.onboardingComplete, () => completeOnboarding());
 }
 
 app.whenReady().then(() => {
+  initConfig();
   registerIpc();
   createWindow();
 

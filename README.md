@@ -2,7 +2,7 @@
 
 An open-source, **voice-first agentic harness** for the desktop. Wake it, speak, and a tool-using LLM agent replies aloud — with everything (LLM, voice, visualization theme, greeting, skills) configurable. Built on Electron.
 
-> Status: **Phase 1 of 7** complete — the Electron shell + secure agent/TTS-over-IPC architecture. See `docs`/`AGENTS.md` for the roadmap (config & onboarding → voice-viz themes → pluggable wake/STT → skills + MCP → computer-use → signed releases).
+> Status: **Phases 1–2 of 7** complete — the Electron shell + secure agent/TTS-over-IPC architecture, plus a full config system (first-run onboarding, settings, OS-keychain-encrypted keys, configurable model/voice/greeting/wake-word, and an ElevenLabs-or-system-TTS toggle). Remaining roadmap: voice-viz themes → pluggable wake/STT → skills + MCP → computer-use → signed releases. See `AGENTS.md`.
 
 ## Stack
 
@@ -29,15 +29,15 @@ pnpm install
 pnpm dev                         # launches the OpenDex desktop window
 ```
 
-Environment (`.env`, dev only — Phase 2 moves keys to the OS keychain):
+Keys & preferences are configured in-app: a **first-run onboarding wizard** and the **Settings** panel (⚙) collect the AI Gateway key, model, TTS engine + voice, greeting, and wake word. API keys are encrypted with your OS keychain (`safeStorage`) and never reach the renderer.
 
-| Var | Required | Default |
-|---|---|---|
-| `ELEVENLABS_API_KEY` | yes (for TTS) | — |
-| `ELEVENLABS_VOICE_ID` | no | `JBFqnCBsd6RMkjVDRZzb` (George) |
-| `AI_GATEWAY_API_KEY` | yes | — |
-| `OPENDEX_MODEL` | no | `anthropic/claude-sonnet-4-6` |
-| `TAVILY_API_KEY` | no | web-search tool disabled if absent |
+For development you can still seed values via `.env` (used as a fallback for any unset key):
+
+| Var | Notes |
+|---|---|
+| `AI_GATEWAY_API_KEY` | required to think/reply |
+| `ELEVENLABS_API_KEY` | required for ElevenLabs TTS (not needed for system voice) |
+| `ELEVENLABS_VOICE_ID` / `OPENDEX_MODEL` / `TAVILY_API_KEY` | optional overrides |
 
 ## Scripts
 

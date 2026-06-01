@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { randomUUID } from "node:crypto";
 import { IPC, type ChatMessage } from "../main/ipc/channels";
+import type {
+  DeepPartial,
+  OpenDexConfig,
+  PublicConfig,
+  SecretName,
+} from "../main/config/schema";
 
 export interface ChatRequest {
   messages: ChatMessage[];
@@ -66,6 +72,26 @@ const opendex = {
   /** Synthesise a sentence to MP3 bytes for playback in the renderer. */
   async synthesize(text: string): Promise<ArrayBuffer> {
     return ipcRenderer.invoke(IPC.ttsSynthesize, text);
+  },
+
+  /** Read the full (non-secret) config plus which secrets are present. */
+  getConfig(): Promise<PublicConfig> {
+    return ipcRenderer.invoke(IPC.configGet);
+  },
+
+  /** Patch non-secret config; returns the updated public config. */
+  setConfig(patch: DeepPartial<OpenDexConfig>): Promise<PublicConfig> {
+    return ipcRenderer.invoke(IPC.configSet, patch);
+  },
+
+  /** Store (or clear, if empty) an API key. Values never come back out. */
+  setSecret(name: SecretName, value: string): Promise<PublicConfig> {
+    return ipcRenderer.invoke(IPC.secretSet, name, value);
+  },
+
+  /** Mark first-run onboarding complete. */
+  completeOnboarding(): Promise<PublicConfig> {
+    return ipcRenderer.invoke(IPC.onboardingComplete);
   },
 };
 
