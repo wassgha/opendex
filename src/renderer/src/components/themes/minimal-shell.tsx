@@ -10,15 +10,20 @@ export function MinimalShell({
   visual,
   transcript,
   mono,
+  hideTranscript,
 }: {
   props: DexThemeProps;
   visual: ReactNode;
-  transcript: ReactNode;
+  transcript?: ReactNode;
   mono?: boolean;
+  /** Suppress the bottom transcript overlay (e.g. the cursor theme types it inline). */
+  hideTranscript?: boolean;
 }) {
   const { name, status, unsupported, canPushToTalk, onPushToTalk, briefingActive } =
     props;
-  const hasTranscript = props.transcript.length > 0 || props.liveCaption.length > 0;
+  const hasTranscript =
+    !hideTranscript &&
+    (props.transcript.length > 0 || props.liveCaption.length > 0);
 
   return (
     <div

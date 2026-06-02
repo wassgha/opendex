@@ -33,6 +33,11 @@ body {
   to { transform: rotate(0deg); }
 }
 
+@keyframes dex-bar {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
 @keyframes caret-blink {
   0%, 50% { opacity: 1; }
   50.01%, 100% { opacity: 0.15; }

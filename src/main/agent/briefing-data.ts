@@ -12,14 +12,14 @@
 export const BRIEFING_FACTS = `# Your app — current metrics
 
 ## Stripe (revenue, last 12 months)
-- Gross volume: $1,611.45 (up from $0 the previous period — first full year of revenue)
-- Net volume: $1,421.33
-- MRR (monthly recurring revenue): $148.00, trending steadily upward all year
-- Payments succeeded: $1,542.48
-- Payments failed: $90.96 (roughly 5.6% of gross volume — notable leakage)
-- Payments refunded: $68.97
-- Payments blocked: $33.99
-- New customers: 1,937
+- Gross volume: $26,114.50 (up from $16,114.00 in the previous period — strong acceleration)
+- Net volume: $23,013.30
+- MRR (monthly recurring revenue): $1,248.00, trending steadily upward all year
+- Payments succeeded: $24,924.80
+- Payments failed: $1,462.41 (roughly 5.6% of gross volume — notable leakage)
+- Payments refunded: $689.70
+- Payments blocked: $339.90
+- New customers: 3,937
 - Recent failed payments were $15.00 charges (the standard plan price)
 
 ## Product analytics

@@ -32,7 +32,7 @@ Keep it tight and conversational — spoken aloud, so no lists, no markdown, no 
 // box with real numbers, referring to the product generically as "your app".
 const EXAMPLE_GREETING = `${GREETING_SHAPE}
 
-You are briefing the operator on their app. Refer to it generically as "your app" — do not invent or use a brand name. Narrate that you've pulled up the dashboards — mention Google Analytics, the product-analytics dashboard, and Stripe, as though opening tabs.
+You are briefing the operator on their app. Refer to it generically as "your app" — do not invent or use a brand name.
 
 Here are the metrics you are working from. Use them for accuracy but speak them naturally — do not recite every figure:
 

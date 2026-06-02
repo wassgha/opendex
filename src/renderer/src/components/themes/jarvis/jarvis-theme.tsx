@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { STATUS_LABELS } from "@/lib/dex/state";
 import { JarvisReactor } from "./jarvis-reactor";
+import { HudRing, HudGauge, HudWaveform } from "./hud-widgets";
 import type { DexThemeProps } from "../types";
 import type { TranscriptTurn } from "@/lib/dex/state";
 
@@ -94,6 +95,25 @@ export function JarvisTheme(props: DexThemeProps) {
         }}
       />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(8,145,178,0.12),transparent_60%)]" />
+
+      {/* Ambient HUD satellites scattered around the reactor (decorative). */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <HudRing size={150} className="absolute left-[20%] top-[9%] opacity-50" />
+        <HudRing size={96} ticks={false} className="absolute left-[33%] top-[26%] opacity-35" />
+        <HudGauge size={86} value={0.62} label="CPU" className="absolute left-[7%] top-[34%] opacity-55" />
+        <HudGauge size={66} value={0.8} label="MEM" className="absolute left-[9%] top-[55%] opacity-45" />
+        <HudRing size={120} className="absolute left-[26%] bottom-[12%] opacity-40" />
+        <HudRing size={190} accent className="absolute right-[16%] top-[8%] opacity-45" />
+        <HudGauge size={70} value={0.45} label="NET" className="absolute right-[30%] top-[33%] opacity-50" />
+        <HudRing size={120} ticks={false} className="absolute right-[10%] bottom-[20%] opacity-40" />
+        <HudGauge size={56} value={0.66} className="absolute right-[34%] bottom-[16%] opacity-45" />
+        <HudWaveform
+          status={status}
+          getAmplitude={getAmplitude}
+          className="absolute bottom-[7%] left-1/2 w-80 -translate-x-1/2 opacity-60"
+        />
+      </div>
+
       <Corner className="left-5 top-5 border-l-2 border-t-2" />
       <Corner className="right-5 top-5 border-r-2 border-t-2" />
       <Corner className="bottom-5 left-5 border-b-2 border-l-2" />
