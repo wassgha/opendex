@@ -61,7 +61,7 @@ function HudLog({
   );
 }
 
-const SOURCES = ["Google Analytics", "Nubio", "Stripe"];
+const SOURCES = ["Google Analytics", "Product Analytics", "Stripe"];
 
 export function JarvisTheme(props: DexThemeProps) {
   const {

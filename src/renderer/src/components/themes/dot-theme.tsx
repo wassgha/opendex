@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { Transcript } from "@/components/transcript";
 import { MinimalShell } from "./minimal-shell";
+import { OverlayTranscript } from "./overlay-transcript";
 import { useAmplitudeFrame, ACTIVE_STATES } from "./use-amplitude";
 import type { DexThemeProps } from "./types";
 
@@ -36,10 +36,10 @@ export function DotTheme(props: DexThemeProps) {
       props={props}
       visual={<Dot {...props} />}
       transcript={
-        <Transcript
+        <OverlayTranscript
           turns={props.transcript}
           liveCaption={props.liveCaption}
-          placeholder={`Say “${props.wakeWord}” to begin.`}
+          variant="bubble"
         />
       }
     />

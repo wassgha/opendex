@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { MinimalShell } from "./minimal-shell";
+import { OverlayTranscript } from "./overlay-transcript";
 import { useAmplitudeFrame } from "./use-amplitude";
 import type { DexThemeProps } from "./types";
-import type { TranscriptTurn } from "@/lib/dex/state";
 
 function Caret({ status, getAmplitude }: DexThemeProps) {
   const caretRef = useRef<HTMLSpanElement>(null);
@@ -45,53 +45,6 @@ function Caret({ status, getAmplitude }: DexThemeProps) {
   );
 }
 
-function TerminalLog({
-  turns,
-  liveCaption,
-  wakeWord,
-}: {
-  turns: TranscriptTurn[];
-  liveCaption: string;
-  wakeWord: string;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [turns, liveCaption]);
-
-  if (turns.length === 0 && !liveCaption) {
-    return (
-      <div className="flex h-full items-center px-1 text-sm text-white/30">
-        <span className="text-white/40">{">"}</span>
-        <span className="ml-2">say “{wakeWord}” to begin</span>
-        <span className="ml-0.5 inline-block h-4 w-2 animate-caret-blink bg-white/40" />
-      </div>
-    );
-  }
-
-  return (
-    <div ref={scrollRef} className="h-full overflow-y-auto px-1 text-sm leading-relaxed">
-      {turns.map((t) => (
-        <div key={t.id} className="mb-1.5 flex gap-2">
-          <span className={t.role === "user" ? "text-white/40" : "text-white/30"}>
-            {t.role === "user" ? ">" : "·"}
-          </span>
-          <span className={t.role === "user" ? "text-white" : "text-white/70"}>
-            {t.content || "…"}
-          </span>
-        </div>
-      ))}
-      {liveCaption && (
-        <div className="flex gap-2 text-white/40">
-          <span>{">"}</span>
-          <span className="italic">{liveCaption}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function CursorTheme(props: DexThemeProps) {
   return (
     <MinimalShell
@@ -99,10 +52,10 @@ export function CursorTheme(props: DexThemeProps) {
       mono
       visual={<Caret {...props} />}
       transcript={
-        <TerminalLog
+        <OverlayTranscript
           turns={props.transcript}
           liveCaption={props.liveCaption}
-          wakeWord={props.wakeWord}
+          variant="line"
         />
       }
     />

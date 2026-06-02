@@ -222,7 +222,7 @@ export function SettingsPanel({
             hint="What the assistant says the first time you wake it."
             value={config.greeting.mode}
             options={[
-              { value: "example", label: "Example briefing (CoreViz demo)" },
+              { value: "example", label: "Example briefing (demo)" },
               { value: "custom", label: "Custom prompt" },
               { value: "none", label: "None — just listen" },
             ]}

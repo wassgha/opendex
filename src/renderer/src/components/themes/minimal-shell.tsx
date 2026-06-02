@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import { StatusBar } from "@/components/status-bar";
 import type { DexThemeProps } from "./types";
 
-// Shared chrome for the minimalist themes (dot, cursor). Black/white, calm.
-// Themes supply their own centred `visual` and `transcript` slots.
+// Shared chrome for the minimalist themes (dot, cursor): a solid background, a
+// centred visual, and a borderless transcript that only appears when there's
+// something to show — overlaid at the bottom and fading out as lines age.
 export function MinimalShell({
   props,
   visual,
@@ -15,42 +16,33 @@ export function MinimalShell({
   transcript: ReactNode;
   mono?: boolean;
 }) {
-  const {
-    name,
-    wakeWord,
-    status,
-    isMuted,
-    bargeInEnabled,
-    toggleMute,
-    toggleBargeIn,
-    unsupported,
-    canPushToTalk,
-    onPushToTalk,
-  } = props;
+  const { name, status, unsupported, canPushToTalk, onPushToTalk, briefingActive } =
+    props;
+  const hasTranscript = props.transcript.length > 0 || props.liveCaption.length > 0;
 
   return (
     <div
-      className={`flex flex-1 flex-col items-center justify-between px-6 py-10 sm:py-14 ${
+      className={`relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-[#0b0b0c] px-6 ${
         mono ? "font-mono" : ""
       }`}
     >
-      <header className="flex w-full max-w-3xl items-center justify-between">
+      <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-6 py-7">
         <div className="text-xs uppercase tracking-[0.4em] text-white/40">
           {name || "OpenDex"}
         </div>
         <StatusBar status={status} />
       </header>
 
-      <section className="flex flex-col items-center gap-10">
+      <section className="z-10 flex flex-col items-center gap-6">
         {canPushToTalk ? (
           <button
             type="button"
             onClick={onPushToTalk}
-            className="group flex flex-col items-center gap-2 rounded-full"
+            className="group flex flex-col items-center gap-2"
             title="Tap to talk (or press ⌘⇧Space)"
           >
             {visual}
-            <span className="text-[10px] uppercase tracking-[0.3em] text-white/40 group-hover:text-white/70">
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/30 transition group-hover:text-white/60">
               Tap to talk
             </span>
           </button>
@@ -58,57 +50,36 @@ export function MinimalShell({
           visual
         )}
 
-        {props.briefingActive && (
+        {briefingActive && (
           <div className="text-[10px] uppercase tracking-[0.35em] text-white/40">
             Pulling up your dashboards…
           </div>
         )}
 
-        {unsupported ? (
-          <p className="max-w-sm text-center text-sm text-white/60">
-            Web Speech recognition isn’t available in the desktop app. Open
-            Settings (top-right) → Voice input and set Transcription to
-            <span className="text-white/80"> OpenAI Whisper</span> (add an OpenAI
-            key), or choose Push-to-talk.
+        {unsupported && (
+          <p className="max-w-sm text-center text-sm text-white/55">
+            Web Speech recognition isn’t available here. Open Settings (top-right)
+            → Voice input and pick a local or OpenAI transcription engine.
           </p>
-        ) : (
-          <div className="flex flex-col items-center gap-4">
-            {status !== "error" && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={toggleMute}
-                  className="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm text-white/80 transition hover:bg-white/10"
-                >
-                  {isMuted ? "Unmute" : "Mute"}
-                </button>
-                <button
-                  onClick={toggleBargeIn}
-                  aria-pressed={bargeInEnabled}
-                  className={`rounded-full px-5 py-2 text-sm transition ${
-                    bargeInEnabled
-                      ? "border border-white/40 bg-white/15 text-white hover:bg-white/20"
-                      : "border border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
-                  }`}
-                  title="Allow interrupting mid-reply. Requires headphones to avoid echo loops."
-                >
-                  Interrupt: {bargeInEnabled ? "on" : "off"}
-                </button>
-              </div>
-            )}
-            <p className="max-w-md text-center text-xs text-white/40">
-              {status === "error"
-                ? "Microphone access was denied. Restart OpenDex to try again."
-                : `Say “${wakeWord}” to begin. After a reply, ask follow-ups freely.`}
-            </p>
-          </div>
         )}
       </section>
 
-      <section className="flex w-full max-w-3xl flex-col">
-        <div className="h-72 rounded-2xl border border-white/10 bg-white/[0.02] p-4 backdrop-blur">
-          {transcript}
+      {/* Borderless transcript overlay — only when there's content, fading up. */}
+      {hasTranscript && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center">
+          <div
+            className="max-h-[42vh] w-full max-w-2xl overflow-hidden px-6 pb-10"
+            style={{
+              maskImage:
+                "linear-gradient(to top, black 0%, black 55%, transparent 100%)",
+              WebkitMaskImage:
+                "linear-gradient(to top, black 0%, black 55%, transparent 100%)",
+            }}
+          >
+            {transcript}
+          </div>
         </div>
-      </section>
+      )}
     </div>
   );
 }

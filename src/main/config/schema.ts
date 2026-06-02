@@ -30,7 +30,7 @@ export interface OpenDexConfig {
     system: { voiceURI: string | null; rate: number; pitch: number };
   };
   greeting: {
-    /** example = bundled CoreViz briefing · custom = user prompt · none = no proactive greeting */
+    /** example = bundled demo briefing · custom = user prompt · none = no proactive greeting */
     mode: GreetingMode;
     customPrompt: string;
   };

@@ -189,7 +189,7 @@ export function OnboardingWizard({
             label="Proactive greeting"
             value={config.greeting.mode}
             options={[
-              { value: "example", label: "Example briefing (CoreViz demo)" },
+              { value: "example", label: "Example briefing (demo)" },
               { value: "custom", label: "Custom prompt" },
               { value: "none", label: "None — just listen" },
             ]}

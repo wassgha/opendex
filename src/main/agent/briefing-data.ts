@@ -1,6 +1,6 @@
-// Real metrics transcribed from the operator's dashboards (Stripe, the Nubio
-// product-analytics dashboard, and Google Analytics). Used to ground the assistant's
-// "morning briefing" so the spoken numbers are accurate rather than invented.
+// Example metrics for the bundled briefing profile (real numbers from Stripe, a
+// product-analytics dashboard, and Google Analytics). Used to ground the
+// assistant's spoken briefing so the numbers are accurate rather than invented.
 //
 // The product is referred to generically as "your app" — no brand name.
 
@@ -22,7 +22,7 @@ export const BRIEFING_FACTS = `# Your app — current metrics
 - New customers: 1,937
 - Recent failed payments were $15.00 charges (the standard plan price)
 
-## Nubio (product analytics)
+## Product analytics
 - Total registered users: 3,577
 - Monthly signups: December 220, January 390, February 340, March 270, April 310, May 360
 - Signups dipped in March then recovered; May is the second-strongest month
