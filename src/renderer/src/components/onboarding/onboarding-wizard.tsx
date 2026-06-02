@@ -128,11 +128,12 @@ export function OnboardingWizard({
         <>
           <SelectField
             label="How to start listening"
-            hint="Push-to-talk needs no extra signup and works everywhere."
+            hint="Push-to-talk and Vosk need no paid key."
             value={config.voiceInput.wakeMode}
             options={[
               { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
-              { value: "porcupine", label: "Wake word (hands-free)" },
+              { value: "vosk", label: "Wake word (Vosk — free, offline)" },
+              { value: "porcupine", label: "Wake word (Porcupine)" },
               { value: "webspeech", label: "Wake word (Web Speech)" },
             ]}
             onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, wakeMode: v } })}
@@ -147,9 +148,11 @@ export function OnboardingWizard({
           )}
           <SelectField
             label="Transcription"
-            hint="OpenAI is the reliable option inside the desktop app."
+            hint="Local options are free + offline (one-time model download)."
             value={config.voiceInput.sttProvider}
             options={[
+              { value: "whisper-local", label: "Local Whisper (free, offline)" },
+              { value: "vosk-local", label: "Local Vosk (free, offline)" },
               { value: "openai", label: "OpenAI Whisper (cloud)" },
               { value: "webspeech", label: "Web Speech (browser)" },
             ]}

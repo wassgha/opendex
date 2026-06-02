@@ -3,10 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Electron: lock down what the renderer may load. -->
+    <!-- Electron CSP. blob: workers + eval are needed by the in-renderer WASM
+         voice engines: Porcupine and the ONNX runtime need 'wasm-unsafe-eval',
+         and Vosk's emscripten WASM additionally requires 'unsafe-eval'. (This
+         loosens script-src; it's a deliberate tradeoff for the offline Vosk
+         engine. The renderer only loads our own bundle + trusted model CDNs.)
+         connect-src allows on-demand model downloads (Hugging Face for Whisper,
+         GitHub Pages for the Vosk model, jsDelivr for the ONNX runtime). -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com"
+      content="default-src 'self';
+        script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' blob:;
+        worker-src 'self' blob:;
+        child-src 'self' blob:;
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        media-src 'self' blob:;
+        connect-src 'self' blob: data:
+          https://geocoding-api.open-meteo.com https://api.open-meteo.com
+          https://huggingface.co https://*.huggingface.co https://*.hf.co
+          https://cdn.jsdelivr.net https://ccoreilly.github.io"
     />
     <title>OpenDex</title>
   </head>

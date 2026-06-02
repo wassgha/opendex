@@ -72,10 +72,11 @@ export function SettingsPanel({
         <Section title="Voice input">
           <SelectField
             label="How to start listening"
-            hint="Push-to-talk works without any extra signup."
+            hint="Push-to-talk and Vosk work without any paid key."
             value={config.voiceInput.wakeMode}
             options={[
               { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
+              { value: "vosk", label: "Wake word (Vosk — free, offline)" },
               { value: "porcupine", label: "Wake word (Porcupine, hands-free)" },
               { value: "webspeech", label: "Wake word (Web Speech — browser)" },
             ]}
@@ -109,9 +110,11 @@ export function SettingsPanel({
           )}
           <SelectField
             label="Transcription (speech-to-text)"
-            hint="OpenAI works reliably inside the desktop app; Web Speech needs a browser."
+            hint="Whisper-local and Vosk-local are free and offline (one-time model download)."
             value={config.voiceInput.sttProvider}
             options={[
+              { value: "whisper-local", label: "Local Whisper (free, offline)" },
+              { value: "vosk-local", label: "Local Vosk (free, offline, fast)" },
               { value: "openai", label: "OpenAI Whisper (cloud)" },
               { value: "webspeech", label: "Web Speech (browser)" },
             ]}
@@ -123,6 +126,21 @@ export function SettingsPanel({
               hint="Used in the main process to transcribe captured audio."
               present={secrets.OPENAI_API_KEY}
               onSave={(v) => setSecret("OPENAI_API_KEY", v)}
+            />
+          )}
+          {config.voiceInput.sttProvider === "whisper-local" && (
+            <SelectField
+              label="Whisper model"
+              hint="Bigger = more accurate but larger download + slower on CPU."
+              value={config.voiceInput.whisperModel}
+              options={[
+                { value: "Xenova/whisper-tiny.en", label: "tiny.en (~75MB)" },
+                { value: "Xenova/whisper-base.en", label: "base.en (~145MB)" },
+                { value: "Xenova/whisper-small.en", label: "small.en (~480MB)" },
+              ]}
+              onChange={(v) =>
+                setConfig({ voiceInput: { ...config.voiceInput, whisperModel: v } })
+              }
             />
           )}
         </Section>

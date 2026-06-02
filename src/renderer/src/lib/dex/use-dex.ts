@@ -14,9 +14,14 @@ import {
 } from "./speech-engine";
 import { AudioMeter } from "./audio-meter";
 import { CloudSttEngine } from "./engines/cloud-stt";
-import type { PorcupineWakeEngine } from "./engines/porcupine-wake";
+import type { SttEngine, WakeEngine } from "./engines/types";
 import type { DexStatus, TranscriptTurn } from "./state";
 import type { SttProvider, WakeMode } from "../../../../main/config/schema";
+
+export interface ModelLoadingState {
+  active: boolean;
+  label: string;
+}
 
 // A smooth, organic synthetic loudness envelope (0..1) used for speaking/
 // thinking states where we don't meter the actual audio. Layered sines give it
@@ -72,6 +77,8 @@ export interface UseDexOptions {
   porcupineKeyword: string;
   /** Which engine transcribes captured commands. */
   sttProvider: SttProvider;
+  /** transformers.js Whisper model id (local STT). */
+  whisperModel: string;
   /** Whether a proactive greeting fires on the first wake. */
   greetingEnabled: boolean;
   /** Which speech engine to use for spoken output. */
@@ -88,6 +95,8 @@ export interface UseDexResult {
   audioBlocked: boolean;
   bargeInEnabled: boolean;
   briefingActive: boolean;
+  /** Local model download/load progress (Whisper / Vosk). */
+  loadingModel: ModelLoadingState;
   /** True when the user can tap/hotkey to talk (manual wake mode, idle). */
   canPushToTalk: boolean;
   pushToTalk: () => void;
@@ -115,12 +124,16 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [bargeInEnabled, setBargeInEnabled] = useState(false);
   const [briefingActive, setBriefingActive] = useState(false);
+  const [loadingModel, setLoadingModel] = useState<ModelLoadingState>({
+    active: false,
+    label: "",
+  });
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const bargeRef = useRef<SpeechRecognitionInstance | null>(null);
   // Phase 4 engines (instantiated only for their respective modes).
-  const porcupineRef = useRef<PorcupineWakeEngine | null>(null);
-  const cloudSttRef = useRef<CloudSttEngine | null>(null);
+  const wakeEngineRef = useRef<WakeEngine | null>(null);
+  const sttEngineRef = useRef<{ provider: SttProvider; engine: SttEngine } | null>(null);
   const sttAbortRef = useRef<AbortController | null>(null);
   const modeRef = useRef<Mode>("off");
   const ttsRef = useRef<SpeechEngine | null>(null);
@@ -218,11 +231,43 @@ export function useDex(options: UseDexOptions): UseDexResult {
     recognitionRef.current = null;
   }, []);
 
-  const stopPorcupine = useCallback(() => {
-    const engine = porcupineRef.current;
-    porcupineRef.current = null;
+  const stopWakeEngine = useCallback(() => {
+    const engine = wakeEngineRef.current;
+    wakeEngineRef.current = null;
     void engine?.dispose();
   }, []);
+
+  // Lazily create (and cache) the STT engine for the configured provider.
+  // Local engines are dynamic-imported so their WASM only loads when chosen.
+  const ensureSttEngine = useCallback(
+    async (provider: SttProvider, whisperModel: string): Promise<SttEngine> => {
+      if (sttEngineRef.current?.provider === provider) {
+        return sttEngineRef.current.engine;
+      }
+      sttEngineRef.current?.engine.dispose();
+      let engine: SttEngine;
+      if (provider === "openai") {
+        engine = new CloudSttEngine("openai");
+      } else if (provider === "whisper-local") {
+        const { WhisperSttEngine } = await import("./engines/whisper-stt");
+        engine = new WhisperSttEngine(whisperModel, (p) =>
+          setLoadingModel({ active: p.progress < 100, label: p.label }),
+        );
+        void engine.preload?.();
+      } else if (provider === "vosk-local") {
+        const { VoskSttEngine } = await import("./engines/vosk-stt");
+        engine = new VoskSttEngine(undefined, (loading) =>
+          setLoadingModel({ active: loading, label: "Loading voice model…" }),
+        );
+        void engine.preload?.();
+      } else {
+        throw new Error(`Unknown cloud/local STT provider: ${provider}`);
+      }
+      sttEngineRef.current = { provider, engine };
+      return engine;
+    },
+    [],
+  );
 
   const abortStt = useCallback(() => {
     sttAbortRef.current?.abort();
@@ -460,7 +505,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const startMode = useCallback(
     (mode: Mode) => {
       stopRecognition();
-      stopPorcupine();
+      stopWakeEngine();
       abortStt();
       clearTimers();
       modeRef.current = mode;
@@ -476,6 +521,15 @@ export function useDex(options: UseDexOptions): UseDexResult {
       if (mode === "wake") {
         setStatus("listening_wake");
         setLiveCaption("");
+
+        // Warm a local STT model now so the first capture isn't blocked on a
+        // (potentially large) one-time download.
+        if (
+          opts.sttProvider === "whisper-local" ||
+          opts.sttProvider === "vosk-local"
+        ) {
+          void ensureSttEngine(opts.sttProvider, opts.whisperModel).catch(() => {});
+        }
 
         // Fire the proactive greeting on first wake (if enabled), else listen
         // for a command.
@@ -511,7 +565,27 @@ export function useDex(options: UseDexOptions): UseDexResult {
                 if (s !== "ok") setStatus("unsupported");
               },
             );
-            porcupineRef.current = engine;
+            wakeEngineRef.current = engine;
+            await engine.start(onWake);
+          })();
+          return;
+        }
+
+        if (opts.wakeMode === "vosk") {
+          void (async () => {
+            // Code-split: the Vosk WASM loads only in this mode.
+            const { VoskWakeEngine } = await import("./engines/vosk-wake");
+            if (modeRef.current !== "wake") return;
+            const engine = new VoskWakeEngine(
+              opts.wakeWord,
+              undefined,
+              (s) => {
+                if (s !== "ok") setStatus("unsupported");
+              },
+              (loading) =>
+                setLoadingModel({ active: loading, label: "Loading wake model…" }),
+            );
+            wakeEngineRef.current = engine;
             await engine.start(onWake);
           })();
           return;
@@ -615,19 +689,21 @@ export function useDex(options: UseDexOptions): UseDexResult {
       const silenceMs =
         mode === "follow_up" ? FOLLOW_UP_SILENCE_MS : COMMAND_SILENCE_MS;
 
-      // Cloud STT: capture an utterance, transcribe in main, then run it.
-      if (opts.sttProvider === "openai") {
+      // Cloud / local STT: capture an utterance via the chosen engine, then run
+      // it. (openai = main-process Whisper; whisper-local / vosk-local = offline
+      // WASM in the renderer.)
+      if (opts.sttProvider !== "webspeech") {
         const ac = new AbortController();
         sttAbortRef.current = ac;
-        const engine =
-          cloudSttRef.current ?? (cloudSttRef.current = new CloudSttEngine("openai"));
-        engine
-          .capture({
-            silenceMs,
-            hardTimeoutMs: COMMAND_HARD_TIMEOUT_MS,
-            signal: ac.signal,
-          })
-          .then((text) => {
+        void (async () => {
+          try {
+            const engine = await ensureSttEngine(opts.sttProvider, opts.whisperModel);
+            if (ac.signal.aborted) return;
+            const text = await engine.capture({
+              silenceMs,
+              hardTimeoutMs: COMMAND_HARD_TIMEOUT_MS,
+              signal: ac.signal,
+            });
             if (ac.signal.aborted) return;
             const cleaned = text.trim();
             if (!cleaned) {
@@ -652,12 +728,12 @@ export function useDex(options: UseDexOptions): UseDexResult {
               }
             }
             void runCommand(cleaned);
-          })
-          .catch((err) => {
+          } catch (err) {
             if (ac.signal.aborted) return;
-            console.error("[opendex] cloud stt error", err);
+            console.error("[opendex] stt error", err);
             startModeRef.current?.("wake");
-          });
+          }
+        })();
         return;
       }
 
@@ -762,12 +838,19 @@ export function useDex(options: UseDexOptions): UseDexResult {
           }
           return;
         }
-        if (
-          event.error === "not-allowed" ||
-          event.error === "service-not-allowed"
-        ) {
+        if (event.error === "not-allowed") {
           setStatus("error");
           resolved = true;
+          return;
+        }
+        // Web Speech reaches a remote service that's unavailable in Electron
+        // (logs "OnSizeReceived failed -2"). Don't fail silently — surface that
+        // transcription needs switching to a cloud provider.
+        if (event.error === "network" || event.error === "service-not-allowed") {
+          resolved = true;
+          clearTimers();
+          stopRecognition();
+          setStatus("unsupported");
           return;
         }
       };
@@ -778,7 +861,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
         console.error("[opendex] failed to start command recognition", err);
       }
     },
-    [abortStt, clearTimers, runCommand, stopPorcupine, stopRecognition],
+    [abortStt, clearTimers, ensureSttEngine, runCommand, stopWakeEngine, stopRecognition],
   );
 
   startModeRef.current = startMode;
@@ -893,7 +976,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     restartGuardRef.current = true;
     clearTimers();
     stopRecognition();
-    stopPorcupine();
+    stopWakeEngine();
     abortStt();
     stopBargeMonitor();
     runningCommandRef.current?.abortController.abort();
@@ -903,10 +986,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
     modeRef.current = "off";
+    setLoadingModel({ active: false, label: "" });
     setStatus("idle");
     setLiveCaption("");
     restartGuardRef.current = false;
-  }, [abortStt, clearTimers, stopBargeMonitor, stopPorcupine, stopRecognition]);
+  }, [abortStt, clearTimers, stopBargeMonitor, stopWakeEngine, stopRecognition]);
 
   const toggleMute = useCallback(() => {
     setIsMuted((current) => {
@@ -940,17 +1024,19 @@ export function useDex(options: UseDexOptions): UseDexResult {
       restartGuardRef.current = true;
       clearTimers();
       stopRecognition();
-      stopPorcupine();
+      stopWakeEngine();
       abortStt();
       stopBargeMonitor();
       runningCommandRef.current?.abortController.abort();
       ttsRef.current?.stop();
+      sttEngineRef.current?.engine.dispose();
+      sttEngineRef.current = null;
       meterRef.current?.dispose();
       meterRef.current = null;
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
       micStreamRef.current = null;
     };
-  }, [abortStt, clearTimers, stopBargeMonitor, stopPorcupine, stopRecognition]);
+  }, [abortStt, clearTimers, stopBargeMonitor, stopWakeEngine, stopRecognition]);
 
   // Global hotkey (registered in main) → push to talk, in manual wake mode.
   useEffect(() => {
@@ -970,6 +1056,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     audioBlocked,
     bargeInEnabled,
     briefingActive,
+    loadingModel,
     canPushToTalk,
     pushToTalk,
     getAmplitude,

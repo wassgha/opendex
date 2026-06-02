@@ -2,16 +2,14 @@
 // product-analytics dashboard, and Google Analytics). Used to ground the assistant's
 // "morning briefing" so the spoken numbers are accurate rather than invented.
 //
-// The product is CoreViz Studio — an AI tool for exploring, organising, and
-// searching visual media (notable features: 2D-to-3D Floor Plan, AI Image
-// Similarity).
+// The product is referred to generically as "your app" — no brand name.
 
 // Note: the UI-side list of "sources" (the tab chips shown during the briefing)
 // lives in the renderer at src/renderer/src/lib/briefing-sources.ts, since it is
 // pure display data. This module is main-process only and holds the facts that
 // ground the spoken briefing.
 
-export const BRIEFING_FACTS = `# CoreViz Studio — current metrics
+export const BRIEFING_FACTS = `# Your app — current metrics
 
 ## Stripe (revenue, last 12 months)
 - Gross volume: $1,611.45 (up from $0 the previous period — first full year of revenue)
@@ -44,10 +42,10 @@ export const BRIEFING_FACTS = `# CoreViz Studio — current metrics
   - threads / referral: 116
   - twitter (t.co) / referral: 92
 - Top pages by views and bounce rate:
-  - Studio (main app): 7,700 views, 13.3% bounce — healthy
-  - CoreViz Studio – Organize: 5,600 views, 66.6% bounce — high
+  - Main app: 7,700 views, 13.3% bounce — healthy
+  - Organize: 5,600 views, 66.6% bounce — high
   - "Not Available in Your Region": 2,100 views, 84.8% bounce — a large slice of traffic is being geo-blocked and lost
-  - Welcome to CoreViz Studio: 732 views, 4.3% bounce — excellent
+  - Welcome page: 732 views, 4.3% bounce — excellent
   - 2D to 3D Floor Plan: 776 views, 38.3% bounce
   - AI Image Similarity Tool: 708 views, 36.0% bounce
 

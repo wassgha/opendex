@@ -33,5 +33,10 @@ OpenDex is an **Electron** desktop app (electron-vite + React + Tailwind v4). It
 - Porcupine English params bundled at `src/renderer/public/models/porcupine_params.pv`; the Porcupine engine is dynamic-imported so its ~3.6MB WASM chunk loads only in `porcupine` mode (main bundle stays ~870KB).
 - Manual mode: `useDex().pushToTalk()` + `canPushToTalk`; themes make the visualization tap-to-talk. Global hotkey registered in main (`globalShortcut`) → `push-to-talk` IPC event → `onPushToTalk` (preload) → `pushToTalk()`.
 
+## Free offline engines (Phase 4b)
+- STT providers now also include **`whisper-local`** (transformers.js Whisper, WASM/WebGPU — `engines/whisper-stt.ts`) and **`vosk-local`** (vosk-browser WASM — `engines/vosk-stt.ts`); wake modes include **`vosk`** (free, no-signup, hands-free keyword spotting — `engines/vosk-wake.ts`). All free, offline, no key (one-time model download, cached). `engines/frame-capture.ts` is the shared WVP capture + endpointing helper; `engines/vosk-model.ts` caches the Vosk model.
+- All heavy engines are **dynamic-imported** → code-split: main bundle ~900KB; ORT WASM (~23MB), Vosk (~5.8MB), Porcupine (~3.7MB), Whisper glue (~1.2MB) load only when their mode is selected, and are bundled locally (offline-capable). Local STT model is preloaded when entering wake mode so the first capture isn't blocked; `useDex().loadingModel` drives a global download banner in `App.tsx`.
+- **CSP note:** Vosk's emscripten WASM requires `'unsafe-eval'` in `script-src` (Porcupine + ORT only need `'wasm-unsafe-eval'`). This is set in `src/renderer/index.html` as a deliberate tradeoff; removing the Vosk engine would let us tighten it back.
+
 ## Status
-Phases 1–4a done. **4b** = offline local Whisper (transformers.js). Roadmap: skills+MCP → computer-use → releases. **Default voice input is still Web Speech (unreliable in Electron); switch to "Push to talk + OpenAI Whisper" in Settings/onboarding for reliable desktop voice.**
+Phases 1–4 done (4a cloud/web + 4b free offline). Roadmap: skills+MCP → computer-use → releases. **Default voice input is still Web Speech; for reliable desktop voice pick Push-to-talk (or Vosk wake) + a local Whisper/Vosk or OpenAI transcription in Settings/onboarding.**

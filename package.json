@@ -14,10 +14,12 @@
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.49.1",
+    "@huggingface/transformers": "^4.2.0",
     "@picovoice/porcupine-web": "^4.0.0",
     "@picovoice/web-voice-processor": "^4.0.10",
     "ai": "^6.0.193",
     "dotenv": "^17.4.2",
+    "vosk-browser": "^0.0.8",
     "zod": "^4.4.3"
   },
   "devDependencies": {

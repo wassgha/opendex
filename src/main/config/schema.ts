@@ -3,8 +3,8 @@
 
 export type TtsEngine = "elevenlabs" | "system";
 export type GreetingMode = "example" | "custom" | "none";
-export type WakeMode = "webspeech" | "manual" | "porcupine";
-export type SttProvider = "webspeech" | "openai";
+export type WakeMode = "webspeech" | "manual" | "porcupine" | "vosk";
+export type SttProvider = "webspeech" | "openai" | "whisper-local" | "vosk-local";
 export type SecretName =
   | "AI_GATEWAY_API_KEY"
   | "ELEVENLABS_API_KEY"
@@ -41,6 +41,8 @@ export interface OpenDexConfig {
     porcupineKeyword: string;
     /** Which engine transcribes the captured command. */
     sttProvider: SttProvider;
+    /** transformers.js Whisper model id (local STT). */
+    whisperModel: string;
   };
   appearance: {
     /** Voice-visualization theme id (used from the themes phase onward). */
@@ -74,13 +76,13 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     elevenLabs: { voiceId: "JBFqnCBsd6RMkjVDRZzb", modelId: "eleven_turbo_v2_5" },
     system: { voiceURI: null, rate: 1, pitch: 1 },
   },
-  // Default to the bundled CoreViz example so the demo works out of the box;
-  // users change this during onboarding or in settings.
-  greeting: { mode: "example", customPrompt: "" },
+  greeting: { mode: "none", customPrompt: "" },
   voiceInput: {
-    wakeMode: "webspeech",
+    // Free, offline defaults: Vosk wake word + local Whisper transcription.
+    wakeMode: "vosk",
     porcupineKeyword: "jarvis",
-    sttProvider: "webspeech",
+    sttProvider: "whisper-local",
+    whisperModel: "Xenova/whisper-base.en",
   },
   appearance: { theme: "jarvis" },
   onboarding: { completed: false },

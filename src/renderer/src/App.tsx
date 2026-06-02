@@ -60,6 +60,7 @@ function MainExperience({
       wakeMode: cfg.voiceInput.wakeMode,
       porcupineKeyword: cfg.voiceInput.porcupineKeyword,
       sttProvider: cfg.voiceInput.sttProvider,
+      whisperModel: cfg.voiceInput.whisperModel,
       greetingEnabled: greetingEnabled(cfg),
       ttsEngine: cfg.tts.engine,
       systemVoice: cfg.tts.system,
@@ -69,6 +70,7 @@ function MainExperience({
       cfg.voiceInput.wakeMode,
       cfg.voiceInput.porcupineKeyword,
       cfg.voiceInput.sttProvider,
+      cfg.voiceInput.whisperModel,
       cfg.greeting.mode,
       cfg.greeting.customPrompt,
       cfg.tts.engine,
@@ -106,6 +108,15 @@ function MainExperience({
       >
         ⚙
       </button>
+
+      {dex.loadingModel.active && (
+        <div className="fixed inset-x-0 top-16 z-30 flex justify-center">
+          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-black/70 px-5 py-2 text-sm text-white/80 backdrop-blur">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+            {dex.loadingModel.label || "Loading voice model…"}
+          </div>
+        </div>
+      )}
 
       {dex.audioBlocked && (
         <button

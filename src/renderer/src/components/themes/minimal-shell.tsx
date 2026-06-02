@@ -66,8 +66,10 @@ export function MinimalShell({
 
         {unsupported ? (
           <p className="max-w-sm text-center text-sm text-white/60">
-            Voice recognition isn’t available in this environment yet. Local
-            wake-word and speech-to-text engines arrive in a later release.
+            Web Speech recognition isn’t available in the desktop app. Open
+            Settings (top-right) → Voice input and set Transcription to
+            <span className="text-white/80"> OpenAI Whisper</span> (add an OpenAI
+            key), or choose Push-to-talk.
           </p>
         ) : (
           <div className="flex flex-col items-center gap-4">

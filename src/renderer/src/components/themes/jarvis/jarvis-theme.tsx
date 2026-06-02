@@ -160,8 +160,9 @@ export function JarvisTheme(props: DexThemeProps) {
 
         {unsupported ? (
           <p className="font-mono text-[11px] leading-relaxed text-cyan-300/50">
-            Voice recognition unavailable in this environment. Local wake/STT
-            engines arrive in a later release.
+            Web Speech unavailable in the desktop app. Settings → Voice input →
+            set Transcription to OpenAI Whisper (add an OpenAI key), or use
+            Push-to-talk.
           </p>
         ) : (
           status !== "error" && (

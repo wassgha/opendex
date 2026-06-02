@@ -22,5 +22,7 @@ export interface CaptureOptions {
 export interface SttEngine {
   /** Capture one utterance and resolve its transcript ("" if nothing heard). */
   capture(opts: CaptureOptions): Promise<string>;
+  /** Optional: warm a local model (triggers download) before first capture. */
+  preload?(): Promise<void>;
   dispose(): void;
 }
