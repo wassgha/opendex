@@ -53,7 +53,7 @@ export interface PublicConfig {
 
 export const DEFAULT_CONFIG: OpenDexConfig = {
   version: 1,
-  assistant: { name: "Jarvis", wakeWord: "jarvis" },
+  assistant: { name: "Dex", wakeWord: "dex" },
   llm: { model: "anthropic/claude-sonnet-4-6" },
   tts: {
     engine: "elevenlabs",

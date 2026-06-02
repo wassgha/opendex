@@ -126,4 +126,4 @@ export const tools = {
   webSearch,
 } as const;
 
-export type JarvisTools = typeof tools;
+export type DexTools = typeof tools;

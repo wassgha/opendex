@@ -1,9 +1,9 @@
-export type JarvisStatus =
+export type DexStatus =
   | "idle" // very brief — before auto-engage fires
-  | "listening_wake" // continuous recognition waiting for "Jarvis"
+  | "listening_wake" // continuous recognition waiting for the wake word
   | "active_listening" // captured wake word, listening for command
   | "follow_up_listening" // listening for a follow-up turn after a reply
-  | "thinking" // hitting /api/chat
+  | "thinking" // querying the agent
   | "speaking" // audio playing
   | "muted" // wake-word loop paused
   | "error" // unrecoverable error
@@ -15,9 +15,9 @@ export interface TranscriptTurn {
   content: string;
 }
 
-export const STATUS_LABELS: Record<JarvisStatus, string> = {
+export const STATUS_LABELS: Record<DexStatus, string> = {
   idle: "Initialising…",
-  listening_wake: "Listening for “Jarvis”…",
+  listening_wake: "Standing by…",
   active_listening: "Listening…",
   follow_up_listening: "Anything else, sir?",
   thinking: "Thinking…",

@@ -1,5 +1,5 @@
 // Real metrics transcribed from the operator's dashboards (Stripe, the Nubio
-// product-analytics dashboard, and Google Analytics). Used to ground Jarvis's
+// product-analytics dashboard, and Google Analytics). Used to ground the assistant's
 // "morning briefing" so the spoken numbers are accurate rather than invented.
 //
 // The product is CoreViz Studio — an AI tool for exploring, organising, and

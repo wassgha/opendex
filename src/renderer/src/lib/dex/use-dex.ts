@@ -12,14 +12,27 @@ import {
   type SpeechEngineKind,
   type SystemVoiceOptions,
 } from "./speech-engine";
-import type { JarvisStatus, TranscriptTurn } from "./state";
+import { AudioMeter } from "./audio-meter";
+import type { DexStatus, TranscriptTurn } from "./state";
+
+// A smooth, organic synthetic loudness envelope (0..1) used for speaking/
+// thinking states where we don't meter the actual audio. Layered sines give it
+// life without looking like a pure sine wave.
+function syntheticEnvelope(intensity: number): number {
+  const t = performance.now() / 1000;
+  const v =
+    Math.sin(t * 7.0) * 0.5 +
+    Math.sin(t * 11.3 + 1.1) * 0.3 +
+    Math.sin(t * 17.7 + 2.3) * 0.2;
+  return Math.max(0, Math.min(1, 0.55 + v * 0.45)) * intensity;
+}
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function buildWakeRegex(word: string): RegExp {
-  const cleaned = word.trim() || "jarvis";
+  const cleaned = word.trim() || "dex";
   return new RegExp(`\\b${escapeRegExp(cleaned)}\\b`, "i");
 }
 
@@ -34,7 +47,7 @@ const POST_TTS_COOLDOWN_MS = 800;
 // dropped, regardless of confidence.
 const FOLLOW_UP_ECHO_WINDOW_MS = 4500;
 const FOLLOW_UP_ECHO_REJECT_RATIO = 0.45;
-// Barge-in (interrupting Jarvis while he speaks) is opt-in. Without proper
+// Barge-in (interrupting the assistant while it speaks) is opt-in. Without proper
 // hardware AEC, listening while audio plays produces echo-induced loops.
 const BARGE_COOLDOWN_MS = 1200;
 const BARGE_MIN_CHARS = 16;
@@ -47,7 +60,7 @@ interface RunningCommand {
   getPartialReply: () => string;
 }
 
-export interface UseJarvisOptions {
+export interface UseDexOptions {
   /** Wake word that triggers active listening. */
   wakeWord: string;
   /** Whether a proactive greeting fires on the first wake. */
@@ -58,25 +71,32 @@ export interface UseJarvisOptions {
   systemVoice: SystemVoiceOptions;
 }
 
-export interface UseJarvisResult {
-  status: JarvisStatus;
+export interface UseDexResult {
+  status: DexStatus;
   transcript: TranscriptTurn[];
   liveCaption: string;
   isMuted: boolean;
   audioBlocked: boolean;
   bargeInEnabled: boolean;
   briefingActive: boolean;
+  /** Current voice loudness, 0..1 — real mic level while listening, a synthetic
+   *  envelope while speaking/thinking. Sampled by the visualization via rAF. */
+  getAmplitude: () => number;
   unlockAudio: () => void;
   stop: () => void;
   toggleMute: () => void;
   toggleBargeIn: () => void;
 }
 
-export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
+export function useDex(options: UseDexOptions): UseDexResult {
   // Latest options, readable from event handlers without re-binding them.
   const optionsRef = useRef(options);
   optionsRef.current = options;
-  const [status, setStatus] = useState<JarvisStatus>("idle");
+  const [status, setStatus] = useState<DexStatus>("idle");
+  // Mirror of status for rAF-driven reads (getAmplitude) without re-binding.
+  const statusRef = useRef<DexStatus>("idle");
+  statusRef.current = status;
+  const meterRef = useRef<AudioMeter | null>(null);
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [liveCaption, setLiveCaption] = useState("");
   const [isMuted, setIsMuted] = useState(false);
@@ -214,7 +234,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
         if (heard.length < BARGE_MIN_CHARS) return;
 
         // Echo filter: reject heard text where most words appear in
-        // Jarvis's own recent reply.
+        // the assistant's own recent reply.
         const heardWords = heard
           .toLowerCase()
           .split(/\s+/)
@@ -245,7 +265,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
       try {
         rec.start();
       } catch (err) {
-        console.error("[jarvis] failed to start barge monitor", err);
+        console.error("[opendex] failed to start barge monitor", err);
       }
     },
     [stopBargeMonitor],
@@ -292,7 +312,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
       };
 
       // Only arm the barge monitor if the user has opted into interruption.
-      // Without proper hardware AEC, listening while Jarvis speaks produces
+      // Without proper hardware AEC, listening while the assistant speaks produces
       // self-triggered loops.
       if (bargeInEnabledRef.current) {
         bargeOnSpeakingRef.current = () => startBargeMonitor(handleBarge);
@@ -373,7 +393,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
 
       // Wait for the TTS queue to drain, then transition to follow-up listening
       // after a short cooldown that lets the speaker output fully flush so the
-      // mic doesn't pick up the tail of Jarvis's own voice.
+      // mic doesn't pick up the tail of the assistant's own voice.
       const waitForDrain = () =>
         new Promise<void>((resolve) => {
           const check = () => {
@@ -508,7 +528,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
         try {
           rec.start();
         } catch (err) {
-          console.error("[jarvis] failed to start wake recognition", err);
+          console.error("[opendex] failed to start wake recognition", err);
         }
         return;
       }
@@ -559,7 +579,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
         const live = interimText || finalText;
 
         // Echo guard: within the early window of follow-up listening, drop
-        // transcripts that look like the tail of Jarvis's reply leaking through
+        // transcripts that look like the tail of the assistant's reply leaking through
         // the mic. We compare against the just-finished assistant words.
         if (
           mode === "follow_up" &&
@@ -621,7 +641,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
       try {
         rec.start();
       } catch (err) {
-        console.error("[jarvis] failed to start command recognition", err);
+        console.error("[opendex] failed to start command recognition", err);
       }
     },
     [clearTimers, runCommand, stopRecognition],
@@ -676,16 +696,35 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
           },
         });
       } catch (err) {
-        console.error("[jarvis] mic permission denied", err);
+        console.error("[opendex] mic permission denied", err);
         setStatus("error");
         return;
       }
     }
+    // Meter the mic so visualizations react to the user's voice while listening.
+    if (!meterRef.current) meterRef.current = new AudioMeter();
+    meterRef.current.attachMicStream(micStreamRef.current);
     ensureTts();
     mutedRef.current = false;
     setIsMuted(false);
     startMode("wake");
   }, [ensureTts, startMode]);
+
+  const getAmplitude = useCallback(() => {
+    const s = statusRef.current;
+    if (
+      s === "active_listening" ||
+      s === "follow_up_listening" ||
+      s === "listening_wake"
+    ) {
+      // Real mic loudness, with a faint floor so the viz never flatlines.
+      const level = meterRef.current?.inputLevel() ?? 0;
+      return Math.max(level, s === "listening_wake" ? 0.04 : 0.08);
+    }
+    if (s === "speaking") return syntheticEnvelope(0.9);
+    if (s === "thinking") return syntheticEnvelope(0.35);
+    return 0;
+  }, []);
 
   const toggleBargeIn = useCallback(() => {
     setBargeInEnabled((current) => {
@@ -704,6 +743,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
   const unlockAudio = useCallback(() => {
     setAudioBlocked(false);
     ttsRef.current?.unlock();
+    meterRef.current?.resume();
   }, []);
 
   const stop = useCallback(() => {
@@ -713,6 +753,8 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
     stopBargeMonitor();
     runningCommandRef.current?.abortController.abort();
     ttsRef.current?.stop();
+    meterRef.current?.dispose();
+    meterRef.current = null;
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
     modeRef.current = "off";
@@ -756,6 +798,8 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
       stopBargeMonitor();
       runningCommandRef.current?.abortController.abort();
       ttsRef.current?.stop();
+      meterRef.current?.dispose();
+      meterRef.current = null;
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
       micStreamRef.current = null;
     };
@@ -769,6 +813,7 @@ export function useJarvis(options: UseJarvisOptions): UseJarvisResult {
     audioBlocked,
     bargeInEnabled,
     briefingActive,
+    getAmplitude,
     unlockAudio,
     stop,
     toggleMute,

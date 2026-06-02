@@ -1,12 +1,14 @@
 import { useEffect, useRef } from "react";
-import type { TranscriptTurn } from "@/lib/jarvis/state";
+import type { TranscriptTurn } from "@/lib/dex/state";
 
 export function Transcript({
   turns,
   liveCaption,
+  placeholder = "Say the wake word, then a request.",
 }: {
   turns: TranscriptTurn[];
   liveCaption: string;
+  placeholder?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -18,7 +20,7 @@ export function Transcript({
   if (turns.length === 0 && !liveCaption) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-white/30">
-        Say “Jarvis” followed by a request.
+        {placeholder}
       </div>
     );
   }

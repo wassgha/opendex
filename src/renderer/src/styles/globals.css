@@ -19,22 +19,36 @@ body {
 @theme inline {
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 
-  --animate-jarvis-breath: jarvis-breath 4s ease-in-out infinite;
-  --animate-jarvis-pulse: jarvis-pulse 1.4s ease-in-out infinite;
-  --animate-jarvis-spin: jarvis-spin 6s linear infinite;
+  --animate-dex-breath: dex-breath 4s ease-in-out infinite;
+  --animate-dex-pulse: dex-pulse 1.4s ease-in-out infinite;
+  --animate-dex-spin: dex-spin 6s linear infinite;
+  --animate-dex-spin-slow: dex-spin 28s linear infinite;
+  --animate-dex-spin-slower: dex-spin 64s linear infinite;
+  --animate-dex-spin-rev: dex-spin-rev 20s linear infinite;
+  --animate-caret-blink: caret-blink 1.1s steps(1, end) infinite;
 }
 
-@keyframes jarvis-breath {
+@keyframes dex-spin-rev {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0.15; }
+}
+
+@keyframes dex-breath {
   0%, 100% { transform: scale(1); opacity: 0.92; }
   50% { transform: scale(1.04); opacity: 1; }
 }
 
-@keyframes jarvis-pulse {
+@keyframes dex-pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.08); }
 }
 
-@keyframes jarvis-spin {
+@keyframes dex-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }

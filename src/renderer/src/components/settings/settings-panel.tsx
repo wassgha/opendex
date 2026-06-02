@@ -8,6 +8,7 @@ import {
   TextField,
 } from "../ui/fields";
 import { useSystemVoices } from "@/lib/use-system-voices";
+import { ThemePicker } from "@/components/themes/theme-picker";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -65,6 +66,13 @@ export function SettingsPanel({
             hint="Say this word to start talking."
             value={config.assistant.wakeWord}
             onChange={(v) => setConfig({ assistant: { wakeWord: v } })}
+          />
+        </Section>
+
+        <Section title="Voice visualization">
+          <ThemePicker
+            value={config.appearance.theme}
+            onChange={(id) => setConfig({ appearance: { theme: id } })}
           />
         </Section>
 

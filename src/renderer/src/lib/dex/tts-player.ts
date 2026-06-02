@@ -54,7 +54,7 @@ export class TtsPlayer {
       await this.playBlob(blob);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
-        console.error("[jarvis tts] playback error", err);
+        console.error("[opendex tts] playback error", err);
       }
     } finally {
       this.playing = false;

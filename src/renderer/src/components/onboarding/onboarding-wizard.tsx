@@ -13,6 +13,7 @@ import {
   TextField,
 } from "../ui/fields";
 import { useSystemVoices } from "@/lib/use-system-voices";
+import { ThemePicker } from "@/components/themes/theme-picker";
 
 interface Step {
   key: string;
@@ -117,6 +118,17 @@ export function OnboardingWizard({
             />
           )}
         </>
+      ),
+    },
+    {
+      key: "appearance",
+      title: "Voice visualization",
+      subtitle: "Pick how OpenDex appears while listening and speaking.",
+      render: () => (
+        <ThemePicker
+          value={config.appearance.theme}
+          onChange={(id) => setConfig({ appearance: { theme: id } })}
+        />
       ),
     },
     {

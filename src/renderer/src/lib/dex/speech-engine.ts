@@ -1,6 +1,6 @@
 import { TtsPlayer } from "./tts-player";
 
-// Common interface for spoken output, so the orchestrator (use-jarvis) is
+// Common interface for spoken output, so the orchestrator (use-dex) is
 // agnostic to whether audio comes from ElevenLabs (main process) or the OS's
 // built-in speech synthesis (renderer Web Speech).
 export interface SpeechEngine {
