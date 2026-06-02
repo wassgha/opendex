@@ -63,10 +63,68 @@ export function SettingsPanel({
           />
           <TextField
             label="Wake word"
-            hint="Say this word to start talking."
+            hint="Used by the Web Speech wake mode."
             value={config.assistant.wakeWord}
             onChange={(v) => setConfig({ assistant: { wakeWord: v } })}
           />
+        </Section>
+
+        <Section title="Voice input">
+          <SelectField
+            label="How to start listening"
+            hint="Push-to-talk works without any extra signup."
+            value={config.voiceInput.wakeMode}
+            options={[
+              { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
+              { value: "porcupine", label: "Wake word (Porcupine, hands-free)" },
+              { value: "webspeech", label: "Wake word (Web Speech — browser)" },
+            ]}
+            onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, wakeMode: v } })}
+          />
+          {config.voiceInput.wakeMode === "porcupine" && (
+            <>
+              <SelectField
+                label="Wake keyword"
+                value={config.voiceInput.porcupineKeyword}
+                options={[
+                  { value: "jarvis", label: "Jarvis" },
+                  { value: "computer", label: "Computer" },
+                  { value: "bumblebee", label: "Bumblebee" },
+                  { value: "porcupine", label: "Porcupine" },
+                  { value: "picovoice", label: "Picovoice" },
+                  { value: "alexa", label: "Alexa" },
+                  { value: "terminator", label: "Terminator" },
+                ]}
+                onChange={(v) =>
+                  setConfig({ voiceInput: { ...config.voiceInput, porcupineKeyword: v } })
+                }
+              />
+              <SecretField
+                label="Picovoice AccessKey"
+                hint="Free at console.picovoice.ai. Required for hands-free wake word."
+                present={secrets.PICOVOICE_ACCESS_KEY}
+                onSave={(v) => setSecret("PICOVOICE_ACCESS_KEY", v)}
+              />
+            </>
+          )}
+          <SelectField
+            label="Transcription (speech-to-text)"
+            hint="OpenAI works reliably inside the desktop app; Web Speech needs a browser."
+            value={config.voiceInput.sttProvider}
+            options={[
+              { value: "openai", label: "OpenAI Whisper (cloud)" },
+              { value: "webspeech", label: "Web Speech (browser)" },
+            ]}
+            onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, sttProvider: v } })}
+          />
+          {config.voiceInput.sttProvider === "openai" && (
+            <SecretField
+              label="OpenAI API key"
+              hint="Used in the main process to transcribe captured audio."
+              present={secrets.OPENAI_API_KEY}
+              onSave={(v) => setSecret("OPENAI_API_KEY", v)}
+            />
+          )}
         </Section>
 
         <Section title="Voice visualization">

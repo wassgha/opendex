@@ -57,12 +57,18 @@ function MainExperience({
   const dexOptions = useMemo<UseDexOptions>(
     () => ({
       wakeWord: cfg.assistant.wakeWord,
+      wakeMode: cfg.voiceInput.wakeMode,
+      porcupineKeyword: cfg.voiceInput.porcupineKeyword,
+      sttProvider: cfg.voiceInput.sttProvider,
       greetingEnabled: greetingEnabled(cfg),
       ttsEngine: cfg.tts.engine,
       systemVoice: cfg.tts.system,
     }),
     [
       cfg.assistant.wakeWord,
+      cfg.voiceInput.wakeMode,
+      cfg.voiceInput.porcupineKeyword,
+      cfg.voiceInput.sttProvider,
       cfg.greeting.mode,
       cfg.greeting.customPrompt,
       cfg.tts.engine,
@@ -86,6 +92,8 @@ function MainExperience({
         bargeInEnabled={dex.bargeInEnabled}
         briefingActive={dex.briefingActive}
         unsupported={dex.status === "unsupported"}
+        canPushToTalk={dex.canPushToTalk}
+        onPushToTalk={dex.pushToTalk}
         toggleMute={dex.toggleMute}
         toggleBargeIn={dex.toggleBargeIn}
       />

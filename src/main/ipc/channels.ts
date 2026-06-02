@@ -17,6 +17,11 @@ export const IPC = {
   configSet: "config:set",
   secretSet: "secret:set",
   onboardingComplete: "onboarding:complete",
+  // STT
+  transcribe: "stt:transcribe",
+  getPicovoiceKey: "stt:picovoice-key",
+  // main → renderer event: global push-to-talk hotkey pressed
+  pushToTalk: "push-to-talk",
 } as const;
 
 export interface ChatStartPayload {

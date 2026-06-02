@@ -2,7 +2,7 @@
 
 An open-source, **voice-first agentic harness** for the desktop. Wake it, speak, and a tool-using LLM agent replies aloud — with everything (LLM, voice, visualization theme, greeting, skills) configurable. Built on Electron.
 
-> Status: **Phases 1–3 of 7** complete — the Electron shell + secure agent/TTS-over-IPC architecture; a full config system (first-run onboarding, settings, OS-keychain-encrypted keys, configurable model/voice/greeting/wake-word, ElevenLabs-or-system-TTS); and selectable **full-interface themes** (a cinematic Jarvis HUD with an animated arc reactor, plus minimal Talking Dot and Typing Cursor) that react to mic loudness. Remaining roadmap: pluggable wake/STT → skills + MCP → computer-use → signed releases. See `AGENTS.md`.
+> Status: **Phases 1–3 of 7** complete — the Electron shell + secure agent/TTS-over-IPC architecture; a full config system (first-run onboarding, settings, OS-keychain-encrypted keys, configurable model/voice/greeting/wake-word, ElevenLabs-or-system-TTS); selectable **full-interface themes** (a cinematic Jarvis HUD with an animated arc reactor, plus minimal Talking Dot and Typing Cursor) that react to mic loudness; and **pluggable voice input** — push-to-talk (keyless), Porcupine wake word (WASM), or Web Speech, with OpenAI Whisper or Web Speech transcription. Remaining roadmap: offline local STT (4b) → skills + MCP → computer-use → signed releases. See `AGENTS.md`.
 
 ## Stack
 

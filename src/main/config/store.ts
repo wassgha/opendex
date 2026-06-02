@@ -124,12 +124,25 @@ export function getConfig(): OpenDexConfig {
   return cachedConfig!;
 }
 
+function hasSecret(name: SecretName): boolean {
+  return Boolean(cachedSecrets[name] || process.env[name]);
+}
+
 function secretsPresence(): SecretsPresence {
   return {
-    AI_GATEWAY_API_KEY: Boolean(cachedSecrets.AI_GATEWAY_API_KEY || process.env.AI_GATEWAY_API_KEY),
-    ELEVENLABS_API_KEY: Boolean(cachedSecrets.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY),
-    TAVILY_API_KEY: Boolean(cachedSecrets.TAVILY_API_KEY || process.env.TAVILY_API_KEY),
+    AI_GATEWAY_API_KEY: hasSecret("AI_GATEWAY_API_KEY"),
+    ELEVENLABS_API_KEY: hasSecret("ELEVENLABS_API_KEY"),
+    TAVILY_API_KEY: hasSecret("TAVILY_API_KEY"),
+    PICOVOICE_ACCESS_KEY: hasSecret("PICOVOICE_ACCESS_KEY"),
+    OPENAI_API_KEY: hasSecret("OPENAI_API_KEY"),
   };
+}
+
+/** Returns the Picovoice AccessKey for the renderer. This is the one secret the
+ *  renderer is allowed to read: Porcupine's WASM SDK requires the key
+ *  client-side. It is a rate-limited client SDK key, not a billing API key. */
+export function getPicovoiceKey(): string {
+  return cachedSecrets.PICOVOICE_ACCESS_KEY || process.env.PICOVOICE_ACCESS_KEY || "";
 }
 
 export function getPublicConfig(): PublicConfig {

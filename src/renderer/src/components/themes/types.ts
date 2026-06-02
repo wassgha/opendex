@@ -16,6 +16,9 @@ export interface DexThemeProps {
   bargeInEnabled: boolean;
   briefingActive: boolean;
   unsupported: boolean;
+  /** Manual wake mode + ready: the visualization is tap-to-talk. */
+  canPushToTalk: boolean;
+  onPushToTalk: () => void;
   toggleMute: () => void;
   toggleBargeIn: () => void;
 }

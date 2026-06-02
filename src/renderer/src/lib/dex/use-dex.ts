@@ -13,7 +13,10 @@ import {
   type SystemVoiceOptions,
 } from "./speech-engine";
 import { AudioMeter } from "./audio-meter";
+import { CloudSttEngine } from "./engines/cloud-stt";
+import type { PorcupineWakeEngine } from "./engines/porcupine-wake";
 import type { DexStatus, TranscriptTurn } from "./state";
+import type { SttProvider, WakeMode } from "../../../../main/config/schema";
 
 // A smooth, organic synthetic loudness envelope (0..1) used for speaking/
 // thinking states where we don't meter the actual audio. Layered sines give it
@@ -61,8 +64,14 @@ interface RunningCommand {
 }
 
 export interface UseDexOptions {
-  /** Wake word that triggers active listening. */
+  /** Wake word that triggers active listening (Web Speech wake mode). */
   wakeWord: string;
+  /** How active listening is triggered. */
+  wakeMode: WakeMode;
+  /** Built-in Porcupine keyword id (porcupine wake mode). */
+  porcupineKeyword: string;
+  /** Which engine transcribes captured commands. */
+  sttProvider: SttProvider;
   /** Whether a proactive greeting fires on the first wake. */
   greetingEnabled: boolean;
   /** Which speech engine to use for spoken output. */
@@ -79,6 +88,9 @@ export interface UseDexResult {
   audioBlocked: boolean;
   bargeInEnabled: boolean;
   briefingActive: boolean;
+  /** True when the user can tap/hotkey to talk (manual wake mode, idle). */
+  canPushToTalk: boolean;
+  pushToTalk: () => void;
   /** Current voice loudness, 0..1 — real mic level while listening, a synthetic
    *  envelope while speaking/thinking. Sampled by the visualization via rAF. */
   getAmplitude: () => number;
@@ -106,6 +118,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const bargeRef = useRef<SpeechRecognitionInstance | null>(null);
+  // Phase 4 engines (instantiated only for their respective modes).
+  const porcupineRef = useRef<PorcupineWakeEngine | null>(null);
+  const cloudSttRef = useRef<CloudSttEngine | null>(null);
+  const sttAbortRef = useRef<AbortController | null>(null);
   const modeRef = useRef<Mode>("off");
   const ttsRef = useRef<SpeechEngine | null>(null);
   const messagesRef = useRef<
@@ -135,9 +151,12 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const assistantWordsRef = useRef<Set<string>>(new Set());
   const bargeTriggeredRef = useRef(false);
 
+  // Web Speech is only required when it's the chosen wake or STT backend.
+  const needsWebSpeech =
+    options.wakeMode === "webspeech" || options.sttProvider === "webspeech";
   useEffect(() => {
-    if (!isSpeechRecognitionSupported()) setStatus("unsupported");
-  }, []);
+    if (needsWebSpeech && !isSpeechRecognitionSupported()) setStatus("unsupported");
+  }, [needsWebSpeech]);
 
   const appendTurn = useCallback(
     (role: TranscriptTurn["role"], content: string) => {
@@ -197,6 +216,17 @@ export function useDex(options: UseDexOptions): UseDexResult {
       // ignore — already stopped
     }
     recognitionRef.current = null;
+  }, []);
+
+  const stopPorcupine = useCallback(() => {
+    const engine = porcupineRef.current;
+    porcupineRef.current = null;
+    void engine?.dispose();
+  }, []);
+
+  const abortStt = useCallback(() => {
+    sttAbortRef.current?.abort();
+    sttAbortRef.current = null;
   }, []);
 
   const stopBargeMonitor = useCallback(() => {
@@ -430,6 +460,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const startMode = useCallback(
     (mode: Mode) => {
       stopRecognition();
+      stopPorcupine();
+      abortStt();
       clearTimers();
       modeRef.current = mode;
 
@@ -438,20 +470,64 @@ export function useDex(options: UseDexOptions): UseDexResult {
         return;
       }
 
-      const rec = createRecognition({
-        continuous: mode === "wake",
-        interimResults: true,
-        lang: "en-US",
-      });
-      if (!rec) {
-        setStatus("unsupported");
-        return;
-      }
-      recognitionRef.current = rec;
+      const opts = optionsRef.current;
 
+      // ---- Wake ----
       if (mode === "wake") {
         setStatus("listening_wake");
         setLiveCaption("");
+
+        // Fire the proactive greeting on first wake (if enabled), else listen
+        // for a command.
+        const onWake = () => {
+          if (!hasBriefedRef.current && opts.greetingEnabled) {
+            hasBriefedRef.current = true;
+            void runCommand("Give me my briefing.", { mode: "briefing" });
+          } else {
+            startModeRef.current?.("command");
+          }
+        };
+
+        if (opts.wakeMode === "manual") {
+          // No continuous listening — wait for pushToTalk(). Still deliver the
+          // first greeting proactively so manual users get the briefing.
+          if (!hasBriefedRef.current && opts.greetingEnabled) {
+            hasBriefedRef.current = true;
+            void runCommand("Give me my briefing.", { mode: "briefing" });
+          }
+          return;
+        }
+
+        if (opts.wakeMode === "porcupine") {
+          void (async () => {
+            // Code-split: the Porcupine WASM (~4MB) loads only in this mode.
+            const { PorcupineWakeEngine } = await import("./engines/porcupine-wake");
+            const key = await window.opendex.getPicovoiceKey();
+            if (modeRef.current !== "wake") return; // mode changed while loading
+            const engine = new PorcupineWakeEngine(
+              key,
+              opts.porcupineKeyword,
+              (s) => {
+                if (s !== "ok") setStatus("unsupported");
+              },
+            );
+            porcupineRef.current = engine;
+            await engine.start(onWake);
+          })();
+          return;
+        }
+
+        // wakeMode === "webspeech": continuous recognition scanning for the word.
+        const rec = createRecognition({
+          continuous: true,
+          interimResults: true,
+          lang: "en-US",
+        });
+        if (!rec) {
+          setStatus("unsupported");
+          return;
+        }
+        recognitionRef.current = rec;
         let resultBaseline = 0;
         rec.onresult = (event) => {
           const { finalText, interimText } = joinTranscript(
@@ -533,11 +609,69 @@ export function useDex(options: UseDexOptions): UseDexResult {
         return;
       }
 
-      // mode === "command" | "follow_up"
+      // ---- Command / follow-up capture ----
       setStatus(mode === "follow_up" ? "follow_up_listening" : "active_listening");
       setLiveCaption("");
       const silenceMs =
         mode === "follow_up" ? FOLLOW_UP_SILENCE_MS : COMMAND_SILENCE_MS;
+
+      // Cloud STT: capture an utterance, transcribe in main, then run it.
+      if (opts.sttProvider === "openai") {
+        const ac = new AbortController();
+        sttAbortRef.current = ac;
+        const engine =
+          cloudSttRef.current ?? (cloudSttRef.current = new CloudSttEngine("openai"));
+        engine
+          .capture({
+            silenceMs,
+            hardTimeoutMs: COMMAND_HARD_TIMEOUT_MS,
+            signal: ac.signal,
+          })
+          .then((text) => {
+            if (ac.signal.aborted) return;
+            const cleaned = text.trim();
+            if (!cleaned) {
+              startModeRef.current?.("wake");
+              return;
+            }
+            // Echo guard for follow-ups: drop a transcript that's mostly the
+            // assistant's just-spoken words leaking back through the mic.
+            if (mode === "follow_up" && assistantWordsRef.current.size > 0) {
+              const words = cleaned
+                .toLowerCase()
+                .split(/\s+/)
+                .filter((w) => w.length > 3);
+              if (words.length > 0) {
+                const newRatio =
+                  words.filter((w) => !assistantWordsRef.current.has(w)).length /
+                  words.length;
+                if (newRatio < FOLLOW_UP_ECHO_REJECT_RATIO) {
+                  startModeRef.current?.("wake");
+                  return;
+                }
+              }
+            }
+            void runCommand(cleaned);
+          })
+          .catch((err) => {
+            if (ac.signal.aborted) return;
+            console.error("[opendex] cloud stt error", err);
+            startModeRef.current?.("wake");
+          });
+        return;
+      }
+
+      // sttProvider === "webspeech": single-shot recognition.
+      const rec = createRecognition({
+        continuous: false,
+        interimResults: true,
+        lang: "en-US",
+      });
+      if (!rec) {
+        setStatus("unsupported");
+        return;
+      }
+      recognitionRef.current = rec;
       const startedAt = Date.now();
       let finalTranscript = "";
       let heardAnything = false;
@@ -644,10 +778,19 @@ export function useDex(options: UseDexOptions): UseDexResult {
         console.error("[opendex] failed to start command recognition", err);
       }
     },
-    [clearTimers, runCommand, stopRecognition],
+    [abortStt, clearTimers, runCommand, stopPorcupine, stopRecognition],
   );
 
   startModeRef.current = startMode;
+
+  // Manual push-to-talk: jump straight to command capture (orb click / hotkey).
+  const pushToTalk = useCallback(() => {
+    if (optionsRef.current.wakeMode !== "manual" || mutedRef.current) return;
+    const s = statusRef.current;
+    if (s === "listening_wake" || s === "idle") {
+      startModeRef.current?.("command");
+    }
+  }, []);
 
   const ttsKindRef = useRef<SpeechEngineKind | null>(null);
   const ensureTts = useCallback(() => {
@@ -750,6 +893,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
     restartGuardRef.current = true;
     clearTimers();
     stopRecognition();
+    stopPorcupine();
+    abortStt();
     stopBargeMonitor();
     runningCommandRef.current?.abortController.abort();
     ttsRef.current?.stop();
@@ -761,7 +906,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     setStatus("idle");
     setLiveCaption("");
     restartGuardRef.current = false;
-  }, [clearTimers, stopBargeMonitor, stopRecognition]);
+  }, [abortStt, clearTimers, stopBargeMonitor, stopPorcupine, stopRecognition]);
 
   const toggleMute = useCallback(() => {
     setIsMuted((current) => {
@@ -785,16 +930,18 @@ export function useDex(options: UseDexOptions): UseDexResult {
   // and only attempt this once per page lifecycle.
   useEffect(() => {
     if (startedRef.current) return;
-    if (!isSpeechRecognitionSupported()) return;
+    if (needsWebSpeech && !isSpeechRecognitionSupported()) return;
     startedRef.current = true;
     void engage();
-  }, [engage]);
+  }, [engage, needsWebSpeech]);
 
   useEffect(() => {
     return () => {
       restartGuardRef.current = true;
       clearTimers();
       stopRecognition();
+      stopPorcupine();
+      abortStt();
       stopBargeMonitor();
       runningCommandRef.current?.abortController.abort();
       ttsRef.current?.stop();
@@ -803,7 +950,17 @@ export function useDex(options: UseDexOptions): UseDexResult {
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
       micStreamRef.current = null;
     };
-  }, [clearTimers, stopBargeMonitor, stopRecognition]);
+  }, [abortStt, clearTimers, stopBargeMonitor, stopPorcupine, stopRecognition]);
+
+  // Global hotkey (registered in main) → push to talk, in manual wake mode.
+  useEffect(() => {
+    const off = window.opendex.onPushToTalk(() => pushToTalk());
+    return off;
+  }, [pushToTalk]);
+
+  const canPushToTalk =
+    options.wakeMode === "manual" &&
+    (status === "listening_wake" || status === "idle");
 
   return {
     status,
@@ -813,6 +970,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
     audioBlocked,
     bargeInEnabled,
     briefingActive,
+    canPushToTalk,
+    pushToTalk,
     getAmplitude,
     unlockAudio,
     stop,

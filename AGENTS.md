@@ -26,5 +26,12 @@ OpenDex is an **Electron** desktop app (electron-vite + React + Tailwind v4). It
 - Amplitude: `lib/dex/audio-meter.ts` meters the **mic** (real listening loudness, never connected to destination). Speaking/thinking use a synthetic envelope in `use-dex.ts` (no audio routing → no autoplay/silence risk). `useDex().getAmplitude()` returns the status-appropriate 0..1 level; themes sample it via `components/themes/use-amplitude.ts` (rAF → direct DOM writes, no React re-renders).
 - To add a theme: implement a `DexThemeProps` component, register it in `registry.ts`. Picker + config wiring are automatic.
 
+## Wake/STT (Phase 4a) — pluggable voice input
+- Config `voiceInput: { wakeMode, porcupineKeyword, sttProvider }`. Wake: `manual` (push-to-talk — orb click or ⌘⇧Space global hotkey), `porcupine` (WASM wake word, needs Picovoice key), `webspeech` (continuous scan). STT: `webspeech` (single-shot) or `openai` (cloud Whisper). All pure JS/WASM — no native modules.
+- Web Speech + the keyless `manual` path stay inline in `use-dex.ts` (tightly coupled to the state machine). `porcupine` wake and `openai` STT are encapsulated in `lib/dex/engines/` (`porcupine-wake.ts`, `cloud-stt.ts`, `wav.ts`, `types.ts`); `startMode` branches on config.
+- Audio: Porcupine + cloud capture use `@picovoice/web-voice-processor` (16kHz Int16 frames) in the renderer. Cloud STT endpoints on silence (energy/RMS), encodes WAV, and sends bytes to main → `src/main/stt/` (OpenAI). **OpenAI key stays main-only**; the **Picovoice AccessKey is the one secret the renderer may read** (`getPicovoiceKey` IPC) because the Porcupine WASM SDK needs it client-side.
+- Porcupine English params bundled at `src/renderer/public/models/porcupine_params.pv`; the Porcupine engine is dynamic-imported so its ~3.6MB WASM chunk loads only in `porcupine` mode (main bundle stays ~870KB).
+- Manual mode: `useDex().pushToTalk()` + `canPushToTalk`; themes make the visualization tap-to-talk. Global hotkey registered in main (`globalShortcut`) → `push-to-talk` IPC event → `onPushToTalk` (preload) → `pushToTalk()`.
+
 ## Status
-Phases 1–3 done. Roadmap: pluggable wake/STT → skills+MCP → computer-use → releases. **Voice wake/STT uses the Web Speech API today, which is unreliable in Electron (backs off, then surfaces as "unsupported"); local engines land in the wake/STT phase.**
+Phases 1–4a done. **4b** = offline local Whisper (transformers.js). Roadmap: skills+MCP → computer-use → releases. **Default voice input is still Web Speech (unreliable in Electron); switch to "Push to talk + OpenAI Whisper" in Settings/onboarding for reliable desktop voice.**

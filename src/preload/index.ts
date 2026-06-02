@@ -6,6 +6,7 @@ import type {
   OpenDexConfig,
   PublicConfig,
   SecretName,
+  SttProvider,
 } from "../main/config/schema";
 
 export interface ChatRequest {
@@ -92,6 +93,24 @@ const opendex = {
   /** Mark first-run onboarding complete. */
   completeOnboarding(): Promise<PublicConfig> {
     return ipcRenderer.invoke(IPC.onboardingComplete);
+  },
+
+  /** Transcribe a captured utterance (WAV bytes) via a cloud STT provider. */
+  transcribe(provider: SttProvider, wav: ArrayBuffer): Promise<string> {
+    return ipcRenderer.invoke(IPC.transcribe, provider, wav);
+  },
+
+  /** Read the Picovoice AccessKey (the one secret the renderer may read — the
+   *  Porcupine WASM SDK requires it client-side). */
+  getPicovoiceKey(): Promise<string> {
+    return ipcRenderer.invoke(IPC.getPicovoiceKey);
+  },
+
+  /** Subscribe to the global push-to-talk hotkey. Returns an unsubscribe fn. */
+  onPushToTalk(handler: () => void): () => void {
+    const listener = () => handler();
+    ipcRenderer.on(IPC.pushToTalk, listener);
+    return () => ipcRenderer.removeListener(IPC.pushToTalk, listener);
   },
 };
 

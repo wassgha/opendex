@@ -15,8 +15,18 @@ export function MinimalShell({
   transcript: ReactNode;
   mono?: boolean;
 }) {
-  const { name, wakeWord, status, isMuted, bargeInEnabled, toggleMute, toggleBargeIn, unsupported } =
-    props;
+  const {
+    name,
+    wakeWord,
+    status,
+    isMuted,
+    bargeInEnabled,
+    toggleMute,
+    toggleBargeIn,
+    unsupported,
+    canPushToTalk,
+    onPushToTalk,
+  } = props;
 
   return (
     <div
@@ -32,7 +42,21 @@ export function MinimalShell({
       </header>
 
       <section className="flex flex-col items-center gap-10">
-        {visual}
+        {canPushToTalk ? (
+          <button
+            type="button"
+            onClick={onPushToTalk}
+            className="group flex flex-col items-center gap-2 rounded-full"
+            title="Tap to talk (or press ⌘⇧Space)"
+          >
+            {visual}
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/40 group-hover:text-white/70">
+              Tap to talk
+            </span>
+          </button>
+        ) : (
+          visual
+        )}
 
         {props.briefingActive && (
           <div className="text-[10px] uppercase tracking-[0.35em] text-white/40">

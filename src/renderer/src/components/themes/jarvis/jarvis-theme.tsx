@@ -75,6 +75,8 @@ export function JarvisTheme(props: DexThemeProps) {
     bargeInEnabled,
     briefingActive,
     unsupported,
+    canPushToTalk,
+    onPushToTalk,
     toggleMute,
     toggleBargeIn,
   } = props;
@@ -131,9 +133,23 @@ export function JarvisTheme(props: DexThemeProps) {
         </div>
       </div>
 
-      {/* Center: the reactor */}
-      <div className="relative z-10 flex flex-1 items-center justify-center">
-        <JarvisReactor status={status} getAmplitude={getAmplitude} />
+      {/* Center: the reactor (tap-to-talk in manual wake mode) */}
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center">
+        {canPushToTalk ? (
+          <button
+            type="button"
+            onClick={onPushToTalk}
+            className="group flex flex-col items-center"
+            title="Tap to talk (or press ⌘⇧Space)"
+          >
+            <JarvisReactor status={status} getAmplitude={getAmplitude} />
+            <span className="-mt-4 font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-300/50 group-hover:text-cyan-200">
+              Tap to talk
+            </span>
+          </button>
+        ) : (
+          <JarvisReactor status={status} getAmplitude={getAmplitude} />
+        )}
       </div>
 
       {/* Right HUD column: transcript + controls */}

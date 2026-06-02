@@ -121,6 +121,51 @@ export function OnboardingWizard({
       ),
     },
     {
+      key: "voiceinput",
+      title: "Voice input",
+      subtitle: "How you start talking, and how speech is transcribed.",
+      render: () => (
+        <>
+          <SelectField
+            label="How to start listening"
+            hint="Push-to-talk needs no extra signup and works everywhere."
+            value={config.voiceInput.wakeMode}
+            options={[
+              { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
+              { value: "porcupine", label: "Wake word (hands-free)" },
+              { value: "webspeech", label: "Wake word (Web Speech)" },
+            ]}
+            onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, wakeMode: v } })}
+          />
+          {config.voiceInput.wakeMode === "porcupine" && (
+            <SecretField
+              label="Picovoice AccessKey"
+              hint="Free at console.picovoice.ai."
+              present={secrets.PICOVOICE_ACCESS_KEY}
+              onSave={(v) => setSecret("PICOVOICE_ACCESS_KEY", v)}
+            />
+          )}
+          <SelectField
+            label="Transcription"
+            hint="OpenAI is the reliable option inside the desktop app."
+            value={config.voiceInput.sttProvider}
+            options={[
+              { value: "openai", label: "OpenAI Whisper (cloud)" },
+              { value: "webspeech", label: "Web Speech (browser)" },
+            ]}
+            onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, sttProvider: v } })}
+          />
+          {config.voiceInput.sttProvider === "openai" && (
+            <SecretField
+              label="OpenAI API key"
+              present={secrets.OPENAI_API_KEY}
+              onSave={(v) => setSecret("OPENAI_API_KEY", v)}
+            />
+          )}
+        </>
+      ),
+    },
+    {
       key: "appearance",
       title: "Voice visualization",
       subtitle: "Pick how OpenDex appears while listening and speaking.",

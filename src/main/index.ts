@@ -1,19 +1,21 @@
 import { join } from "node:path";
 import { config as loadEnv } from "dotenv";
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, shell } from "electron";
 import { IPC, type ChatStartPayload } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
 import { buildSystemPrompt } from "./agent/system-prompt";
 import { synthesizeSpeech } from "./tts/elevenlabs";
+import { transcribe } from "./stt";
 import {
   completeOnboarding,
   getConfig,
+  getPicovoiceKey,
   getPublicConfig,
   initConfig,
   setSecret,
   updateConfig,
 } from "./config/store";
-import type { DeepPartial, OpenDexConfig, SecretName } from "./config/schema";
+import type { DeepPartial, OpenDexConfig, SecretName, SttProvider } from "./config/schema";
 
 // Load a dev .env first; initConfig() then layers the user's saved config on
 // top (config values win; .env remains a fallback for unset secrets).
@@ -110,16 +112,46 @@ function registerIpc() {
   );
 
   ipcMain.handle(IPC.onboardingComplete, () => completeOnboarding());
+
+  // STT ----------------------------------------------------------------------
+  ipcMain.handle(
+    IPC.transcribe,
+    async (_event, provider: SttProvider, wav: ArrayBuffer) => {
+      return transcribe(provider, Buffer.from(wav));
+    },
+  );
+
+  // The one secret the renderer may read — Porcupine's WASM SDK needs it
+  // client-side. Billing keys (OpenAI, etc.) never leave main.
+  ipcMain.handle(IPC.getPicovoiceKey, () => getPicovoiceKey());
+}
+
+function registerPushToTalkHotkey() {
+  // Global push-to-talk for manual wake mode. Forwarded to the focused window;
+  // the renderer ignores it unless wakeMode === "manual".
+  const accelerator = "CommandOrControl+Shift+Space";
+  try {
+    globalShortcut.register(accelerator, () => {
+      BrowserWindow.getAllWindows()[0]?.webContents.send(IPC.pushToTalk);
+    });
+  } catch (err) {
+    console.error("[opendex] failed to register push-to-talk hotkey", err);
+  }
 }
 
 app.whenReady().then(() => {
   initConfig();
   registerIpc();
   createWindow();
+  registerPushToTalkHotkey();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on("window-all-closed", () => {
