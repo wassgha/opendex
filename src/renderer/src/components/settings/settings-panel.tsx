@@ -155,7 +155,9 @@ export function SettingsPanel({
 
         <Section title="Skills & tools">
           {SKILLS_META.map((skill) => {
-            const enabled = config.skills.enabled[skill.id] !== false;
+            const enabled = skill.optIn
+              ? config.skills.enabled[skill.id] === true
+              : config.skills.enabled[skill.id] !== false;
             const permission = config.skills.permissions[skill.id] ?? "ask";
             return (
               <div key={skill.id} className="flex flex-col gap-2">

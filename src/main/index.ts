@@ -4,7 +4,8 @@ import { app, BrowserWindow, globalShortcut, ipcMain, shell } from "electron";
 import { IPC, type ChatStartPayload } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
 import { buildSystemPrompt } from "./agent/system-prompt";
-import { buildToolSet } from "./agent/skills/registry";
+import { buildToolSet, isSkillEnabled } from "./agent/skills/registry";
+import { computerSkill } from "./agent/skills/computer";
 import {
   makePermissionRequester,
   recordAndResolve,
@@ -71,7 +72,8 @@ function registerIpc() {
     const sender = event.sender;
     const config = getConfig();
     const briefing = mode === "briefing";
-    const system = buildSystemPrompt({ config, briefing });
+    const computerUse = !briefing && isSkillEnabled(computerSkill, config);
+    const system = buildSystemPrompt({ config, briefing, computerUse });
     const tools = buildToolSet({
       config,
       requestPermission: makePermissionRequester(sender),
@@ -83,6 +85,8 @@ function registerIpc() {
         model: config.llm.model,
         tools,
         briefing,
+        // Computer-use sessions need many screenshot→act→screenshot steps.
+        maxSteps: computerUse ? 40 : 8,
         signal: ac.signal,
         onDelta: (delta) => {
           if (!ac.signal.aborted && !sender.isDestroyed()) {

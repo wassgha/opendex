@@ -94,8 +94,9 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
   },
   appearance: { theme: "jarvis" },
   skills: {
-    enabled: { open: true },
-    permissions: { open: "ask" },
+    // `computer` is opt-in (off until the user enables it in Settings).
+    enabled: { open: true, computer: false },
+    permissions: { open: "ask", computer: "ask" },
   },
   onboarding: { completed: false },
 };

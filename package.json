@@ -15,6 +15,7 @@
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.49.1",
     "@huggingface/transformers": "^4.2.0",
+    "@nut-tree-fork/nut-js": "^4.2.6",
     "@picovoice/porcupine-web": "^4.0.0",
     "@picovoice/web-voice-processor": "^4.0.10",
     "ai": "^6.0.193",

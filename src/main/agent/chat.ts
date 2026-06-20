@@ -15,6 +15,8 @@ export interface StreamChatOptions {
   tools?: ToolSet;
   /** Briefing turns are self-contained narration — tools are disabled. */
   briefing?: boolean;
+  /** Max tool/generation steps before the loop stops. Defaults to 8. */
+  maxSteps?: number;
   signal?: AbortSignal;
   /** Called with each text delta as it streams. */
   onDelta: (text: string) => void;
@@ -40,6 +42,7 @@ export async function streamChat({
   model,
   tools,
   briefing,
+  maxSteps,
   signal,
   onDelta,
 }: StreamChatOptions): Promise<ModelMessage[]> {
@@ -49,7 +52,7 @@ export async function streamChat({
     system,
     messages,
     tools: briefing ? undefined : tools,
-    stopWhen: stepCountIs(5),
+    stopWhen: stepCountIs(maxSteps ?? 8),
     abortSignal: signal,
     onError: ({ error }) => {
       capturedError = error;

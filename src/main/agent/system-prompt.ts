@@ -38,16 +38,35 @@ Here are the metrics you are working from. Use them for accuracy but speak them 
 
 ${BRIEFING_FACTS}`;
 
+// Operating manual injected when the computer-control skill is active, so the
+// model drives the screenshot → act → screenshot loop correctly.
+function computerUseGuidance(): string {
+  const platform =
+    process.platform === "darwin"
+      ? "macOS (use the Cmd key for shortcuts, not Ctrl)"
+      : process.platform === "win32"
+        ? "Windows (use the Ctrl key for shortcuts)"
+        : "Linux (use the Ctrl key for shortcuts)";
+  return `You can see and control this computer. The operating system is ${platform}.
+
+To operate it: first call captureScreen to see the screen, then act with click, moveMouse, typeText, pressKeys, and scroll. Coordinates are in the pixel space of the most recent screenshot, with (0,0) at the top-left. Action tools return a fresh screenshot — always look at it to confirm the effect before the next step, and re-screenshot if you're unsure.
+
+Work in small, deliberate steps. Briefly narrate what you're about to do (it's spoken aloud), keep it short, and stop once the task is done or if something looks wrong. If a screenshot is empty or a click has no effect, the operator may need to grant Screen Recording and Accessibility permissions in their system settings — say so rather than retrying blindly.`;
+}
+
 export interface PromptInputs {
   config: OpenDexConfig;
   briefing: boolean;
+  /** Whether the computer-control skill is active this turn. */
+  computerUse?: boolean;
 }
 
 /** Resolve the system prompt for a turn, honouring the configured persona and
  *  greeting mode. */
-export function buildSystemPrompt({ config, briefing }: PromptInputs): string {
+export function buildSystemPrompt({ config, briefing, computerUse }: PromptInputs): string {
   const persona = buildPersona(config.assistant.name);
-  if (!briefing || config.greeting.mode === "none") return persona;
+  const base = computerUse && !briefing ? `${persona}\n\n---\n\n${computerUseGuidance()}` : persona;
+  if (!briefing || config.greeting.mode === "none") return base;
 
   if (config.greeting.mode === "custom") {
     const custom = config.greeting.customPrompt.trim();

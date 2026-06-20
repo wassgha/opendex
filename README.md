@@ -29,6 +29,7 @@ It's a **harness**, not a single bot: the model, the voice, the wake/transcripti
 - 🔌 **Pluggable voice I/O** — wake via push-to-talk, Vosk, Porcupine, or Web Speech; transcribe via local Whisper/Vosk, OpenAI, or Web Speech; speak via ElevenLabs or system TTS.
 - 🎨 **Full-interface themes** — the theme *is* the whole UI: a cinematic **Jarvis HUD** with an animated arc reactor, a minimal **Talking Dot**, or a **Typing Cursor** terminal. All react to your voice.
 - 🛠️ **Agentic skills with a permission gate** — the agent can take real actions (e.g. open apps & URLs); sensitive actions pop an **Allow once / Always / Deny** prompt that's remembered per skill.
+- 🖥️ **Computer-use (opt-in)** — let it *see the screen and drive the mouse & keyboard* to operate apps for you. Works with any vision model (screenshots stream back as images), and stays behind the permission gate.
 - 🔐 **Secure by design** — API keys are encrypted with your OS keychain and live only in the main process, never in the UI.
 
 ## Screenshots
@@ -86,7 +87,9 @@ The **renderer** captures audio and runs the wake/STT engines (all WASM); the **
 
 ## Skills & permissions
 
-The agent's capabilities are **skills** — declarative tool bundles. Sensitive ones run behind a permission gate: when the model wants to act, OpenDex pauses and asks, and your choice (Allow once / Always / Never) is remembered. Today's built-in skill opens apps, URLs, and files; MCP servers and more built-ins are next.
+The agent's capabilities are **skills** — declarative tool bundles. Sensitive ones run behind a permission gate: when the model wants to act, OpenDex pauses and asks, and your choice (Allow once / Always / Never) is remembered. Built-in skills today: **Open apps & URLs**, and **Control the computer** (screen capture + mouse/keyboard — opt-in, off by default).
+
+> **Computer-use setup (macOS):** enable *Control the computer* in **Settings → Skills & tools**, then grant OpenDex **Screen Recording** and **Accessibility** permission in *System Settings → Privacy & Security* (without them, screenshots come back blank and clicks do nothing). It's powerful — keep the permission on **Ask**, and "Allow once" covers the whole task it's working on.
 
 ## Roadmap
 
@@ -95,8 +98,8 @@ The agent's capabilities are **skills** — declarative tool bundles. Sensitive 
 - [x] Full-interface themes (Jarvis HUD · Talking Dot · Typing Cursor)
 - [x] Pluggable wake-word + speech-to-text (incl. free offline Whisper & Vosk)
 - [x] Skills + permission gate *(Open apps & URLs)*
+- [x] Computer-use — screen capture + mouse/keyboard control, gated & opt-in
 - [ ] MCP servers + more built-in skills (shell, filesystem, …)
-- [ ] Computer-use (screen capture + mouse/keyboard, gated)
 - [ ] Signed GitHub releases + auto-update
 
 ## Scripts
@@ -112,7 +115,7 @@ The agent's capabilities are **skills** — declarative tool bundles. Sensitive 
 
 ## Tech
 
-Electron · electron-vite · React 19 · Tailwind CSS 4 · Vercel AI SDK v6 · ElevenLabs · Picovoice Porcupine · Vosk · transformers.js (Whisper) — all local speech engines are WASM, no native modules.
+Electron · electron-vite · React 19 · Tailwind CSS 4 · Vercel AI SDK v6 · ElevenLabs · Picovoice Porcupine · Vosk · transformers.js (Whisper) — all local speech engines are WASM. The only native module is **nut.js** (computer-use input control); it ships prebuilt N-API binaries per platform.
 
 ## License
 

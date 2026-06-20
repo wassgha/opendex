@@ -6,6 +6,8 @@ export interface SkillMeta {
   label: string;
   description: string;
   sensitive: boolean;
+  /** Opt-in skills are OFF until the user enables them (powerful/risky). */
+  optIn?: boolean;
 }
 
 export const SKILLS_META: SkillMeta[] = [
@@ -14,5 +16,13 @@ export const SKILLS_META: SkillMeta[] = [
     label: "Open apps & URLs",
     description: "Open URLs in the browser, launch apps, and open files/folders.",
     sensitive: true,
+  },
+  {
+    id: "computer",
+    label: "Control the computer",
+    description:
+      "Let the assistant see the screen and control the mouse & keyboard to operate apps. Needs Screen Recording + Accessibility permissions.",
+    sensitive: true,
+    optIn: true,
   },
 ];
