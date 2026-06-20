@@ -1,57 +1,119 @@
+<div align="center">
+
 # OpenDex
 
-An open-source, **voice-first agentic harness** for the desktop. Wake it, speak, and a tool-using LLM agent replies aloud — with everything (LLM, voice, visualization theme, greeting, skills) configurable. Built on Electron.
+**A voice-first, open-source AI assistant for your desktop.**
+Wake it, talk to it, and a tool-using agent talks back — in a cinematic interface you choose.
 
-> Status: **Phases 1–3 of 7** complete — the Electron shell + secure agent/TTS-over-IPC architecture; a full config system (first-run onboarding, settings, OS-keychain-encrypted keys, configurable model/voice/greeting/wake-word, ElevenLabs-or-system-TTS); selectable **full-interface themes** (a cinematic Jarvis HUD with an animated arc reactor, plus minimal Talking Dot and Typing Cursor) that react to mic loudness; and **pluggable voice input** — wake via push-to-talk (keyless), Vosk or Porcupine wake-word, or Web Speech; transcription via **free offline Whisper or Vosk** (no key), OpenAI Whisper, or Web Speech. All local engines are WASM (no native modules). Remaining roadmap: skills + MCP → computer-use → signed releases. See `AGENTS.md`.
+[![License: MIT](https://img.shields.io/badge/license-MIT-111?style=flat-square)](LICENSE)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20·%20Windows%20·%20Linux-111?style=flat-square)](#install)
+[![Electron](https://img.shields.io/badge/Electron-42-111?style=flat-square&logo=electron&logoColor=9FEAF9)](https://www.electronjs.org/)
+[![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v6-111?style=flat-square)](https://sdk.vercel.ai/)
+[![Stars](https://img.shields.io/github/stars/wassgha/notjarvis?style=flat-square&color=111)](https://github.com/wassgha/notjarvis/stargazers)
 
-## Stack
+![OpenDex — Jarvis HUD theme](screenshots/jarvis.png)
 
-- **Electron** + **electron-vite** (main / preload / renderer)
-- **React 19** + **Tailwind CSS 4** renderer
-- **Vercel AI SDK v6** agent loop in the main process (defaults to `anthropic/claude-sonnet-4-6` via the AI Gateway)
-- **ElevenLabs** streaming TTS (`eleven_turbo_v2_5`, "George" voice by default)
-- API keys live only in the main process — never in the renderer.
+</div>
 
-## Architecture
+## What is OpenDex?
 
-```
-Renderer (React) ──window.opendex──▶ Preload (contextBridge) ──IPC──▶ Main (Node)
-  state machine, UI                    typed bridge                   agent loop · TTS · keys
-```
+OpenDex is a desktop app that turns any LLM into a hands-free, **Iron-Man-style voice assistant**. Say the wake word (or push to talk), speak naturally, and the agent thinks, uses tools, and replies out loud — streaming its answer into a live visualization.
 
-The renderer asks the main process to `chat()` (streamed text deltas) and `synthesize()` (MP3 bytes); secrets stay in main. See `AGENTS.md` for the process model and how to add IPC channels.
+It's a **harness**, not a single bot: the model, the voice, the wake/transcription engines, the on-screen theme, the greeting, and the agent's skills are all configurable, and it can run **fully offline and free** (local speech in, local speech recognition, system voice out) — you only need a model key.
 
-## Quick start
+## Features
+
+- 🎙️ **Voice-first loop** — wake word → listen → think (with tools) → speak, plus natural follow-ups and opt-in barge-in (interrupt mid-reply).
+- 🧠 **Any model** — routes through the Vercel AI Gateway, so one key gets you Claude, GPT, Gemini, and more (`anthropic/claude-sonnet-4-6` by default).
+- 🆓 **Free & offline option** — Vosk wake word + local Whisper transcription (WASM, no signup) and your OS's built-in voice. No data leaves the machine except the LLM call.
+- 🔌 **Pluggable voice I/O** — wake via push-to-talk, Vosk, Porcupine, or Web Speech; transcribe via local Whisper/Vosk, OpenAI, or Web Speech; speak via ElevenLabs or system TTS.
+- 🎨 **Full-interface themes** — the theme *is* the whole UI: a cinematic **Jarvis HUD** with an animated arc reactor, a minimal **Talking Dot**, or a **Typing Cursor** terminal. All react to your voice.
+- 🛠️ **Agentic skills with a permission gate** — the agent can take real actions (e.g. open apps & URLs); sensitive actions pop an **Allow once / Always / Deny** prompt that's remembered per skill.
+- 🔐 **Secure by design** — API keys are encrypted with your OS keychain and live only in the main process, never in the UI.
+
+## Screenshots
+
+| First-run setup | Minimal "typing cursor" theme |
+| --- | --- |
+| ![Onboarding theme picker](screenshots/hud-selection.png) | ![Typing cursor theme](screenshots/typing-cursor.png) |
+
+## Install
+
+> Requires [Node.js](https://nodejs.org) 20+ and [pnpm](https://pnpm.io).
 
 ```bash
-cp .env.local.example .env       # fill in keys (see below)
+git clone https://github.com/wassgha/notjarvis.git opendex
+cd opendex
 pnpm install
-pnpm dev                         # launches the OpenDex desktop window
+pnpm dev            # launches the OpenDex desktop window
 ```
 
-Keys & preferences are configured in-app: a **first-run onboarding wizard** and the **Settings** panel (⚙) collect the AI Gateway key, model, TTS engine + voice, greeting, and wake word. API keys are encrypted with your OS keychain (`safeStorage`) and never reach the renderer.
+On first launch a short **onboarding wizard** walks you through the model key, voice, wake/transcription engine, theme, and greeting. Everything is changeable later from the **Settings** gear (⚙).
 
-For development you can still seed values via `.env` (used as a fallback for any unset key):
+The only thing you must provide is an LLM key (an **AI Gateway key**, or any provider key it proxies). Everything else can be free/offline:
 
-| Var | Notes |
-|---|---|
-| `AI_GATEWAY_API_KEY` | required to think/reply |
-| `ELEVENLABS_API_KEY` | required for ElevenLabs TTS (not needed for system voice) |
-| `ELEVENLABS_VOICE_ID` / `OPENDEX_MODEL` / `TAVILY_API_KEY` | optional overrides |
+- **Voice out:** "System voice" (free) or ElevenLabs (key).
+- **Voice in:** local **Whisper**/**Vosk** (free, offline, one-time model download) or OpenAI Whisper (key).
+- **Wake:** push-to-talk / Vosk (free) or Porcupine (free Picovoice key).
+
+### Optional `.env` (dev convenience)
+
+Keys are normally entered in-app and stored encrypted. For development you can seed them via `.env` (used only as a fallback):
+
+```bash
+cp .env.local.example .env
+```
+
+| Variable | Purpose |
+| --- | --- |
+| `AI_GATEWAY_API_KEY` | required — lets the agent think/reply |
+| `ELEVENLABS_API_KEY` | ElevenLabs TTS (skip if using the system voice) |
+| `OPENAI_API_KEY` | OpenAI Whisper transcription (optional) |
+| `PICOVOICE_ACCESS_KEY` | Porcupine wake word (optional, free) |
+| `TAVILY_API_KEY` | web-search tool (optional) |
+
+## How it works
+
+```
+ Renderer (React + Tailwind)            Preload                Main process (Node)
+ ─────────────────────────             ─────────              ─────────────────────
+ themes · state machine   ──window.opendex──▶  typed IPC  ──▶  agent loop (AI SDK) · tools
+ mic capture · WASM STT   ◀──  text deltas / audio bytes  ──   ElevenLabs TTS · skills
+                                                               🔑 API keys (OS keychain)
+```
+
+The **renderer** captures audio and runs the wake/STT engines (all WASM); the **main process** holds the keys, runs the streaming agent loop, executes tools, and synthesizes speech. They talk only over a small typed `window.opendex` bridge. See [`AGENTS.md`](AGENTS.md) for the full architecture and how to add channels, themes, or skills.
+
+## Skills & permissions
+
+The agent's capabilities are **skills** — declarative tool bundles. Sensitive ones run behind a permission gate: when the model wants to act, OpenDex pauses and asks, and your choice (Allow once / Always / Never) is remembered. Today's built-in skill opens apps, URLs, and files; MCP servers and more built-ins are next.
+
+## Roadmap
+
+- [x] Electron shell + secure agent/TTS-over-IPC
+- [x] Config, onboarding & OS-keychain key storage
+- [x] Full-interface themes (Jarvis HUD · Talking Dot · Typing Cursor)
+- [x] Pluggable wake-word + speech-to-text (incl. free offline Whisper & Vosk)
+- [x] Skills + permission gate *(Open apps & URLs)*
+- [ ] MCP servers + more built-in skills (shell, filesystem, …)
+- [ ] Computer-use (screen capture + mouse/keyboard, gated)
+- [ ] Signed GitHub releases + auto-update
 
 ## Scripts
 
-- `pnpm dev` — run the app with HMR
-- `pnpm build` — build main/preload/renderer into `out/`
-- `pnpm start` — run the built app
-- `pnpm dist` — package installers via electron-builder (mac/win/linux)
-- `pnpm typecheck` — `tsc --noEmit`
-- `pnpm smoke:chat [briefing]` — exercise the main-process agent without Electron
+| Command | Description |
+| --- | --- |
+| `pnpm dev` | run the app with hot reload |
+| `pnpm build` | build main/preload/renderer into `out/` |
+| `pnpm start` | run the built app |
+| `pnpm dist` | package installers (mac/win/linux) via electron-builder |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm smoke:chat [briefing]` | exercise the agent loop without Electron |
 
-## Known limitation (Phase 1)
+## Tech
 
-Wake-word + speech-to-text currently use the browser **Web Speech API**, which depends on a remote service that is **unavailable inside Electron** — so voice input surfaces as "unsupported" for now. The pluggable local wake/STT engines (Picovoice + Whisper) land in a later phase. The agent and TTS pipeline are fully functional today (verify with `pnpm smoke:chat`).
+Electron · electron-vite · React 19 · Tailwind CSS 4 · Vercel AI SDK v6 · ElevenLabs · Picovoice Porcupine · Vosk · transformers.js (Whisper) — all local speech engines are WASM, no native modules.
 
 ## License
 
-MIT (see `LICENSE`).
+[MIT](LICENSE) — contributions welcome.
