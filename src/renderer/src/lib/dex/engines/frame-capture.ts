@@ -8,8 +8,12 @@ import type { CaptureOptions } from "./types";
 // transcriber. Used by every local/cloud STT engine so capture behaves
 // identically regardless of backend.
 
-const SPEECH_RMS = 0.015;
-const MIN_SPEECH_FRAMES = 6;
+// Energy threshold for counting a frame as speech, and how much speech must
+// accumulate before we'll treat the capture as a real utterance. Kept fairly
+// strict so ambient noise doesn't trigger a capture (which local Whisper would
+// otherwise "hallucinate" text from, causing a runaway follow-up loop).
+const SPEECH_RMS = 0.025;
+const MIN_SPEECH_FRAMES = 12; // ~0.4s of voiced audio at 16kHz/512
 
 export async function captureUtterance(
   opts: CaptureOptions,
@@ -55,9 +59,15 @@ export async function captureUtterance(
 
     const poll = setInterval(() => {
       const now = performance.now();
-      if (now - started > opts.hardTimeoutMs) return void finish(false);
-      if (speechFrames >= MIN_SPEECH_FRAMES && now - lastVoiceAt > opts.silenceMs) {
-        void finish(false);
+      const elapsed = now - started;
+      if (elapsed > opts.hardTimeoutMs) return void finish(false);
+      if (speechFrames >= MIN_SPEECH_FRAMES) {
+        // Heard speech, then a trailing silence → end and transcribe.
+        if (now - lastVoiceAt > opts.silenceMs) void finish(false);
+      } else if (elapsed > opts.silenceMs) {
+        // Nothing meaningful within the listen window → give up quietly (no
+        // transcription) instead of waiting out the hard timeout.
+        void finish(true);
       }
     }, 100);
 

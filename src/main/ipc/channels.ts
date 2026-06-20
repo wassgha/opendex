@@ -22,12 +22,22 @@ export const IPC = {
   getPicovoiceKey: "stt:picovoice-key",
   // main → renderer event: global push-to-talk hotkey pressed
   pushToTalk: "push-to-talk",
+  // Permission gate: main → renderer prompt, renderer → main answer
+  permissionRequest: "permission:request",
+  permissionRespond: "permission:respond",
 } as const;
 
 export interface ChatStartPayload {
   requestId: string;
   messages: ChatMessage[];
   mode?: "briefing";
+}
+
+export interface PermissionRequestPayload {
+  id: string;
+  skillId: string;
+  label: string;
+  detail: string;
 }
 
 export type { ChatMessage };

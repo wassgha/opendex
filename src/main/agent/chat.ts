@@ -1,10 +1,9 @@
-import { stepCountIs, streamText, type ModelMessage } from "ai";
-import { tools } from "./tools";
+import { stepCountIs, streamText, type ModelMessage, type ToolSet } from "ai";
 
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+// Conversation messages are full ModelMessages so tool calls + tool results are
+// carried across turns (otherwise the model forgets actions it already took and
+// repeats them — e.g. re-asking permission to open the same URL).
+export type ChatMessage = ModelMessage;
 
 export interface StreamChatOptions {
   messages: ChatMessage[];
@@ -12,9 +11,13 @@ export interface StreamChatOptions {
   system: string;
   /** AI Gateway model id. */
   model: string;
+  /** Tool set for this turn (base tools + enabled, permission-gated skills). */
+  tools?: ToolSet;
   /** Briefing turns are self-contained narration — tools are disabled. */
   briefing?: boolean;
   signal?: AbortSignal;
+  /** Called with each text delta as it streams. */
+  onDelta: (text: string) => void;
 }
 
 // Strip ANSI colour codes and noisy trailers from gateway errors before they
@@ -26,22 +29,25 @@ function sanitiseError(raw: string): string {
 }
 
 /**
- * Streams the agent's reply as plain text deltas. On an underlying provider
- * error (e.g. missing/invalid API key) the AI SDK's textStream completes
- * silently — so we capture the error and yield a spoken apology instead.
+ * Streams the agent's reply as text deltas (via `onDelta`) and resolves with the
+ * assistant/tool messages it generated, so the caller can append them to the
+ * conversation history. On a provider error the AI SDK's textStream completes
+ * silently — we surface a spoken apology and record it as the assistant turn.
  */
-export async function* streamChat({
+export async function streamChat({
   messages,
   system,
   model,
+  tools,
   briefing,
   signal,
-}: StreamChatOptions): AsyncIterable<string> {
+  onDelta,
+}: StreamChatOptions): Promise<ModelMessage[]> {
   let capturedError: unknown = null;
   const result = streamText({
     model,
     system,
-    messages: messages.map((m): ModelMessage => ({ role: m.role, content: m.content })),
+    messages,
     tools: briefing ? undefined : tools,
     stopWhen: stepCountIs(5),
     abortSignal: signal,
@@ -56,15 +62,22 @@ export async function* streamChat({
     for await (const delta of result.textStream) {
       if (delta.length === 0) continue;
       emittedAny = true;
-      yield delta;
+      onDelta(delta);
     }
   } catch (err) {
-    if ((err as Error)?.name === "AbortError") return;
+    if ((err as Error)?.name === "AbortError") return [];
     capturedError = err;
   }
 
+  if (signal?.aborted) return [];
+
   if (!emittedAny && capturedError) {
     const err = capturedError as Error;
-    yield `Apologies, sir — ${sanitiseError(err.message ?? String(err))}`;
+    const apology = `Apologies, sir — ${sanitiseError(err.message ?? String(err))}`;
+    onDelta(apology);
+    return [{ role: "assistant", content: apology }];
   }
+
+  // The generated assistant + tool messages (text, tool calls, tool results).
+  return (await result.response).messages;
 }

@@ -18,10 +18,16 @@ async function main() {
 
   let chars = 0;
   process.stdout.write(`\n[smoke] mode=${briefing ? "briefing" : "chat"}\n---\n`);
-  for await (const delta of streamChat({ messages, system, model, briefing })) {
-    process.stdout.write(delta);
-    chars += delta.length;
-  }
+  await streamChat({
+    messages,
+    system,
+    model,
+    briefing,
+    onDelta: (delta) => {
+      process.stdout.write(delta);
+      chars += delta.length;
+    },
+  });
   process.stdout.write(`\n---\n[smoke] received ${chars} chars\n`);
   if (chars === 0) {
     console.error("[smoke] FAIL: no output");

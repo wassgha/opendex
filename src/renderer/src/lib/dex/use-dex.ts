@@ -16,6 +16,7 @@ import { AudioMeter } from "./audio-meter";
 import { CloudSttEngine } from "./engines/cloud-stt";
 import type { SttEngine, WakeEngine } from "./engines/types";
 import type { DexStatus, TranscriptTurn } from "./state";
+import type { ChatMessage } from "../../../../main/agent/chat";
 import type { SttProvider, WakeMode } from "../../../../main/config/schema";
 
 export interface ModelLoadingState {
@@ -137,9 +138,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const sttAbortRef = useRef<AbortController | null>(null);
   const modeRef = useRef<Mode>("off");
   const ttsRef = useRef<SpeechEngine | null>(null);
-  const messagesRef = useRef<
-    Array<{ role: "user" | "assistant"; content: string }>
-  >([]);
+  // Full conversation history sent to the model — ModelMessages so tool calls +
+  // results persist across turns (prevents the agent re-running prior actions).
+  const messagesRef = useRef<ChatMessage[]>([]);
   const runningCommandRef = useRef<RunningCommand | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -429,19 +430,16 @@ export function useDex(options: UseDexOptions): UseDexResult {
           );
         }
 
-        await chatHandle.done;
+        const respMessages = await chatHandle.done;
 
         if (abortController.signal.aborted) {
           // Cancelled by barge-in or stop — skip the drain/follow-up transition.
           bargedIn = true;
         } else {
           for (const tail of buffer.flush()) tts.enqueue(tail);
-          if (assistantText.trim()) {
-            messagesRef.current.push({
-              role: "assistant",
-              content: assistantText.trim(),
-            });
-          }
+          // Record the real assistant + tool messages so the model remembers
+          // what it already did (and won't re-trigger gated actions next turn).
+          if (respMessages.length) messagesRef.current.push(...respMessages);
         }
       } catch (err) {
         if (abortController.signal.aborted) {
@@ -706,7 +704,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
             });
             if (ac.signal.aborted) return;
             const cleaned = text.trim();
-            if (!cleaned) {
+            // Empty, or no real words (Whisper can hallucinate "." / "♪" from
+            // noise) → ignore and go back to waiting.
+            if (!cleaned || !/[a-z0-9]/i.test(cleaned)) {
               startModeRef.current?.("wake");
               return;
             }

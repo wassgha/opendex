@@ -9,6 +9,7 @@ import {
 } from "../ui/fields";
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
+import { SKILLS_META } from "@/lib/skills-meta";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -150,6 +151,57 @@ export function SettingsPanel({
             value={config.appearance.theme}
             onChange={(id) => setConfig({ appearance: { theme: id } })}
           />
+        </Section>
+
+        <Section title="Skills & tools">
+          {SKILLS_META.map((skill) => {
+            const enabled = config.skills.enabled[skill.id] !== false;
+            const permission = config.skills.permissions[skill.id] ?? "ask";
+            return (
+              <div key={skill.id} className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-white/90">{skill.label}</div>
+                    <div className="text-xs text-white/40">{skill.description}</div>
+                  </div>
+                  <SegmentedControl
+                    value={enabled ? "on" : "off"}
+                    options={[
+                      { value: "on", label: "On" },
+                      { value: "off", label: "Off" },
+                    ]}
+                    onChange={(v) =>
+                      setConfig({
+                        skills: {
+                          ...config.skills,
+                          enabled: { ...config.skills.enabled, [skill.id]: v === "on" },
+                        },
+                      })
+                    }
+                  />
+                </div>
+                {enabled && skill.sensitive && (
+                  <SelectField
+                    label="Permission"
+                    value={permission}
+                    options={[
+                      { value: "ask", label: "Ask each time" },
+                      { value: "always", label: "Always allow" },
+                      { value: "never", label: "Never allow" },
+                    ]}
+                    onChange={(v) =>
+                      setConfig({
+                        skills: {
+                          ...config.skills,
+                          permissions: { ...config.skills.permissions, [skill.id]: v },
+                        },
+                      })
+                    }
+                  />
+                )}
+              </div>
+            );
+          })}
         </Section>
 
         <Section title="Language model">

@@ -4,6 +4,12 @@ import { app, BrowserWindow, globalShortcut, ipcMain, shell } from "electron";
 import { IPC, type ChatStartPayload } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
 import { buildSystemPrompt } from "./agent/system-prompt";
+import { buildToolSet } from "./agent/skills/registry";
+import {
+  makePermissionRequester,
+  recordAndResolve,
+  type PermissionDecision,
+} from "./agent/permissions";
 import { synthesizeSpeech } from "./tts/elevenlabs";
 import { transcribe } from "./stt";
 import {
@@ -66,18 +72,27 @@ function registerIpc() {
     const config = getConfig();
     const briefing = mode === "briefing";
     const system = buildSystemPrompt({ config, briefing });
+    const tools = buildToolSet({
+      config,
+      requestPermission: makePermissionRequester(sender),
+    });
     try {
-      for await (const delta of streamChat({
+      const responseMessages = await streamChat({
         messages,
         system,
         model: config.llm.model,
+        tools,
         briefing,
         signal: ac.signal,
-      })) {
-        if (ac.signal.aborted || sender.isDestroyed()) break;
-        sender.send(IPC.chatDelta(requestId), delta);
+        onDelta: (delta) => {
+          if (!ac.signal.aborted && !sender.isDestroyed()) {
+            sender.send(IPC.chatDelta(requestId), delta);
+          }
+        },
+      });
+      if (!sender.isDestroyed()) {
+        sender.send(IPC.chatDone(requestId), responseMessages);
       }
-      if (!sender.isDestroyed()) sender.send(IPC.chatDone(requestId));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (!sender.isDestroyed()) sender.send(IPC.chatError(requestId), message);
@@ -124,6 +139,14 @@ function registerIpc() {
   // The one secret the renderer may read — Porcupine's WASM SDK needs it
   // client-side. Billing keys (OpenAI, etc.) never leave main.
   ipcMain.handle(IPC.getPicovoiceKey, () => getPicovoiceKey());
+
+  // Permission gate: the renderer answers a sensitive-tool prompt.
+  ipcMain.on(
+    IPC.permissionRespond,
+    (_event, payload: { id: string; skillId: string; decision: PermissionDecision }) => {
+      recordAndResolve(payload.id, payload.skillId, payload.decision);
+    },
+  );
 }
 
 function registerPushToTalkHotkey() {

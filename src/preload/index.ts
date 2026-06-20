@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { randomUUID } from "node:crypto";
-import { IPC, type ChatMessage } from "../main/ipc/channels";
+import {
+  IPC,
+  type ChatMessage,
+  type PermissionRequestPayload,
+} from "../main/ipc/channels";
+import type { PermissionDecision } from "../main/agent/permissions";
 import type {
   DeepPartial,
   OpenDexConfig,
@@ -17,14 +22,15 @@ export interface ChatRequest {
 
 export interface ChatHandle {
   cancel: () => void;
-  done: Promise<void>;
+  /** Resolves with the assistant/tool messages generated this turn (for history). */
+  done: Promise<ChatMessage[]>;
 }
 
 const opendex = {
   /**
    * Stream a chat reply. Text deltas arrive via `onDelta`; the returned promise
-   * resolves when the reply completes (or rejects on error). `cancel()` aborts
-   * the main-process stream (used for barge-in / stop).
+   * resolves with the generated messages (or rejects on error). `cancel()`
+   * aborts the main-process stream (used for barge-in / stop).
    */
   chat({ messages, mode, onDelta }: ChatRequest): ChatHandle {
     const requestId = randomUUID();
@@ -33,26 +39,27 @@ const opendex = {
     const errorCh = IPC.chatError(requestId);
 
     let settled = false;
-    let resolveDone!: () => void;
+    let resolveDone!: (msgs: ChatMessage[]) => void;
     let rejectDone!: (err: Error) => void;
-    const done = new Promise<void>((res, rej) => {
+    const done = new Promise<ChatMessage[]>((res, rej) => {
       resolveDone = res;
       rejectDone = rej;
     });
 
     const onDeltaEvt = (_e: IpcRendererEvent, text: string) => onDelta(text);
-    const onDoneEvt = () => finish(null);
+    const onDoneEvt = (_e: IpcRendererEvent, msgs: ChatMessage[]) =>
+      finish(null, msgs);
     const onErrorEvt = (_e: IpcRendererEvent, message: string) =>
       finish(new Error(message));
 
-    function finish(err: Error | null) {
+    function finish(err: Error | null, msgs: ChatMessage[] = []) {
       if (settled) return;
       settled = true;
       ipcRenderer.removeListener(deltaCh, onDeltaEvt);
       ipcRenderer.removeListener(doneCh, onDoneEvt);
       ipcRenderer.removeListener(errorCh, onErrorEvt);
       if (err) rejectDone(err);
-      else resolveDone();
+      else resolveDone(msgs);
     }
 
     ipcRenderer.on(deltaCh, onDeltaEvt);
@@ -111,6 +118,25 @@ const opendex = {
     const listener = () => handler();
     ipcRenderer.on(IPC.pushToTalk, listener);
     return () => ipcRenderer.removeListener(IPC.pushToTalk, listener);
+  },
+
+  /** Subscribe to permission prompts for sensitive tool calls. */
+  onPermissionRequest(
+    handler: (req: PermissionRequestPayload) => void,
+  ): () => void {
+    const listener = (_e: IpcRendererEvent, req: PermissionRequestPayload) =>
+      handler(req);
+    ipcRenderer.on(IPC.permissionRequest, listener);
+    return () => ipcRenderer.removeListener(IPC.permissionRequest, listener);
+  },
+
+  /** Answer a permission prompt. */
+  respondPermission(
+    id: string,
+    skillId: string,
+    decision: PermissionDecision,
+  ): void {
+    ipcRenderer.send(IPC.permissionRespond, { id, skillId, decision });
   },
 };
 

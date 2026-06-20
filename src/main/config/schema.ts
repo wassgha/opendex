@@ -48,8 +48,16 @@ export interface OpenDexConfig {
     /** Voice-visualization theme id (used from the themes phase onward). */
     theme: string;
   };
+  skills: {
+    /** Per-skill enablement; a skill is on unless explicitly false. */
+    enabled: Record<string, boolean>;
+    /** Standing permission decision per skill: ask each time / always / never. */
+    permissions: Record<string, SkillPermission>;
+  };
   onboarding: { completed: boolean };
 }
+
+export type SkillPermission = "ask" | "always" | "never";
 
 export interface SecretsPresence {
   AI_GATEWAY_API_KEY: boolean;
@@ -85,6 +93,10 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     whisperModel: "Xenova/whisper-base.en",
   },
   appearance: { theme: "jarvis" },
+  skills: {
+    enabled: { open: true },
+    permissions: { open: "ask" },
+  },
   onboarding: { completed: false },
 };
 

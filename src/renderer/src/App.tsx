@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { SettingsPanel } from "@/components/settings/settings-panel";
+import { PermissionPrompt } from "@/components/permission-prompt";
 import { getDexTheme } from "@/components/themes/registry";
 import { useConfig } from "@/lib/use-config";
+import { usePermission } from "@/lib/use-permission";
 import { useDex, type UseDexOptions } from "@/lib/dex/use-dex";
 import type { PublicConfig } from "../../main/config/schema";
 import type { DeepPartial, OpenDexConfig, SecretName } from "../../main/config/schema";
@@ -52,6 +54,7 @@ function MainExperience({
   setSecret: (name: SecretName, value: string) => void;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const permission = usePermission();
   const cfg = data.config;
 
   const dexOptions = useMemo<UseDexOptions>(
@@ -142,6 +145,13 @@ function MainExperience({
           setConfig={setConfig}
           setSecret={setSecret}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {permission.current && (
+        <PermissionPrompt
+          request={permission.current}
+          onRespond={permission.respond}
         />
       )}
     </div>
