@@ -1,9 +1,9 @@
 import { desktopCapturer, screen, systemPreferences } from "electron";
 
 export interface Screenshot {
-  /** Base64-encoded PNG (no data: prefix). */
+  /** Base64-encoded JPEG (no data: prefix). */
   base64: string;
-  mediaType: "image/png";
+  mediaType: "image/jpeg";
   /** Pixel size of the image the model sees. */
   width: number;
   height: number;
@@ -14,8 +14,10 @@ export interface Screenshot {
 
 // Screenshots are captured at (at most) this width to keep token cost sane while
 // staying legible. Coordinates the model returns are scaled back up to the real
-// display via `toScreenPoint`.
-const MAX_WIDTH = 1366;
+// display via `toScreenPoint`. We encode as JPEG (much smaller than PNG, so each
+// step's upload is faster) at a quality that keeps UI text readable.
+const MAX_WIDTH = 1280;
+const JPEG_QUALITY = 80;
 
 /**
  * Capture the primary display as a PNG via Electron's `desktopCapturer`
@@ -61,8 +63,8 @@ export async function captureScreen(): Promise<Screenshot | { error: string }> {
   const size = image.getSize();
 
   return {
-    base64: image.toPNG().toString("base64"),
-    mediaType: "image/png",
+    base64: image.toJPEG(JPEG_QUALITY).toString("base64"),
+    mediaType: "image/jpeg",
     width: size.width,
     height: size.height,
     logicalWidth,

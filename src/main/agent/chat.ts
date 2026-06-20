@@ -22,6 +22,57 @@ export interface StreamChatOptions {
   onDelta: (text: string) => void;
 }
 
+// Computer-use returns a screenshot from every action, so the visual history
+// piles up — and a naive loop re-sends EVERY past screenshot to the model on
+// each step, which dominates latency and token cost. The model only needs the
+// most recent frame(s) to decide the next action, so before each step we keep
+// the last `KEEP_SCREENSHOTS` images and replace older ones with a text stub.
+const KEEP_SCREENSHOTS = 2;
+
+function hasImage(output: unknown): boolean {
+  return (
+    !!output &&
+    typeof output === "object" &&
+    (output as { type?: string }).type === "content" &&
+    Array.isArray((output as { value?: unknown[] }).value) &&
+    (output as { value: Array<{ type?: string }> }).value.some(
+      (c) => c.type === "media" || c.type === "file-data",
+    )
+  );
+}
+
+function pruneOldScreenshots(messages: ModelMessage[]): ModelMessage[] {
+  // Collect every image-bearing tool-result part, in order.
+  const imageParts: object[] = [];
+  for (const m of messages) {
+    if (m.role !== "tool" || !Array.isArray(m.content)) continue;
+    for (const part of m.content) {
+      if (part?.type === "tool-result" && hasImage(part.output)) imageParts.push(part);
+    }
+  }
+  if (imageParts.length <= KEEP_SCREENSHOTS) return messages;
+
+  const strip = new Set(imageParts.slice(0, imageParts.length - KEEP_SCREENSHOTS));
+  return messages.map((m) => {
+    if (m.role !== "tool" || !Array.isArray(m.content)) return m;
+    let changed = false;
+    const content = m.content.map((part) => {
+      if (strip.has(part as object)) {
+        changed = true;
+        return {
+          ...part,
+          output: {
+            type: "text" as const,
+            value: "[earlier screenshot omitted to save context]",
+          },
+        };
+      }
+      return part;
+    });
+    return changed ? { ...m, content } : m;
+  });
+}
+
 // Strip ANSI colour codes and noisy trailers from gateway errors before they
 // are read aloud.
 function sanitiseError(raw: string): string {
@@ -53,6 +104,11 @@ export async function streamChat({
     messages,
     tools: briefing ? undefined : tools,
     stopWhen: stepCountIs(maxSteps ?? 8),
+    // Trim stale screenshots from the context before each step (no-op when
+    // there are none, e.g. ordinary turns).
+    prepareStep: ({ messages: stepMessages }) => ({
+      messages: pruneOldScreenshots(stepMessages),
+    }),
     abortSignal: signal,
     onError: ({ error }) => {
       capturedError = error;

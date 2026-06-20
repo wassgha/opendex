@@ -9,8 +9,8 @@ let configured = false;
 function ensureConfigured() {
   if (configured) return;
   mouse.config.mouseSpeed = 3000; // px/sec when animating moves
-  mouse.config.autoDelayMs = 60;
-  keyboard.config.autoDelayMs = 8;
+  mouse.config.autoDelayMs = 25;
+  keyboard.config.autoDelayMs = 4;
   configured = true;
 }
 
