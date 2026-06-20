@@ -151,6 +151,24 @@ export function SettingsPanel({
             value={config.appearance.theme}
             onChange={(id) => setConfig({ appearance: { theme: id } })}
           />
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-white/90">Tool activity banners</div>
+              <div className="text-xs text-white/40">
+                Show what the assistant is doing (each tool it calls) as it works.
+              </div>
+            </div>
+            <SegmentedControl
+              value={config.appearance.showToolActivity ? "on" : "off"}
+              options={[
+                { value: "on", label: "On" },
+                { value: "off", label: "Off" },
+              ]}
+              onChange={(v) =>
+                setConfig({ appearance: { showToolActivity: v === "on" } })
+              }
+            />
+          </div>
         </Section>
 
         <Section title="Skills & tools">

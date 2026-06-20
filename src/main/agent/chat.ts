@@ -20,6 +20,8 @@ export interface StreamChatOptions {
   signal?: AbortSignal;
   /** Called with each text delta as it streams. */
   onDelta: (text: string) => void;
+  /** Called when the model invokes a tool, so the UI can surface activity. */
+  onToolCall?: (call: { toolCallId: string; toolName: string; input: unknown }) => void;
 }
 
 // Computer-use returns a screenshot from every action, so the visual history
@@ -96,6 +98,7 @@ export async function streamChat({
   maxSteps,
   signal,
   onDelta,
+  onToolCall,
 }: StreamChatOptions): Promise<ModelMessage[]> {
   let capturedError: unknown = null;
   const result = streamText({
@@ -118,10 +121,20 @@ export async function streamChat({
 
   let emittedAny = false;
   try {
-    for await (const delta of result.textStream) {
-      if (delta.length === 0) continue;
-      emittedAny = true;
-      onDelta(delta);
+    // Iterate the full stream (not just textStream) so we can forward tool-call
+    // events for the activity UI alongside the text deltas.
+    for await (const part of result.fullStream) {
+      if (part.type === "text-delta") {
+        if (part.text.length === 0) continue;
+        emittedAny = true;
+        onDelta(part.text);
+      } else if (part.type === "tool-call") {
+        onToolCall?.({
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          input: part.input,
+        });
+      }
     }
   } catch (err) {
     if ((err as Error)?.name === "AbortError") return [];

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { PermissionPrompt } from "@/components/permission-prompt";
+import { ToolActivityBanner } from "@/components/tool-activity-banner";
 import { getDexTheme } from "@/components/themes/registry";
 import { useConfig } from "@/lib/use-config";
 import { usePermission } from "@/lib/use-permission";
@@ -120,6 +121,10 @@ function MainExperience({
             {dex.loadingModel.label || "Loading voice model…"}
           </div>
         </div>
+      )}
+
+      {cfg.appearance.showToolActivity && (
+        <ToolActivityBanner activity={dex.toolActivity} />
       )}
 
       {dex.audioBlocked && (

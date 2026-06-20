@@ -93,6 +93,11 @@ function registerIpc() {
             sender.send(IPC.chatDelta(requestId), delta);
           }
         },
+        onToolCall: (call) => {
+          if (!ac.signal.aborted && !sender.isDestroyed()) {
+            sender.send(IPC.chatTool(requestId), call);
+          }
+        },
       });
       if (!sender.isDestroyed()) {
         sender.send(IPC.chatDone(requestId), responseMessages);

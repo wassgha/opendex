@@ -16,6 +16,8 @@ import { AudioMeter } from "./audio-meter";
 import { CloudSttEngine } from "./engines/cloud-stt";
 import type { SttEngine, WakeEngine } from "./engines/types";
 import type { DexStatus, TranscriptTurn } from "./state";
+import { formatToolCall } from "../format-tool-call";
+import type { ToolCallEvent } from "../../../../main/ipc/channels";
 import type { ChatMessage } from "../../../../main/agent/chat";
 import type { SttProvider, WakeMode } from "../../../../main/config/schema";
 
@@ -23,6 +25,15 @@ export interface ModelLoadingState {
   active: boolean;
   label: string;
 }
+
+export interface ToolActivity {
+  id: string;
+  icon: string;
+  label: string;
+}
+
+// How long a tool-activity banner lingers before fading out.
+const TOOL_ACTIVITY_TTL_MS = 4000;
 
 // A smooth, organic synthetic loudness envelope (0..1) used for speaking/
 // thinking states where we don't meter the actual audio. Layered sines give it
@@ -103,6 +114,8 @@ export interface UseDexResult {
   pushToTalk: () => void;
   /** Submit a typed command through the same agent path as a spoken one. */
   submitText: (text: string) => void;
+  /** Recent tool calls the agent made (transient; for the activity banners). */
+  toolActivity: ToolActivity[];
   /** Current voice loudness, 0..1 — real mic level while listening, a synthetic
    *  envelope while speaking/thinking. Sampled by the visualization via rAF. */
   getAmplitude: () => number;
@@ -131,6 +144,25 @@ export function useDex(options: UseDexOptions): UseDexResult {
     active: false,
     label: "",
   });
+  const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
+  const toolTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  const addToolActivity = useCallback((call: ToolCallEvent) => {
+    const { icon, label } = formatToolCall(call);
+    const id = `${call.toolCallId}-${Math.random().toString(36).slice(2, 6)}`;
+    setToolActivity((prev) => [...prev, { id, icon, label }]);
+    const timer = setTimeout(() => {
+      setToolActivity((prev) => prev.filter((t) => t.id !== id));
+      toolTimersRef.current.delete(timer);
+    }, TOOL_ACTIVITY_TTL_MS);
+    toolTimersRef.current.add(timer);
+  }, []);
+
+  const clearToolActivity = useCallback(() => {
+    toolTimersRef.current.forEach(clearTimeout);
+    toolTimersRef.current.clear();
+    setToolActivity([]);
+  }, []);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const bargeRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -406,6 +438,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
         const chatHandle = window.opendex.chat({
           messages: messagesRef.current,
           mode: isBriefing ? "briefing" : undefined,
+          onToolCall: addToolActivity,
           onDelta: (value) => {
             if (!value) return;
             assistantText += value;
@@ -494,6 +527,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
       }
     },
     [
+      addToolActivity,
       appendTurn,
       startBargeMonitor,
       stopBargeMonitor,
@@ -1033,10 +1067,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
     micStreamRef.current = null;
     modeRef.current = "off";
     setLoadingModel({ active: false, label: "" });
+    clearToolActivity();
     setStatus("idle");
     setLiveCaption("");
     restartGuardRef.current = false;
-  }, [abortStt, clearTimers, stopBargeMonitor, stopWakeEngine, stopRecognition]);
+  }, [abortStt, clearTimers, clearToolActivity, stopBargeMonitor, stopWakeEngine, stopRecognition]);
 
   const toggleMute = useCallback(() => {
     setIsMuted((current) => {
@@ -1081,6 +1116,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
       meterRef.current = null;
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
       micStreamRef.current = null;
+      toolTimersRef.current.forEach(clearTimeout);
+      toolTimersRef.current.clear();
     };
   }, [abortStt, clearTimers, stopBargeMonitor, stopWakeEngine, stopRecognition]);
 
@@ -1106,6 +1143,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     canPushToTalk,
     pushToTalk,
     submitText,
+    toolActivity,
     getAmplitude,
     unlockAudio,
     stop,

@@ -47,6 +47,8 @@ export interface OpenDexConfig {
   appearance: {
     /** Voice-visualization theme id (used from the themes phase onward). */
     theme: string;
+    /** Show transient banners for each tool the agent calls. */
+    showToolActivity: boolean;
   };
   skills: {
     /** Per-skill enablement; a skill is on unless explicitly false. */
@@ -92,7 +94,7 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     sttProvider: "whisper-local",
     whisperModel: "Xenova/whisper-base.en",
   },
-  appearance: { theme: "jarvis" },
+  appearance: { theme: "jarvis", showToolActivity: true },
   skills: {
     // `computer` is opt-in (off until the user enables it in Settings).
     enabled: { open: true, computer: false },

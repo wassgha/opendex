@@ -9,6 +9,7 @@ export const IPC = {
   // Per-request reply channels are suffixed with the requestId:
   //   chat:delta:<id> · chat:done:<id> · chat:error:<id>
   chatDelta: (id: string) => `chat:delta:${id}`,
+  chatTool: (id: string) => `chat:tool:${id}`,
   chatDone: (id: string) => `chat:done:${id}`,
   chatError: (id: string) => `chat:error:${id}`,
   ttsSynthesize: "tts:synthesize",
@@ -31,6 +32,12 @@ export interface ChatStartPayload {
   requestId: string;
   messages: ChatMessage[];
   mode?: "briefing";
+}
+
+export interface ToolCallEvent {
+  toolCallId: string;
+  toolName: string;
+  input: unknown;
 }
 
 export interface PermissionRequestPayload {

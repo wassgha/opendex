@@ -26,6 +26,12 @@ body {
   --animate-dex-spin-slower: dex-spin 64s linear infinite;
   --animate-dex-spin-rev: dex-spin-rev 20s linear infinite;
   --animate-caret-blink: caret-blink 1.1s steps(1, end) infinite;
+  --animate-dex-rise: dex-rise 0.22s ease-out;
+}
+
+@keyframes dex-rise {
+  from { transform: translateY(6px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes dex-spin-rev {

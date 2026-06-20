@@ -51,5 +51,9 @@ OpenDex is an **Electron** desktop app (electron-vite + React + Tailwind v4). It
 - **System prompt:** `buildSystemPrompt({computerUse})` injects an operating manual (screenshot-first, platform-correct modifier keys, small steps, permission hints) when the skill is active. `chatStart` sets `computerUse` + bumps `maxSteps` to 40 (vs 8) for the longer loop.
 - **OS permissions:** macOS needs **Screen Recording** (else captures come back empty — surfaced as a spoken hint) and **Accessibility** (for input; silently no-ops if missing). Grant them to the Electron/packaged app in System Settings → Privacy & Security.
 
+## Tool-activity banners
+- The agent loop streams **tool-call events** to the renderer, not just text: `streamChat` iterates `result.fullStream` and fires `onToolCall({toolCallId,toolName,input})` on each `tool-call` part → `chatStart` forwards them over the `chat:tool:<id>` IPC channel (`ToolCallEvent`) → preload's `chat()` surfaces them via `onToolCall` → `useDex` turns each into a transient `ToolActivity` (auto-expires after 4s) via `lib/format-tool-call.ts` (toolName+input → icon+label). `App.tsx` renders `ToolActivityBanner` (top-center stack, global chrome over any theme) gated on `appearance.showToolActivity` (Settings → Voice visualization toggle, default on).
+- The chat loop also prunes stale screenshots between steps: `prepareStep` keeps only the last `KEEP_SCREENSHOTS` (2) image tool-results and stubs older ones out — keeps computer-use latency flat instead of growing per step. Screenshots are JPEG (≤1280px) for smaller per-step uploads.
+
 ## Status
 Phases 1–4 done (4a cloud/web + 4b free offline); **5a done** (skills + permission gate + Open built-in); **6 done** (computer-use: screen capture + mouse/keyboard, gated & opt-in). Roadmap: 5b MCP + more built-ins → signed releases + auto-update.

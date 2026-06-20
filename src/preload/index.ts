@@ -4,6 +4,7 @@ import {
   IPC,
   type ChatMessage,
   type PermissionRequestPayload,
+  type ToolCallEvent,
 } from "../main/ipc/channels";
 import type { PermissionDecision } from "../main/agent/permissions";
 import type {
@@ -18,6 +19,8 @@ export interface ChatRequest {
   messages: ChatMessage[];
   mode?: "briefing";
   onDelta: (text: string) => void;
+  /** Fired when the agent invokes a tool (for the activity UI). */
+  onToolCall?: (call: ToolCallEvent) => void;
 }
 
 export interface ChatHandle {
@@ -32,9 +35,10 @@ const opendex = {
    * resolves with the generated messages (or rejects on error). `cancel()`
    * aborts the main-process stream (used for barge-in / stop).
    */
-  chat({ messages, mode, onDelta }: ChatRequest): ChatHandle {
+  chat({ messages, mode, onDelta, onToolCall }: ChatRequest): ChatHandle {
     const requestId = randomUUID();
     const deltaCh = IPC.chatDelta(requestId);
+    const toolCh = IPC.chatTool(requestId);
     const doneCh = IPC.chatDone(requestId);
     const errorCh = IPC.chatError(requestId);
 
@@ -47,6 +51,8 @@ const opendex = {
     });
 
     const onDeltaEvt = (_e: IpcRendererEvent, text: string) => onDelta(text);
+    const onToolEvt = (_e: IpcRendererEvent, call: ToolCallEvent) =>
+      onToolCall?.(call);
     const onDoneEvt = (_e: IpcRendererEvent, msgs: ChatMessage[]) =>
       finish(null, msgs);
     const onErrorEvt = (_e: IpcRendererEvent, message: string) =>
@@ -56,6 +62,7 @@ const opendex = {
       if (settled) return;
       settled = true;
       ipcRenderer.removeListener(deltaCh, onDeltaEvt);
+      ipcRenderer.removeListener(toolCh, onToolEvt);
       ipcRenderer.removeListener(doneCh, onDoneEvt);
       ipcRenderer.removeListener(errorCh, onErrorEvt);
       if (err) rejectDone(err);
@@ -63,6 +70,7 @@ const opendex = {
     }
 
     ipcRenderer.on(deltaCh, onDeltaEvt);
+    ipcRenderer.on(toolCh, onToolEvt);
     ipcRenderer.once(doneCh, onDoneEvt);
     ipcRenderer.once(errorCh, onErrorEvt);
     ipcRenderer.send(IPC.chatStart, { requestId, messages, mode });
