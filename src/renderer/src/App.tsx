@@ -99,6 +99,7 @@ function MainExperience({
         unsupported={dex.status === "unsupported"}
         canPushToTalk={dex.canPushToTalk}
         onPushToTalk={dex.pushToTalk}
+        onSubmitText={dex.submitText}
         toggleMute={dex.toggleMute}
         toggleBargeIn={dex.toggleBargeIn}
       />

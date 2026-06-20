@@ -1,4 +1,4 @@
-import { desktopCapturer, screen } from "electron";
+import { desktopCapturer, screen, systemPreferences } from "electron";
 
 export interface Screenshot {
   /** Base64-encoded PNG (no data: prefix). */
@@ -23,6 +23,18 @@ const MAX_WIDTH = 1366;
  * if it's missing the capture comes back empty and we say so.
  */
 export async function captureScreen(): Promise<Screenshot | { error: string }> {
+  // macOS gates screen capture behind Screen Recording permission. Surface a
+  // clear, actionable message rather than handing back a black frame.
+  if (
+    process.platform === "darwin" &&
+    systemPreferences.getMediaAccessStatus("screen") !== "granted"
+  ) {
+    return {
+      error:
+        "I don't have Screen Recording permission, so I can't see the screen yet. Please enable OpenDex (in dev, the Electron app) under System Settings, Privacy and Security, Screen Recording, then restart me and try again.",
+    };
+  }
+
   const display = screen.getPrimaryDisplay();
   const { width: logicalWidth, height: logicalHeight } = display.size;
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { StatusBar } from "@/components/status-bar";
+import { TextComposer } from "./text-composer";
 import type { DexThemeProps } from "./types";
 
 // Shared chrome for the minimalist themes (dot, cursor): a solid background, a
@@ -71,9 +72,9 @@ export function MinimalShell({
 
       {/* Borderless transcript overlay — only when there's content, fading up. */}
       {hasTranscript && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-0 bottom-16 z-10 flex justify-center">
           <div
-            className="max-h-[42vh] w-full max-w-2xl overflow-hidden px-6 pb-10"
+            className="max-h-[42vh] w-full max-w-2xl overflow-hidden px-6 pb-4"
             style={{
               maskImage:
                 "linear-gradient(to top, black 0%, black 55%, transparent 100%)",
@@ -85,6 +86,11 @@ export function MinimalShell({
           </div>
         </div>
       )}
+
+      {/* Concealed typing affordance — voice-first, type when you can't speak. */}
+      <div className="absolute inset-x-0 bottom-5 z-20 flex justify-center">
+        <TextComposer onSubmit={props.onSubmitText} tone="minimal" />
+      </div>
     </div>
   );
 }

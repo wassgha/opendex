@@ -19,6 +19,8 @@ export interface DexThemeProps {
   /** Manual wake mode + ready: the visualization is tap-to-talk. */
   canPushToTalk: boolean;
   onPushToTalk: () => void;
+  /** Submit a typed command (the concealed text-input alternative to voice). */
+  onSubmitText: (text: string) => void;
   toggleMute: () => void;
   toggleBargeIn: () => void;
 }

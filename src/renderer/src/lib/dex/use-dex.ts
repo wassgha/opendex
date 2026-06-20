@@ -101,6 +101,8 @@ export interface UseDexResult {
   /** True when the user can tap/hotkey to talk (manual wake mode, idle). */
   canPushToTalk: boolean;
   pushToTalk: () => void;
+  /** Submit a typed command through the same agent path as a spoken one. */
+  submitText: (text: string) => void;
   /** Current voice loudness, 0..1 — real mic level while listening, a synthetic
    *  envelope while speaking/thinking. Sampled by the visualization via rAF. */
   getAmplitude: () => number;
@@ -348,7 +350,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
   );
 
   const runCommand = useCallback(
-    async (userText: string, opts?: { mode?: "briefing" }) => {
+    async (userText: string, opts?: { mode?: "briefing"; resumeMode?: Mode }) => {
       const isBriefing = opts?.mode === "briefing";
       // The briefing is proactive — we don't show the synthetic prompt as a
       // user turn, but we still record it for conversational continuity.
@@ -486,7 +488,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
       if (mutedRef.current) {
         setStatus("muted");
       } else {
-        startModeRef.current?.("follow_up");
+        // Typed turns resume in passive wake mode (so we don't actively capture
+        // ambient noise as a command); spoken turns flow into follow-up listening.
+        startModeRef.current?.(opts?.resumeMode ?? "follow_up");
       }
     },
     [
@@ -936,6 +940,48 @@ export function useDex(options: UseDexOptions): UseDexResult {
     startMode("wake");
   }, [ensureTts, startMode]);
 
+  // Typed input — an alternative to voice (e.g. when you can't speak). Runs the
+  // text through the same agent path as a spoken command. If a reply is in
+  // flight it interrupts it (preserving the partial for context, like a
+  // barge-in); otherwise it tears down any active listening so the mic doesn't
+  // also fire. Works even when voice is unsupported or audio was never engaged.
+  const submitText = useCallback(
+    (raw: string) => {
+      const text = raw.trim();
+      if (!text || statusRef.current === "error") return;
+
+      restartGuardRef.current = true;
+      clearTimers();
+      stopRecognition();
+      stopWakeEngine();
+      abortStt();
+      stopBargeMonitor();
+      restartGuardRef.current = false;
+
+      const running = runningCommandRef.current;
+      if (running) {
+        const partial = running.getPartialReply().trim();
+        if (partial) messagesRef.current.push({ role: "assistant", content: partial });
+        ttsRef.current?.stop();
+        running.abortController.abort();
+        runningCommandRef.current = null;
+      }
+
+      // Make sure a TTS engine exists even if the voice session never engaged.
+      ensureTts();
+      void runCommand(text, { resumeMode: "wake" });
+    },
+    [
+      abortStt,
+      clearTimers,
+      ensureTts,
+      runCommand,
+      stopBargeMonitor,
+      stopRecognition,
+      stopWakeEngine,
+    ],
+  );
+
   const getAmplitude = useCallback(() => {
     const s = statusRef.current;
     if (
@@ -1059,6 +1105,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     loadingModel,
     canPushToTalk,
     pushToTalk,
+    submitText,
     getAmplitude,
     unlockAudio,
     stop,

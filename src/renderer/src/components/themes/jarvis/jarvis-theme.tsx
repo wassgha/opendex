@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { STATUS_LABELS } from "@/lib/dex/state";
 import { JarvisReactor } from "./jarvis-reactor";
 import { HudRing, HudGauge, HudWaveform } from "./hud-widgets";
+import { TextComposer } from "../text-composer";
 import type { DexThemeProps } from "../types";
 import type { TranscriptTurn } from "@/lib/dex/state";
 
@@ -78,6 +79,7 @@ export function JarvisTheme(props: DexThemeProps) {
     unsupported,
     canPushToTalk,
     onPushToTalk,
+    onSubmitText,
     toggleMute,
     toggleBargeIn,
   } = props;
@@ -208,6 +210,11 @@ export function JarvisTheme(props: DexThemeProps) {
             </div>
           )
         )}
+
+        {/* Concealed typing affordance — type a command when you can't speak. */}
+        <div className="flex">
+          <TextComposer onSubmit={onSubmitText} tone="jarvis" />
+        </div>
       </div>
     </div>
   );

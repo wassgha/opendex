@@ -1,4 +1,5 @@
 import { Button, Key, Point, keyboard, mouse } from "@nut-tree-fork/nut-js";
+import { systemPreferences } from "electron";
 import { z } from "zod";
 import { captureScreen, toScreenPoint, type Screenshot } from "./screen-capture";
 import type { Skill, SkillTool, ToModelOutput } from "./types";
@@ -11,6 +12,27 @@ function ensureConfigured() {
   mouse.config.autoDelayMs = 60;
   keyboard.config.autoDelayMs = 8;
   configured = true;
+}
+
+// macOS gates mouse/keyboard injection behind Accessibility permission. If we
+// call nut.js without it, the action silently no-ops (and libnut spams stderr),
+// so the model would loop pointlessly. Preflight every input action: when the
+// permission is missing, trigger the system grant dialog (which also registers
+// the app in System Settings → Accessibility so the user can toggle it on) and
+// return a clear, spoken-friendly error instead of acting.
+let accessibilityPrompted = false;
+function ensureInputAccess(): { ok: true } | { error: string } {
+  if (process.platform !== "darwin") return { ok: true };
+  if (systemPreferences.isTrustedAccessibilityClient(false)) return { ok: true };
+  // Prompt once per run so we don't reopen the dialog on every retry.
+  if (!accessibilityPrompted) {
+    accessibilityPrompted = true;
+    systemPreferences.isTrustedAccessibilityClient(true);
+  }
+  return {
+    error:
+      "I don't have Accessibility permission, so I can't control the mouse or keyboard yet. I've opened the request — please enable OpenDex (in dev, the Electron app) under System Settings, Privacy and Security, Accessibility, then restart me and try again.",
+  };
 }
 
 // The pixel space of the most recent screenshot, so the coordinates the model
@@ -135,6 +157,8 @@ const tools: SkillTool[] = [
       button?: "left" | "right" | "middle";
       double?: boolean;
     }): Promise<ActionResult> => {
+      const access = ensureInputAccess();
+      if ("error" in access) return access;
       ensureConfigured();
       const ref = lastShot;
       const p = ref ? toScreenPoint(x, y, ref) : { x, y };
@@ -158,6 +182,8 @@ const tools: SkillTool[] = [
       return `Move mouse to (${x}, ${y})`;
     },
     execute: async ({ x, y }: { x: number; y: number }): Promise<ActionResult> => {
+      const access = ensureInputAccess();
+      if ("error" in access) return access;
       ensureConfigured();
       const ref = lastShot;
       const p = ref ? toScreenPoint(x, y, ref) : { x, y };
@@ -178,6 +204,8 @@ const tools: SkillTool[] = [
     },
     toModelOutput: withScreenshot,
     execute: async ({ text }: { text: string }): Promise<ActionResult> => {
+      const access = ensureInputAccess();
+      if ("error" in access) return access;
       ensureConfigured();
       await keyboard.type(text);
       const shot = await shoot();
@@ -194,6 +222,8 @@ const tools: SkillTool[] = [
     summarize: (i) => `Press ${(i as { keys: string[] }).keys.join(" + ")}`,
     toModelOutput: withScreenshot,
     execute: async ({ keys }: { keys: string[] }): Promise<ActionResult> => {
+      const access = ensureInputAccess();
+      if ("error" in access) return access;
       ensureConfigured();
       const resolved = keys.map(keyFromToken);
       const bad = keys.find((_, idx) => resolved[idx] === null);
@@ -224,6 +254,8 @@ const tools: SkillTool[] = [
       direction: "up" | "down" | "left" | "right";
       amount?: number;
     }): Promise<ActionResult> => {
+      const access = ensureInputAccess();
+      if ("error" in access) return access;
       ensureConfigured();
       const n = amount ?? 5;
       if (direction === "up") await mouse.scrollUp(n);
