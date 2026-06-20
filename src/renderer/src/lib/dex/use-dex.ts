@@ -35,6 +35,19 @@ export interface ToolActivity {
 // How long a tool-activity banner lingers before fading out.
 const TOOL_ACTIVITY_TTL_MS = 4000;
 
+// Computer-use tools. When the agent starts driving the screen, we stop voicing
+// its per-action narration (the user can watch the screen + the activity
+// banners) and speak only the opening line and the final summary — otherwise
+// TTS lags far behind the fast on-screen actions.
+const COMPUTER_TOOL_NAMES = new Set([
+  "captureScreen",
+  "click",
+  "moveMouse",
+  "typeText",
+  "pressKeys",
+  "scroll",
+]);
+
 // A smooth, organic synthetic loudness envelope (0..1) used for speaking/
 // thinking states where we don't meter the actual audio. Layered sines give it
 // life without looking like a pure sine wave.
@@ -397,6 +410,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
       const buffer = createSentenceBuffer();
       const abortController = new AbortController();
       let assistantText = "";
+      // Computer-use "quiet mode": once the agent acts on the screen we stop
+      // voicing narration. `summaryOffset` marks where the final spoken summary
+      // begins (the text after the last on-screen action).
+      let quiet = false;
+      let summaryOffset = 0;
       runningCommandRef.current = {
         abortController,
         getPartialReply: () => assistantText,
@@ -438,7 +456,18 @@ export function useDex(options: UseDexOptions): UseDexResult {
         const chatHandle = window.opendex.chat({
           messages: messagesRef.current,
           mode: isBriefing ? "briefing" : undefined,
-          onToolCall: addToolActivity,
+          onToolCall: (call) => {
+            addToolActivity(call);
+            if (COMPUTER_TOOL_NAMES.has(call.toolName)) {
+              // First on-screen action: flush the opener to TTS, then go quiet.
+              if (!quiet) {
+                for (const tail of buffer.flush()) tts.enqueue(tail);
+                quiet = true;
+              }
+              // The spoken summary is whatever the model says after its last action.
+              summaryOffset = assistantText.length;
+            }
+          },
           onDelta: (value) => {
             if (!value) return;
             assistantText += value;
@@ -447,8 +476,12 @@ export function useDex(options: UseDexOptions): UseDexResult {
             for (const w of value.toLowerCase().split(/\s+/)) {
               if (w.length > 3) assistantWordsRef.current.add(w);
             }
-            for (const chunk of buffer.push(value)) {
-              tts.enqueue(chunk);
+            // In quiet mode we keep updating the transcript but don't voice the
+            // running narration — only the final summary is spoken (below).
+            if (!quiet) {
+              for (const chunk of buffer.push(value)) {
+                tts.enqueue(chunk);
+              }
             }
           },
         });
@@ -471,7 +504,14 @@ export function useDex(options: UseDexOptions): UseDexResult {
           // Cancelled by barge-in or stop — skip the drain/follow-up transition.
           bargedIn = true;
         } else {
-          for (const tail of buffer.flush()) tts.enqueue(tail);
+          if (quiet) {
+            // Speak only the closing summary (the text after the last action),
+            // not the per-action narration that streamed by while it worked.
+            const summary = assistantText.slice(summaryOffset).trim();
+            if (summary) tts.enqueue(summary);
+          } else {
+            for (const tail of buffer.flush()) tts.enqueue(tail);
+          }
           // Record the real assistant + tool messages so the model remembers
           // what it already did (and won't re-trigger gated actions next turn).
           if (respMessages.length) messagesRef.current.push(...respMessages);

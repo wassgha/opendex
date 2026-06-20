@@ -49,9 +49,13 @@ function computerUseGuidance(): string {
         : "Linux (use the Ctrl key for shortcuts)";
   return `You can see and control this computer. The operating system is ${platform}.
 
-To operate it: first call captureScreen to see the screen, then act with click, moveMouse, typeText, pressKeys, and scroll. Coordinates are in the pixel space of the most recent screenshot, with (0,0) at the top-left. Action tools return a fresh screenshot — always look at it to confirm the effect before the next step, and re-screenshot if you're unsure.
+To operate it: first call captureScreen to see the screen, then act with click, moveMouse, typeText, pressKeys, and scroll. Coordinates are in the pixel space of the most recent screenshot, with (0,0) at the top-left.
 
-Work in small, deliberate steps. Briefly narrate what you're about to do (it's spoken aloud), keep it short, and stop once the task is done or if something looks wrong. If a screenshot is empty or a click has no effect, the operator may need to grant Screen Recording and Accessibility permissions in their system settings — say so rather than retrying blindly.`;
+Don't take a screenshot after every action — it's slow. typeText and pressKeys return no screenshot by default, so chain related keystrokes (e.g. type a field, press Tab, type the next, press Enter) without looking in between. click and scroll do return a screenshot since they change what's on screen. When you want to verify the result of a keystroke sequence, either pass screenshot:true on the last action or call captureScreen. After you see a screenshot, confirm the effect before continuing, and re-screenshot if you're unsure.
+
+Keep spoken narration minimal — the user is watching the screen and sees a live list of every action you take, so you do NOT need to describe each click or keystroke. Say one short sentence when you begin (e.g. "On it, sir."), then work silently, and when the task is finished give one brief spoken summary of the outcome. Don't announce individual actions in between.
+
+Work in small, deliberate steps and stop once the task is done or if something looks wrong. If a screenshot is empty or a click has no effect, the operator may need to grant Screen Recording and Accessibility permissions in their system settings — say so rather than retrying blindly.`;
 }
 
 export interface PromptInputs {

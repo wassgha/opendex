@@ -63,6 +63,27 @@ async function shoot(): Promise<Screenshot | null> {
   return shot;
 }
 
+// Adaptive screenshot cadence: not every action needs a fresh screenshot.
+// Keystroke-style actions (typeText, pressKeys) default to NOT capturing, so the
+// model can chain a few related steps (type a field, Tab, type the next) without
+// a round-trip per action. Clicks/scrolls capture by default since they change
+// what's on screen. Either way the model can override via the `screenshot` arg.
+async function finishAction(message: string, wantShot: boolean): Promise<ActionResult> {
+  if (!wantShot) return { ok: true, message };
+  const shot = await shoot();
+  if (!shot) {
+    return {
+      ok: true,
+      message: `${message} (couldn't capture a screenshot — check Screen Recording permission)`,
+    };
+  }
+  return { ok: true, message, shot };
+}
+
+// Shared description for the per-action screenshot override.
+const SHOT_ARG =
+  "Whether to return a fresh screenshot so you can see the result. Omit to use the action's default; set false to chain another action without a screenshot, or true to force a look.";
+
 /** Resolve a key name (case-insensitive) to a nut.js Key. */
 function keyFromToken(token: string): Key | null {
   const t = token.trim().toLowerCase();
@@ -134,12 +155,13 @@ const tools: SkillTool[] = [
   {
     name: "click",
     description:
-      "Click the mouse at a point (in screenshot pixel coordinates). Optionally double-click or use the right/middle button. Returns a fresh screenshot.",
+      "Click the mouse at a point (in screenshot pixel coordinates). Optionally double-click or use the right/middle button. Returns a fresh screenshot by default.",
     inputSchema: z.object({
       x: z.number().describe("X coordinate in the most recent screenshot's pixel space."),
       y: z.number().describe("Y coordinate in the most recent screenshot's pixel space."),
       button: z.enum(["left", "right", "middle"]).optional().describe("Defaults to left."),
       double: z.boolean().optional().describe("Double-click when true."),
+      screenshot: z.boolean().optional().describe(SHOT_ARG),
     }),
     summarize: (i) => {
       const { x, y, button, double } = i as { x: number; y: number; button?: string; double?: boolean };
@@ -151,11 +173,13 @@ const tools: SkillTool[] = [
       y,
       button,
       double,
+      screenshot,
     }: {
       x: number;
       y: number;
       button?: "left" | "right" | "middle";
       double?: boolean;
+      screenshot?: boolean;
     }): Promise<ActionResult> => {
       const access = ensureInputAccess();
       if ("error" in access) return access;
@@ -166,8 +190,7 @@ const tools: SkillTool[] = [
       const btn = button === "right" ? Button.RIGHT : button === "middle" ? Button.MIDDLE : Button.LEFT;
       if (double) await mouse.doubleClick(btn);
       else await mouse.click(btn);
-      const shot = await shoot();
-      return { ok: true, message: `Clicked at (${x}, ${y}).`, shot: shot ?? undefined };
+      return finishAction(`Clicked at (${x}, ${y}).`, screenshot ?? true);
     },
   },
   {
@@ -194,34 +217,35 @@ const tools: SkillTool[] = [
   {
     name: "typeText",
     description:
-      "Type a string of text at the current focus (as if typed on the keyboard). Does not press Enter unless the text contains a newline.",
+      "Type a string of text at the current focus (as if typed on the keyboard). Does not press Enter unless the text contains a newline. By default returns NO screenshot, so you can chain typing/keys; pass screenshot:true when you want to see the result.",
     inputSchema: z.object({
       text: z.string().describe("The literal text to type."),
+      screenshot: z.boolean().optional().describe(SHOT_ARG),
     }),
     summarize: (i) => {
       const t = (i as { text: string }).text;
       return `Type: "${t.length > 60 ? t.slice(0, 57) + "…" : t}"`;
     },
     toModelOutput: withScreenshot,
-    execute: async ({ text }: { text: string }): Promise<ActionResult> => {
+    execute: async ({ text, screenshot }: { text: string; screenshot?: boolean }): Promise<ActionResult> => {
       const access = ensureInputAccess();
       if ("error" in access) return access;
       ensureConfigured();
       await keyboard.type(text);
-      const shot = await shoot();
-      return { ok: true, message: `Typed ${text.length} character(s).`, shot: shot ?? undefined };
+      return finishAction(`Typed ${text.length} character(s).`, screenshot ?? false);
     },
   },
   {
     name: "pressKeys",
     description:
-      "Press a key or keyboard shortcut. Pass the keys of a chord together, e.g. ['cmd','c'] to copy, ['ctrl','shift','t'], or ['enter']. Modifiers: cmd, ctrl, alt/option, shift, meta/super. Use the platform-appropriate modifier.",
+      "Press a key or keyboard shortcut. Pass the keys of a chord together, e.g. ['cmd','c'] to copy, ['ctrl','shift','t'], or ['enter']. Modifiers: cmd, ctrl, alt/option, shift, meta/super. Use the platform-appropriate modifier. By default returns NO screenshot, so you can chain keys/typing; pass screenshot:true when you want to see the result (e.g. after Enter submits something).",
     inputSchema: z.object({
       keys: z.array(z.string()).min(1).describe("Keys pressed together as one chord."),
+      screenshot: z.boolean().optional().describe(SHOT_ARG),
     }),
     summarize: (i) => `Press ${(i as { keys: string[] }).keys.join(" + ")}`,
     toModelOutput: withScreenshot,
-    execute: async ({ keys }: { keys: string[] }): Promise<ActionResult> => {
+    execute: async ({ keys, screenshot }: { keys: string[]; screenshot?: boolean }): Promise<ActionResult> => {
       const access = ensureInputAccess();
       if ("error" in access) return access;
       ensureConfigured();
@@ -231,16 +255,17 @@ const tools: SkillTool[] = [
       const ks = resolved as Key[];
       await keyboard.pressKey(...ks);
       await keyboard.releaseKey(...[...ks].reverse());
-      const shot = await shoot();
-      return { ok: true, message: `Pressed ${keys.join(" + ")}.`, shot: shot ?? undefined };
+      return finishAction(`Pressed ${keys.join(" + ")}.`, screenshot ?? false);
     },
   },
   {
     name: "scroll",
-    description: "Scroll the screen in a direction by an amount (in scroll steps). Returns a fresh screenshot.",
+    description:
+      "Scroll the screen in a direction by an amount (in scroll steps). Returns a fresh screenshot by default.",
     inputSchema: z.object({
       direction: z.enum(["up", "down", "left", "right"]),
       amount: z.number().min(1).max(50).optional().describe("Scroll steps (default 5)."),
+      screenshot: z.boolean().optional().describe(SHOT_ARG),
     }),
     summarize: (i) => {
       const { direction, amount } = i as { direction: string; amount?: number };
@@ -250,9 +275,11 @@ const tools: SkillTool[] = [
     execute: async ({
       direction,
       amount,
+      screenshot,
     }: {
       direction: "up" | "down" | "left" | "right";
       amount?: number;
+      screenshot?: boolean;
     }): Promise<ActionResult> => {
       const access = ensureInputAccess();
       if ("error" in access) return access;
@@ -262,8 +289,7 @@ const tools: SkillTool[] = [
       else if (direction === "down") await mouse.scrollDown(n);
       else if (direction === "left") await mouse.scrollLeft(n);
       else await mouse.scrollRight(n);
-      const shot = await shoot();
-      return { ok: true, message: `Scrolled ${direction}.`, shot: shot ?? undefined };
+      return finishAction(`Scrolled ${direction}.`, screenshot ?? true);
     },
   },
 ];
