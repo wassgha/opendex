@@ -56,6 +56,10 @@ export interface OpenDexConfig {
     /** Standing permission decision per skill: ask each time / always / never. */
     permissions: Record<string, SkillPermission>;
   };
+  analytics: {
+    /** Send anonymous usage events (no voice, prompts, keys, URLs, or paths). */
+    enabled: boolean;
+  };
   onboarding: { completed: boolean };
 }
 
@@ -100,6 +104,8 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     enabled: { open: true, computer: false },
     permissions: { open: "ask", computer: "ask" },
   },
+  // Anonymous usage analytics, on by default (opt-out in onboarding/Settings).
+  analytics: { enabled: true },
   onboarding: { completed: false },
 };
 

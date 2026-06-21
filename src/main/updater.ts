@@ -1,6 +1,7 @@
 import { app, dialog } from "electron";
 import log from "electron-log";
 import electronUpdater from "electron-updater";
+import { track } from "./analytics";
 
 // electron-updater ships CommonJS; pull autoUpdater off the default export so
 // it works under our ESM/electron-vite build.
@@ -39,6 +40,7 @@ export function initAutoUpdater(): void {
 
   autoUpdater.on("update-downloaded", (info) => {
     log.info("[updater] update downloaded", info.version);
+    track("update_downloaded", { update_version: info.version });
     void dialog
       .showMessageBox({
         type: "info",

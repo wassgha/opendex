@@ -24,6 +24,7 @@ import {
 } from "./config/store";
 import type { DeepPartial, OpenDexConfig, SecretName, SttProvider } from "./config/schema";
 import { initAutoUpdater } from "./updater";
+import { initAnalytics, track } from "./analytics";
 
 // Load a dev .env first; initConfig() then layers the user's saved config on
 // top (config values win; .env remains a fallback for unset secrets).
@@ -73,6 +74,7 @@ function registerIpc() {
     const sender = event.sender;
     const config = getConfig();
     const briefing = mode === "briefing";
+    track("command_run", { mode: briefing ? "briefing" : "command" });
     const computerUse = !briefing && isSkillEnabled(computerSkill, config);
     const system = buildSystemPrompt({ config, briefing, computerUse });
     const tools = buildToolSet({
@@ -95,6 +97,8 @@ function registerIpc() {
           }
         },
         onToolCall: (call) => {
+          // Tool name only — never the input args.
+          track("tool_used", { tool_name: call.toolName });
           if (!ac.signal.aborted && !sender.isDestroyed()) {
             sender.send(IPC.chatTool(requestId), call);
           }
@@ -136,7 +140,20 @@ function registerIpc() {
     (_event, name: SecretName, value: string) => setSecret(name, value),
   );
 
-  ipcMain.handle(IPC.onboardingComplete, () => completeOnboarding());
+  ipcMain.handle(IPC.onboardingComplete, () => {
+    const result = completeOnboarding();
+    // Coarse, anonymized snapshot of which options the user chose — feature
+    // popularity only, no content or identifiers.
+    const c = result.config;
+    track("onboarding_completed", {
+      theme: c.appearance.theme,
+      wake_mode: c.voiceInput.wakeMode,
+      stt_provider: c.voiceInput.sttProvider,
+      tts_engine: c.tts.engine,
+      greeting_mode: c.greeting.mode,
+    });
+    return result;
+  });
 
   // STT ----------------------------------------------------------------------
   ipcMain.handle(
@@ -188,6 +205,9 @@ function registerInterruptHotkey() {
 
 app.whenReady().then(() => {
   initConfig();
+  initAnalytics();
+  track("app_started");
+  if (!getConfig().onboarding.completed) track("onboarding_started");
   registerIpc();
   createWindow();
   registerPushToTalkHotkey();
@@ -197,6 +217,11 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("before-quit", () => {
+  // Best-effort — the process may exit before the request lands.
+  track("app_quit");
 });
 
 app.on("will-quit", () => {

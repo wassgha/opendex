@@ -311,6 +311,34 @@ export function SettingsPanel({
           )}
         </Section>
 
+        <Section title="Privacy">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-white/90">Anonymous usage data</div>
+              <div className="text-xs text-white/40">
+                Helps improve OpenDex. Never sends voice, transcripts, prompts,
+                API keys, opened URLs, or file paths.{" "}
+                <a
+                  href="https://github.com/wassgha/opendex/blob/main/PRIVACY.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline hover:text-white/70"
+                >
+                  Learn more
+                </a>
+              </div>
+            </div>
+            <SegmentedControl
+              value={config.analytics.enabled ? "on" : "off"}
+              options={[
+                { value: "on", label: "On" },
+                { value: "off", label: "Off" },
+              ]}
+              onChange={(v) => setConfig({ analytics: { enabled: v === "on" } })}
+            />
+          </div>
+        </Section>
+
         <div className="py-6 text-xs text-white/30">
           {data.encryptionAvailable
             ? "API keys are encrypted with your OS keychain."

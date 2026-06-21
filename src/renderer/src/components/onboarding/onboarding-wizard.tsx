@@ -230,6 +230,29 @@ export function OnboardingWizard({
             value={config.assistant.wakeWord}
             onChange={(v) => setConfig({ assistant: { wakeWord: v } })}
           />
+          <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <input
+              type="checkbox"
+              checked={config.analytics.enabled}
+              onChange={(e) => setConfig({ analytics: { enabled: e.target.checked } })}
+              className="mt-0.5 h-4 w-4 accent-white"
+            />
+            <span className="text-xs text-white/60">
+              <span className="font-medium text-white/90">Share anonymous usage data</span>
+              <br />
+              Helps improve OpenDex. No voice, transcripts, prompts, or keys are ever
+              sent.{" "}
+              <a
+                href="https://github.com/wassgha/opendex/blob/main/PRIVACY.md"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="underline hover:text-white/80"
+              >
+                Learn more
+              </a>
+            </span>
+          </label>
         </>
       ),
     },
