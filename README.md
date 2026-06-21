@@ -26,7 +26,7 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 
 [![Download for Windows](https://img.shields.io/badge/Windows-Installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe)
 
-[![Download AppImage for Linux](https://img.shields.io/badge/Linux-AppImage-F84E29?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage)
+[![Download AppImage for Linux](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage)
 [![Download .deb for Debian/Ubuntu](https://img.shields.io/badge/Debian%2FUbuntu-.deb-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb)
 
 </div>
@@ -59,26 +59,6 @@ It's a **harness**, not a single bot: the model, the voice, the wake/transcripti
 | First-run setup | Minimal "typing cursor" theme |
 | --- | --- |
 | ![Onboarding theme picker](screenshots/hud-selection.png) | ![Typing cursor theme](screenshots/typing-cursor.png) |
-
-## Download
-
-[![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest&sort=semver)](https://github.com/wassgha/opendex/releases/latest)
-
-Grab a prebuilt app — no build toolchain needed. These links always point at the **latest release**:
-
-| Platform | Download |
-| --- | --- |
-| 🍎 **macOS** (Apple Silicon) | [OpenDex-mac-arm64.dmg](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg) |
-| 🍎 **macOS** (Intel) | [OpenDex-mac-x64.dmg](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg) |
-| 🪟 **Windows** | [OpenDex-Setup.exe](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe) |
-| 🐧 **Linux** (AppImage) | [OpenDex-linux.AppImage](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage) |
-| 🐧 **Linux** (Debian/Ubuntu) | [OpenDex-linux.deb](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb) |
-
-Or browse every version on the [**Releases**](https://github.com/wassgha/opendex/releases) page.
-
-The macOS builds are **signed and notarized** by Apple, so they open without Gatekeeper warnings. Windows/Linux builds are currently unsigned — on Windows, click **More info → Run anyway** at the SmartScreen prompt.
-
-The app **auto-updates**: it checks GitHub Releases on launch (and hourly), downloads new versions in the background, and prompts you to restart when one is ready.
 
 ## Build from source
 
