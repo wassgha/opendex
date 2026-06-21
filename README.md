@@ -19,15 +19,17 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 
 <div align="center">
 
-<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg"><img src="assets/download/download-macos-arm64.svg" alt="Download for macOS — Apple Silicon" height="58"></a>
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg"><img src="assets/download/download-macos-arm64.svg" alt="Download for macOS — Apple Silicon" height="48"></a>
 &nbsp;
-<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg"><img src="assets/download/download-macos-x64.svg" alt="Download for macOS — Intel" height="58"></a>
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg"><img src="assets/download/download-macos-x64.svg" alt="Download for macOS — Intel" height="48"></a>
 
-<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe"><img src="assets/download/download-windows.svg" alt="Download for Windows" height="58"></a>
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe"><img src="assets/download/download-windows.svg" alt="Download for Windows" height="48"></a>
+&nbsp;
+
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb"><img src="assets/download/download-debian-deb.svg" alt="Download the .deb for Debian" height="48"></a>
 
 <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage"><img src="assets/download/download-linux-appimage.svg" alt="Download the AppImage for Linux" height="58"></a>
 &nbsp;
-<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb"><img src="assets/download/download-debian-deb.svg" alt="Download the .deb for Debian" height="58"></a>
 
 <br>
 
@@ -35,9 +37,7 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 
 </div>
 
-These buttons always grab the **latest release** — no build toolchain needed. Or browse every version on the [Releases](https://github.com/wassgha/opendex/releases) page.
-
-macOS builds are **signed and notarized** by Apple, so they open without Gatekeeper warnings. Windows/Linux builds are currently unsigned — on Windows, click **More info → Run anyway** at the SmartScreen prompt.
+Or browse every version on the [Releases](https://github.com/wassgha/opendex/releases) page.
 
 The app **auto-updates**: it checks GitHub Releases on launch (and hourly), downloads new versions in the background, and prompts you to restart when one is ready.
 
@@ -99,18 +99,6 @@ cp .env.local.example .env
 | `PICOVOICE_ACCESS_KEY` | Porcupine wake word (optional, free) |
 | `TAVILY_API_KEY` | web-search tool (optional) |
 
-## How it works
-
-```
- Renderer (React + Tailwind)            Preload                Main process (Node)
- ─────────────────────────             ─────────              ─────────────────────
- themes · state machine   ──window.opendex──▶  typed IPC  ──▶  agent loop (AI SDK) · tools
- mic capture · WASM STT   ◀──  text deltas / audio bytes  ──   ElevenLabs TTS · skills
-                                                               🔑 API keys (OS keychain)
-```
-
-The **renderer** captures audio and runs the wake/STT engines (all WASM); the **main process** holds the keys, runs the streaming agent loop, executes tools, and synthesizes speech. They talk only over a small typed `window.opendex` bridge. See [`AGENTS.md`](AGENTS.md) for the full architecture and how to add channels, themes, or skills.
-
 ## Skills & permissions
 
 The agent's capabilities are **skills** — declarative tool bundles. Sensitive ones run behind a permission gate: when the model wants to act, OpenDex pauses and asks, and your choice (Allow once / Always / Never) is remembered. Built-in skills today: **Open apps & URLs**, and **Control the computer** (screen capture + mouse/keyboard — opt-in, off by default).
@@ -139,7 +127,7 @@ The agent's capabilities are **skills** — declarative tool bundles. Sensitive 
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm smoke:chat [briefing]` | exercise the agent loop without Electron |
 
-## Tech
+## Tech Stack
 
 Electron · electron-vite · React 19 · Tailwind CSS 4 · Vercel AI SDK v6 · ElevenLabs · Picovoice Porcupine · Vosk · transformers.js (Whisper) — all local speech engines are WASM. The only native module is **nut.js** (computer-use input control); it ships prebuilt N-API binaries per platform.
 
