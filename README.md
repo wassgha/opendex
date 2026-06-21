@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="build/icon.png" alt="OpenDex" width="128" height="128">
+
 # OpenDex
 
 **A voice-first, open-source AI assistant for your desktop.**
