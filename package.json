@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "OpenDex — a voice-first agentic harness for the desktop.",
   "private": true,
+  "author": "wassgha",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wassgha/opendex.git"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -10,7 +15,11 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "smoke:chat": "tsx scripts/smoke-chat.ts",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "electron-vite build && electron-builder",
+    "release": "electron-vite build && electron-builder --publish always",
+    "cut:patch": "pnpm version patch -m \"Release v%s\" && git push --follow-tags",
+    "cut:minor": "pnpm version minor -m \"Release v%s\" && git push --follow-tags",
+    "cut:major": "pnpm version major -m \"Release v%s\" && git push --follow-tags"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.49.1",
@@ -20,6 +29,8 @@
     "@picovoice/web-voice-processor": "^4.0.10",
     "ai": "^6.0.193",
     "dotenv": "^17.4.2",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
     "vosk-browser": "^0.0.8",
     "zod": "^4.4.3"
   },
@@ -42,20 +53,61 @@
   "build": {
     "appId": "io.opendex.app",
     "productName": "OpenDex",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "wassgha",
+        "repo": "opendex"
+      }
+    ],
     "files": [
       "out/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "node_modules/@nut-tree-fork/**/*"
+    ],
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "OpenDex listens to your voice to run agentic commands.",
+        "NSCameraUsageDescription": "OpenDex may capture the screen to see and control your desktop."
+      }
     },
     "win": {
       "target": [
         "nsis"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
     },
     "linux": {
       "target": [

@@ -38,12 +38,27 @@ It's a **harness**, not a single bot: the model, the voice, the wake/transcripti
 | --- | --- |
 | ![Onboarding theme picker](screenshots/hud-selection.png) | ![Typing cursor theme](screenshots/typing-cursor.png) |
 
-## Install
+## Download
+
+Grab a prebuilt app from the [**Releases**](https://github.com/wassgha/opendex/releases/latest) page — no build toolchain needed:
+
+| Platform | File |
+| --- | --- |
+| **macOS** (Apple Silicon) | `OpenDex-<version>-arm64.dmg` |
+| **macOS** (Intel) | `OpenDex-<version>.dmg` |
+| **Windows** | `OpenDex-Setup-<version>.exe` |
+| **Linux** | `OpenDex-<version>.AppImage` / `.deb` |
+
+The macOS builds are **signed and notarized** by Apple, so they open without Gatekeeper warnings. Windows/Linux builds are currently unsigned — on Windows, click **More info → Run anyway** at the SmartScreen prompt.
+
+The app **auto-updates**: it checks GitHub Releases on launch (and hourly), downloads new versions in the background, and prompts you to restart when one is ready.
+
+## Build from source
 
 > Requires [Node.js](https://nodejs.org) 20+ and [pnpm](https://pnpm.io).
 
 ```bash
-git clone https://github.com/wassgha/notjarvis.git opendex
+git clone https://github.com/wassgha/opendex.git
 cd opendex
 pnpm install
 pnpm dev            # launches the OpenDex desktop window

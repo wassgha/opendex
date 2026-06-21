@@ -23,6 +23,7 @@ import {
   updateConfig,
 } from "./config/store";
 import type { DeepPartial, OpenDexConfig, SecretName, SttProvider } from "./config/schema";
+import { initAutoUpdater } from "./updater";
 
 // Load a dev .env first; initConfig() then layers the user's saved config on
 // top (config values win; .env remains a fallback for unset secrets).
@@ -191,6 +192,7 @@ app.whenReady().then(() => {
   createWindow();
   registerPushToTalkHotkey();
   registerInterruptHotkey();
+  initAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
