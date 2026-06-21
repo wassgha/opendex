@@ -101,7 +101,7 @@ function MainExperience({ data }: { data: PublicConfig }) {
           theme. The settings gear now lives in the theme's shared top bar. */}
       {dex.loadingModel.active && (
         <div className="fixed inset-x-0 top-16 z-30 flex justify-center">
-          <div className="flex items-center gap-3 rounded-full border border-border bg-card/80 px-5 py-2 text-sm text-foreground/80 backdrop-blur">
+          <div className="flex items-center gap-3 rounded-full border border-border bg-dex-surface/85 px-5 py-2 text-sm text-foreground/80 backdrop-blur">
             <span className="h-2 w-2 animate-pulse rounded-full bg-foreground" />
             {dex.loadingModel.label || "Loading voice model…"}
           </div>

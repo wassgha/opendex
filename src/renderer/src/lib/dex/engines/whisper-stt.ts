@@ -15,16 +15,32 @@ const pipelines = new Map<string, Promise<AutomaticSpeechRecognitionPipeline>>()
 function getPipeline(model: string, onProgress?: ModelProgress) {
   let p = pipelines.get(model);
   if (!p) {
+    // A Whisper model is several files (encoder, decoder, tokenizer…), each
+    // emitting its own progress. Track bytes per file and report one aggregate
+    // percentage so the banner climbs smoothly instead of bouncing between files.
+    const files = new Map<string, { loaded: number; total: number }>();
     p = pipeline("automatic-speech-recognition", model, {
       // Prefer WebGPU when available; transformers.js falls back to WASM.
       device: "webgpu",
-      progress_callback: (e: { status?: string; progress?: number; file?: string }) => {
-        if (e.status === "progress") {
-          onProgress?.({
-            label: `Downloading voice model… ${Math.round(e.progress ?? 0)}%`,
-            progress: e.progress ?? 0,
-          });
+      progress_callback: (e: {
+        status?: string;
+        file?: string;
+        loaded?: number;
+        total?: number;
+      }) => {
+        if (e.status !== "progress" || !e.file || !e.total) return;
+        files.set(e.file, { loaded: e.loaded ?? 0, total: e.total });
+        let loaded = 0;
+        let total = 0;
+        for (const f of files.values()) {
+          loaded += f.loaded;
+          total += f.total;
         }
+        const pct = total > 0 ? Math.min(100, (loaded / total) * 100) : 0;
+        onProgress?.({
+          label: `Downloading voice model… ${Math.round(pct)}%`,
+          progress: pct,
+        });
       },
     }).catch((err) => {
       // Allow a later retry if loading failed.

@@ -18,6 +18,15 @@ export default defineConfig({
         "@": resolve(__dirname, "src/renderer/src"),
       },
     },
+    // Pin the dev origin. The local STT models (transformers.js / Vosk) cache in
+    // the renderer's Cache API keyed by origin; if the port drifts (e.g. 5173 is
+    // busy and Vite bumps to 5174) the cache is orphaned and the model
+    // re-downloads. strictPort keeps the origin stable — and fails loudly if a
+    // stale dev instance is already running, instead of silently bumping.
+    server: {
+      port: 5173,
+      strictPort: true,
+    },
     plugins: [react(), tailwindcss()],
   },
 });

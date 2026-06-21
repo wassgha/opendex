@@ -40,7 +40,7 @@ export function ToolActivityBanner({ activity }: { activity: ToolActivity[] }) {
       {visible.map((t) => (
         <div
           key={t.id}
-          className="flex animate-dex-rise items-center gap-2.5 rounded-full border border-border bg-card/80 px-4 py-2 text-sm text-foreground/85 shadow-lg backdrop-blur"
+          className="flex animate-dex-rise items-center gap-2.5 rounded-full border border-border bg-dex-surface/85 px-4 py-2 text-sm text-foreground/85 shadow-lg backdrop-blur"
         >
           <span aria-hidden className="text-base leading-none">
             {t.icon}
