@@ -10,6 +10,7 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 [![Electron](https://img.shields.io/badge/Electron-42-111?style=flat-square&logo=electron&logoColor=9FEAF9)](https://www.electronjs.org/)
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v6-111?style=flat-square)](https://sdk.vercel.ai/)
 [![Stars](https://img.shields.io/github/stars/wassgha/notjarvis?style=flat-square&color=111)](https://github.com/wassgha/notjarvis/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square&color=111)](https://github.com/wassgha/opendex/releases/latest)
 
 ![OpenDex — Jarvis HUD theme](screenshots/jarvis.png)
 
@@ -20,11 +21,6 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 <div align="center">
 
 <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg"><img src="assets/download/download-macos-arm64.svg" alt="Download for macOS — Apple Silicon" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg"><img src="assets/download/download-macos-x64.svg" alt="Download for macOS — Intel" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe"><img src="assets/download/download-windows.svg" alt="Download for Windows" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb"><img src="assets/download/download-debian-deb.svg" alt="Download the .deb for Debian" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage"><img src="assets/download/download-linux-appimage.svg" alt="Download the AppImage for Linux" height="48"></a>
-
-<br>
-
-[![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square&color=111)](https://github.com/wassgha/opendex/releases/latest)
-
 </div>
 
 Or browse every version on the [Releases](https://github.com/wassgha/opendex/releases) page.
