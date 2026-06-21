@@ -15,11 +15,11 @@ export function StopControl({ onStop }: { onStop: () => void }) {
         type="button"
         onClick={onStop}
         title="Stop the assistant"
-        className="pointer-events-auto flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-950/70 px-4 py-1.5 text-sm font-medium text-rose-100 shadow-lg backdrop-blur transition hover:bg-rose-900/80"
+        className="pointer-events-auto flex items-center gap-2 rounded-full border border-destructive/40 bg-destructive/15 px-4 py-1.5 text-sm font-medium text-destructive-foreground shadow-lg backdrop-blur transition hover:bg-destructive/25"
       >
-        <span className="h-2.5 w-2.5 rounded-[2px] bg-rose-300" aria-hidden />
+        <span className="h-2.5 w-2.5 rounded-[2px] bg-destructive" aria-hidden />
         Stop
-        <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-100/70">
+        <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 text-[10px] font-normal text-destructive-foreground/70">
           {STOP_HINT}
         </kbd>
       </button>
@@ -40,7 +40,7 @@ export function ToolActivityBanner({ activity }: { activity: ToolActivity[] }) {
       {visible.map((t) => (
         <div
           key={t.id}
-          className="flex animate-dex-rise items-center gap-2.5 rounded-full border border-white/10 bg-black/70 px-4 py-2 text-sm text-white/85 shadow-lg backdrop-blur"
+          className="flex animate-dex-rise items-center gap-2.5 rounded-full border border-border bg-card/80 px-4 py-2 text-sm text-foreground/85 shadow-lg backdrop-blur"
         >
           <span aria-hidden className="text-base leading-none">
             {t.icon}

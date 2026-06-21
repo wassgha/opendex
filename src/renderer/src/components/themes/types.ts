@@ -23,6 +23,8 @@ export interface DexThemeProps {
   onSubmitText: (text: string) => void;
   toggleMute: () => void;
   toggleBargeIn: () => void;
+  /** Open the settings panel — rendered by the theme's shared top bar. */
+  onOpenSettings: () => void;
 }
 
 export interface DexThemeDef {

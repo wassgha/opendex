@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Button } from "./button";
 
 export function Field({
   label,
@@ -11,15 +12,15 @@ export function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-white/80">{label}</span>
+      <span className="text-sm font-medium text-foreground/80">{label}</span>
       {children}
-      {hint && <span className="text-xs text-white/40">{hint}</span>}
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </label>
   );
 }
 
 const inputClass =
-  "w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none transition focus:border-white/40";
+  "w-full rounded-lg border border-input bg-card/40 px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring";
 
 export function TextField({
   label,
@@ -125,23 +126,23 @@ export function SecretField({
   if (present && !editing) {
     return (
       <Field label={label} hint={hint}>
-        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-          <span className="flex items-center gap-2 text-sm text-white/70">
-            <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+        <div className="flex items-center justify-between rounded-lg border border-input bg-card/40 px-3 py-2">
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             Saved
           </span>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="text-xs text-white/60 hover:text-white"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               Replace
             </button>
             <button
               type="button"
               onClick={() => onSave("")}
-              className="text-xs text-rose-300/80 hover:text-rose-200"
+              className="text-xs text-destructive/80 hover:text-destructive"
             >
               Clear
             </button>
@@ -161,7 +162,7 @@ export function SecretField({
           placeholder="Paste key…"
           onChange={(e) => setValue(e.target.value)}
         />
-        <button
+        <Button
           type="button"
           disabled={!value.trim()}
           onClick={() => {
@@ -169,10 +170,9 @@ export function SecretField({
             setValue("");
             setEditing(false);
           }}
-          className="shrink-0 rounded-lg bg-white px-4 text-sm font-medium text-black transition enabled:hover:bg-white/90 disabled:opacity-30"
         >
           Save
-        </button>
+        </Button>
       </div>
     </Field>
   );
@@ -188,7 +188,7 @@ export function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
+    <div className="inline-flex rounded-lg border border-border bg-card/40 p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -196,8 +196,8 @@ export function SegmentedControl<T extends string>({
           onClick={() => onChange(o.value)}
           className={`rounded-md px-3 py-1.5 text-sm transition ${
             value === o.value
-              ? "bg-white/15 text-white"
-              : "text-white/50 hover:text-white/80"
+              ? "bg-secondary text-secondary-foreground"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           {o.label}

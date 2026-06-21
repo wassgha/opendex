@@ -1,14 +1,49 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 :root {
   color-scheme: dark;
+
+  /* ── Design tokens (default / neutral-dark palette) ───────────────────────
+     Global chrome rendered outside a theme root (settings dialog, permission
+     prompt, banners — many via portals) reads THESE values, so they stay
+     consistent across themes. In-theme chrome inherits the per-theme overrides
+     defined under [data-dex-theme="…"] below. */
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #141414;
+  --card-foreground: #ededed;
+  --popover: #0e0e0e;
+  --popover-foreground: #ededed;
+  --primary: #ffffff;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1c1c1c;
+  --secondary-foreground: #ededed;
+  --muted: #1c1c1c;
+  --muted-foreground: #8a8a8a;
+  --accent: #1f1f1f;
+  --accent-foreground: #ffffff;
+  --destructive: #f43f5e;
+  --destructive-foreground: #ffe4e6;
+  --border: #2b2b2b;
+  --input: #2b2b2b;
+  --ring: #52525b;
+
+  /* dex extensions: visualizer accent + status-dot colors */
+  --dex-glow: #ffffff;
+  --dex-active: #ffffff;
+  --dex-idle: #6b7280;
+  /* Subtle chrome surface (pills, gear, composer, banners). Always darker than
+     the background so chrome reads on every theme — distinct from --card, which
+     a theme may set light (e.g. editorial's activity card). */
+  --dex-surface: #1a1a1a;
 }
 
 body {
   background:
     radial-gradient(ellipse at top, rgba(255, 255, 255, 0.04), transparent 55%),
-    #0a0a0a;
-  color: #ededed;
+    var(--background);
+  color: var(--foreground);
   font-family:
     system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-user-select: none;
@@ -16,8 +51,32 @@ body {
   overflow: hidden;
 }
 
+/* ── Token → Tailwind-utility mapping (bg-background, text-foreground, …) ──── */
 @theme inline {
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-dex-glow: var(--dex-glow);
+  --color-dex-active: var(--dex-active);
+  --color-dex-idle: var(--dex-idle);
 
   --animate-dex-breath: dex-breath 4s ease-in-out infinite;
   --animate-dex-pulse: dex-pulse 1.4s ease-in-out infinite;
@@ -27,6 +86,77 @@ body {
   --animate-dex-spin-rev: dex-spin-rev 20s linear infinite;
   --animate-caret-blink: caret-blink 1.1s steps(1, end) infinite;
   --animate-dex-rise: dex-rise 0.22s ease-out;
+}
+
+/* ── Per-theme palettes ───────────────────────────────────────────────────── */
+[data-dex-theme="jarvis"] {
+  --background: #02060c;
+  --foreground: #cffafe;
+  --card: #06141c;
+  --card-foreground: #cffafe;
+  --popover: #07131b;
+  --popover-foreground: #cffafe;
+  --primary: #22d3ee;
+  --primary-foreground: #02060c;
+  --secondary: #0c2530;
+  --secondary-foreground: #cffafe;
+  --muted: #0c2530;
+  --muted-foreground: #7dd3e8;
+  --accent: #0e3a47;
+  --accent-foreground: #cffafe;
+  --border: #164e5b;
+  --input: #164e5b;
+  --ring: #22d3ee;
+  --dex-glow: #22d3ee;
+  --dex-active: #67e8f9;
+  --dex-idle: #155e6b;
+}
+
+[data-dex-theme="dot"],
+[data-dex-theme="cursor"] {
+  --background: #0b0b0c;
+  --foreground: #fafafa;
+  --card: #161617;
+  --card-foreground: #fafafa;
+  --popover: #0e0e0f;
+  --popover-foreground: #fafafa;
+  --primary: #ffffff;
+  --primary-foreground: #0b0b0c;
+  --secondary: #1a1a1c;
+  --secondary-foreground: #fafafa;
+  --muted: #1a1a1c;
+  --muted-foreground: #9b9b9d;
+  --accent: #1d1d1f;
+  --accent-foreground: #ffffff;
+  --border: #2a2a2c;
+  --input: #2a2a2c;
+  --ring: #6b6b6e;
+  --dex-glow: #ffffff;
+  --dex-active: #ffffff;
+  --dex-idle: #6b6b6e;
+}
+
+[data-dex-theme="editorial"] {
+  --background: #16130f;
+  --foreground: #f5efe6;
+  --card: #f3ede3;
+  --card-foreground: #1a1714;
+  --popover: #1f1b16;
+  --popover-foreground: #f5efe6;
+  --primary: #da7756;
+  --primary-foreground: #1a1714;
+  --secondary: #2a241d;
+  --secondary-foreground: #f5efe6;
+  --muted: #2a241d;
+  --muted-foreground: #a89a87;
+  --accent: #2a241d;
+  --accent-foreground: #f5efe6;
+  --border: #322a20;
+  --input: #322a20;
+  --ring: #da7756;
+  --dex-glow: #da7756;
+  --dex-active: #e8916f;
+  --dex-idle: #6f6354;
 }
 
 @keyframes dex-rise {

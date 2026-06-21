@@ -18,6 +18,10 @@ export const IPC = {
   configSet: "config:set",
   secretSet: "secret:set",
   onboardingComplete: "onboarding:complete",
+  // main → renderer event: config changed (broadcast to all windows)
+  configChanged: "config:changed",
+  // renderer → main: open the dedicated settings window
+  settingsOpen: "settings:open",
   // STT
   transcribe: "stt:transcribe",
   getPicovoiceKey: "stt:picovoice-key",

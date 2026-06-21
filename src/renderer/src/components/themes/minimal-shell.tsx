@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { StatusBar } from "@/components/status-bar";
+import { ThemeTopBar } from "./theme-top-bar";
 import { TextComposer } from "./text-composer";
 import type { DexThemeProps } from "./types";
 
@@ -8,12 +8,15 @@ import type { DexThemeProps } from "./types";
 // something to show — overlaid at the bottom and fading out as lines age.
 export function MinimalShell({
   props,
+  themeId,
   visual,
   transcript,
   mono,
   hideTranscript,
 }: {
   props: DexThemeProps;
+  /** Drives the per-theme token palette via [data-dex-theme]. */
+  themeId: string;
   visual: ReactNode;
   transcript?: ReactNode;
   mono?: boolean;
@@ -28,16 +31,16 @@ export function MinimalShell({
 
   return (
     <div
-      className={`relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-[#0b0b0c] px-6 ${
+      data-dex-theme={themeId}
+      className={`relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-background px-6 text-foreground ${
         mono ? "font-mono" : ""
       }`}
     >
-      <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-6 py-7">
-        <div className="text-xs uppercase tracking-[0.4em] text-white/40">
-          {name || "OpenDex"}
-        </div>
-        <StatusBar status={status} />
-      </header>
+      <ThemeTopBar
+        name={name}
+        status={status}
+        onOpenSettings={props.onOpenSettings}
+      />
 
       <section className="z-10 flex flex-col items-center gap-6">
         {canPushToTalk ? (
@@ -48,7 +51,7 @@ export function MinimalShell({
             title="Tap to talk (or press ⌘⇧Space)"
           >
             {visual}
-            <span className="text-[10px] uppercase tracking-[0.3em] text-white/30 transition group-hover:text-white/60">
+            <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/70 transition group-hover:text-foreground/70">
               Tap to talk
             </span>
           </button>
@@ -57,13 +60,13 @@ export function MinimalShell({
         )}
 
         {briefingActive && (
-          <div className="text-[10px] uppercase tracking-[0.35em] text-white/40">
+          <div className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">
             Pulling up your dashboards…
           </div>
         )}
 
         {unsupported && (
-          <p className="max-w-sm text-center text-sm text-white/55">
+          <p className="max-w-sm text-center text-sm text-muted-foreground">
             Web Speech recognition isn’t available here. Open Settings (top-right)
             → Voice input and pick a local or OpenAI transcription engine.
           </p>
@@ -72,7 +75,7 @@ export function MinimalShell({
 
       {/* Borderless transcript overlay — only when there's content, fading up. */}
       {hasTranscript && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-16 z-10 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-10 flex justify-center">
           <div
             className="max-h-[42vh] w-full max-w-2xl overflow-hidden px-6 pb-4"
             style={{
@@ -88,8 +91,8 @@ export function MinimalShell({
       )}
 
       {/* Concealed typing affordance — voice-first, type when you can't speak. */}
-      <div className="absolute inset-x-0 bottom-5 z-20 flex justify-center">
-        <TextComposer onSubmit={props.onSubmitText} tone="minimal" />
+      <div className="absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
+        <TextComposer onSubmit={props.onSubmitText} />
       </div>
     </div>
   );

@@ -36,8 +36,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1100,
     height: 760,
-    minWidth: 760,
-    minHeight: 560,
+    minWidth: 360,
+    minHeight: 420,
     backgroundColor: "#0a0a0a",
     title: "OpenDex",
     show: false,
@@ -56,11 +56,63 @@ function createWindow() {
     return { action: "deny" };
   });
 
+  loadRenderer(win);
+}
+
+// Both windows share one renderer bundle; `hash` selects which experience mounts
+// (the settings window passes "settings"; see src/renderer/src/main.tsx).
+function loadRenderer(win: BrowserWindow, hash?: string) {
   if (isDev && process.env.ELECTRON_RENDERER_URL) {
-    void win.loadURL(process.env.ELECTRON_RENDERER_URL);
-    win.webContents.openDevTools({ mode: "detach" });
+    const base = process.env.ELECTRON_RENDERER_URL;
+    void win.loadURL(hash ? `${base}#${hash}` : base);
   } else {
-    void win.loadFile(join(__dirname, "../renderer/index.html"));
+    void win.loadFile(join(__dirname, "../renderer/index.html"), { hash });
+  }
+}
+
+let settingsWindow: BrowserWindow | null = null;
+
+function openSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.show();
+    settingsWindow.focus();
+    return;
+  }
+
+  settingsWindow = new BrowserWindow({
+    width: 820,
+    height: 720,
+    minWidth: 560,
+    minHeight: 480,
+    backgroundColor: "#0a0a0a",
+    title: "OpenDex Settings",
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  settingsWindow.once("ready-to-show", () => settingsWindow?.show());
+  settingsWindow.on("closed", () => {
+    settingsWindow = null;
+  });
+  settingsWindow.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  loadRenderer(settingsWindow, "settings");
+}
+
+// Push the latest public config to every open window so the main experience and
+// the settings window stay in sync after either one mutates config.
+function broadcastConfig() {
+  const cfg = getPublicConfig();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(IPC.configChanged, cfg);
   }
 }
 
@@ -131,17 +183,23 @@ function registerIpc() {
   // Config / secrets ---------------------------------------------------------
   ipcMain.handle(IPC.configGet, () => getPublicConfig());
 
-  ipcMain.handle(IPC.configSet, (_event, patch: DeepPartial<OpenDexConfig>) =>
-    updateConfig(patch),
-  );
+  ipcMain.handle(IPC.configSet, (_event, patch: DeepPartial<OpenDexConfig>) => {
+    const result = updateConfig(patch);
+    broadcastConfig();
+    return result;
+  });
 
-  ipcMain.handle(
-    IPC.secretSet,
-    (_event, name: SecretName, value: string) => setSecret(name, value),
-  );
+  ipcMain.handle(IPC.secretSet, (_event, name: SecretName, value: string) => {
+    const result = setSecret(name, value);
+    broadcastConfig();
+    return result;
+  });
+
+  ipcMain.handle(IPC.settingsOpen, () => openSettingsWindow());
 
   ipcMain.handle(IPC.onboardingComplete, () => {
     const result = completeOnboarding();
+    broadcastConfig();
     // Coarse, anonymized snapshot of which options the user chose — feature
     // popularity only, no content or identifiers.
     const c = result.config;

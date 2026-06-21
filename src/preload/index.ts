@@ -110,6 +110,20 @@ const opendex = {
     return ipcRenderer.invoke(IPC.onboardingComplete);
   },
 
+  /** Open the dedicated settings window (creates it, or focuses if already open). */
+  openSettings(): Promise<void> {
+    return ipcRenderer.invoke(IPC.settingsOpen);
+  },
+
+  /** Subscribe to config changes broadcast from the main process (so windows
+   *  stay in sync when either one edits config). Returns an unsubscribe fn. */
+  onConfigChanged(handler: (config: PublicConfig) => void): () => void {
+    const listener = (_e: IpcRendererEvent, config: PublicConfig) =>
+      handler(config);
+    ipcRenderer.on(IPC.configChanged, listener);
+    return () => ipcRenderer.removeListener(IPC.configChanged, listener);
+  },
+
   /** Transcribe a captured utterance (WAV bytes) via a cloud STT provider. */
   transcribe(provider: SttProvider, wav: ArrayBuffer): Promise<string> {
     return ipcRenderer.invoke(IPC.transcribe, provider, wav);

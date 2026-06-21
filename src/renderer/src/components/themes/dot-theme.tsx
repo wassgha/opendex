@@ -11,7 +11,7 @@ function Dot({ status, getAmplitude }: DexThemeProps) {
     const el = dotRef.current;
     if (!el) return;
     el.style.transform = `scale(${1 + a * 1.6})`;
-    el.style.boxShadow = `0 0 ${12 + a * 60}px rgba(255,255,255,${(0.5 + a * 0.5) * 0.6})`;
+    el.style.boxShadow = `0 0 ${12 + a * 60}px color-mix(in srgb, var(--dex-glow) ${(0.5 + a * 0.5) * 60}%, transparent)`;
     el.style.opacity = String(0.5 + a * 0.5);
   });
 
@@ -21,7 +21,7 @@ function Dot({ status, getAmplitude }: DexThemeProps) {
     <div className="flex h-56 w-56 items-center justify-center" aria-hidden="true">
       <div
         ref={dotRef}
-        className={`h-6 w-6 rounded-full bg-white transition-opacity duration-300 ${
+        className={`h-6 w-6 rounded-full bg-dex-glow transition-opacity duration-300 ${
           dim ? "opacity-25" : ""
         } ${status === "idle" ? "animate-dex-breath" : ""}`}
         style={{ willChange: "transform, box-shadow, opacity" }}
@@ -34,6 +34,7 @@ export function DotTheme(props: DexThemeProps) {
   return (
     <MinimalShell
       props={props}
+      themeId="dot"
       visual={<Dot {...props} />}
       transcript={
         <OverlayTranscript

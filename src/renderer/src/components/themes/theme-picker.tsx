@@ -1,4 +1,5 @@
 import { DEX_THEMES } from "./registry";
+import { cn } from "@/lib/utils";
 
 // A small static preview glyph per theme (no live audio needed in the picker).
 function Preview({ id }: { id: string }) {
@@ -7,6 +8,14 @@ function Preview({ id }: { id: string }) {
   }
   if (id === "cursor") {
     return <span className="h-6 w-1.5 rounded-[2px] bg-white animate-caret-blink" />;
+  }
+  if (id === "editorial") {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="text-lg font-light leading-none text-[#f5efe6]">A</span>
+        <span className="h-2 w-2 rounded-full bg-[#da7756] shadow-[0_0_10px_rgba(218,119,86,0.8)]" />
+      </span>
+    );
   }
   // jarvis HUD reactor
   return (
@@ -26,7 +35,7 @@ export function ThemePicker({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {DEX_THEMES.map((theme) => {
         const selected = theme.id === value;
         return (
@@ -35,16 +44,17 @@ export function ThemePicker({
             type="button"
             onClick={() => onChange(theme.id)}
             title={theme.description}
-            className={`flex flex-col items-center gap-3 rounded-xl border px-3 py-4 text-center transition ${
+            className={cn(
+              "flex flex-col items-center gap-3 rounded-xl border px-3 py-4 text-center transition",
               selected
-                ? "border-white/50 bg-white/[0.06]"
-                : "border-white/10 bg-white/[0.02] hover:border-white/25"
-            }`}
+                ? "border-ring bg-accent"
+                : "border-border bg-card/40 hover:border-ring/50",
+            )}
           >
-            <span className="flex h-12 w-12 items-center justify-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#0b0b0c]">
               <Preview id={theme.id} />
             </span>
-            <span className="text-xs font-medium text-white/90">{theme.label}</span>
+            <span className="text-xs font-medium text-foreground/90">{theme.label}</span>
           </button>
         );
       })}

@@ -2,6 +2,7 @@ import type { DexThemeDef } from "./types";
 import { JarvisTheme } from "./jarvis/jarvis-theme";
 import { DotTheme } from "./dot-theme";
 import { CursorTheme } from "./cursor-theme";
+import { EditorialTheme } from "./editorial-theme";
 
 export const DEX_THEMES: DexThemeDef[] = [
   {
@@ -9,6 +10,12 @@ export const DEX_THEMES: DexThemeDef[] = [
     label: "Jarvis HUD",
     description: "A full Stark-style heads-up display with a reactive arc reactor.",
     Component: JarvisTheme,
+  },
+  {
+    id: "editorial",
+    label: "Editorial",
+    description: "Warm, type-forward — the latest reply set large with a light activity card.",
+    Component: EditorialTheme,
   },
   {
     id: "dot",

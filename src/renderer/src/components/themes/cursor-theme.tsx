@@ -57,14 +57,15 @@ function TypedLine({ status, transcript, liveCaption }: DexThemeProps) {
   const line = currentSentence(shown);
 
   const done = shown.length >= target.length;
-  const tone = isInterim || last?.role === "user" ? "text-white/55" : "text-white/90";
+  const tone =
+    isInterim || last?.role === "user" ? "text-foreground/55" : "text-foreground/90";
 
   return (
     <div className="flex min-h-[6rem] max-w-3xl items-center justify-center px-6 text-center" aria-hidden="true">
       <span className={`text-3xl font-light leading-snug tracking-tight ${tone}`}>
         {line}
         <span
-          className={`ml-0.5 inline-block h-7 w-[3px] translate-y-1 rounded-[1px] bg-white align-middle ${
+          className={`ml-0.5 inline-block h-7 w-[3px] translate-y-1 rounded-[1px] bg-foreground align-middle ${
             done ? "animate-caret-blink" : ""
           } ${status === "muted" || status === "error" ? "opacity-30" : ""}`}
         />
@@ -75,6 +76,12 @@ function TypedLine({ status, transcript, liveCaption }: DexThemeProps) {
 
 export function CursorTheme(props: DexThemeProps) {
   return (
-    <MinimalShell props={props} mono hideTranscript visual={<TypedLine {...props} />} />
+    <MinimalShell
+      props={props}
+      themeId="cursor"
+      mono
+      hideTranscript
+      visual={<TypedLine {...props} />}
+    />
   );
 }

@@ -36,8 +36,14 @@ export function useConfig(): UseConfigResult {
       .finally(() => {
         if (active) setLoading(false);
       });
+    // Stay in sync when config is edited from another window (e.g. the
+    // dedicated settings window).
+    const off = window.opendex.onConfigChanged((next) => {
+      if (active) setData(next);
+    });
     return () => {
       active = false;
+      off();
     };
   }, []);
 
