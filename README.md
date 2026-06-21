@@ -19,15 +19,19 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 
 <div align="center">
 
-[![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square)](https://github.com/wassgha/opendex/releases/latest)
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg"><img src="assets/download/download-macos-arm64.svg" alt="Download for macOS — Apple Silicon" height="58"></a>
+&nbsp;
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg"><img src="assets/download/download-macos-x64.svg" alt="Download for macOS — Intel" height="58"></a>
 
-[![Download for macOS — Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg)
-[![Download for macOS — Intel](https://img.shields.io/badge/macOS-Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg)
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe"><img src="assets/download/download-windows.svg" alt="Download for Windows" height="58"></a>
 
-[![Download for Windows](https://img.shields.io/badge/Windows-Installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe)
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage"><img src="assets/download/download-linux-appimage.svg" alt="Download the AppImage for Linux" height="58"></a>
+&nbsp;
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb"><img src="assets/download/download-debian-deb.svg" alt="Download the .deb for Debian" height="58"></a>
 
-[![Download AppImage for Linux](https://img.shields.io/badge/Linux-AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage)
-[![Download .deb for Debian/Ubuntu](https://img.shields.io/badge/Debian%2FUbuntu-.deb-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb)
+<br>
+
+[![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square&color=111)](https://github.com/wassgha/opendex/releases/latest)
 
 </div>
 
