@@ -127,6 +127,8 @@ export interface UseDexResult {
   pushToTalk: () => void;
   /** Submit a typed command through the same agent path as a spoken one. */
   submitText: (text: string) => void;
+  /** Abort whatever the agent is currently doing (mid-reply or mid tool loop). */
+  interrupt: () => void;
   /** Recent tool calls the agent made (transient; for the activity banners). */
   toolActivity: ToolActivity[];
   /** Current voice loudness, 0..1 — real mic level while listening, a synthetic
@@ -410,11 +412,13 @@ export function useDex(options: UseDexOptions): UseDexResult {
       const buffer = createSentenceBuffer();
       const abortController = new AbortController();
       let assistantText = "";
-      // Computer-use "quiet mode": once the agent acts on the screen we stop
-      // voicing narration. `summaryOffset` marks where the final spoken summary
-      // begins (the text after the last on-screen action).
+      // Computer-use "quiet mode": once the agent acts on the screen, the model
+      // can emit narration faster than it can be spoken. Rather than mute it or
+      // let it pile up (lagging behind the actions), we voice a note only when
+      // TTS has caught up, always keeping the *freshest* unspoken sentence as
+      // `pending` and dropping stale ones — so spoken updates stay current.
       let quiet = false;
-      let summaryOffset = 0;
+      let pending: string | null = null;
       runningCommandRef.current = {
         abortController,
         getPartialReply: () => assistantText,
@@ -458,14 +462,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
           mode: isBriefing ? "briefing" : undefined,
           onToolCall: (call) => {
             addToolActivity(call);
-            if (COMPUTER_TOOL_NAMES.has(call.toolName)) {
-              // First on-screen action: flush the opener to TTS, then go quiet.
-              if (!quiet) {
-                for (const tail of buffer.flush()) tts.enqueue(tail);
-                quiet = true;
-              }
-              // The spoken summary is whatever the model says after its last action.
-              summaryOffset = assistantText.length;
+            // First on-screen action: flush the opener to TTS, then go quiet.
+            if (COMPUTER_TOOL_NAMES.has(call.toolName) && !quiet) {
+              for (const tail of buffer.flush()) tts.enqueue(tail);
+              quiet = true;
             }
           },
           onDelta: (value) => {
@@ -476,11 +476,16 @@ export function useDex(options: UseDexOptions): UseDexResult {
             for (const w of value.toLowerCase().split(/\s+/)) {
               if (w.length > 3) assistantWordsRef.current.add(w);
             }
-            // In quiet mode we keep updating the transcript but don't voice the
-            // running narration — only the final summary is spoken (below).
-            if (!quiet) {
-              for (const chunk of buffer.push(value)) {
+            for (const chunk of buffer.push(value)) {
+              if (!quiet) {
                 tts.enqueue(chunk);
+              } else if (!tts.isSpeaking) {
+                // Caught up — voice this note now and forget any stale one.
+                tts.enqueue(chunk);
+                pending = null;
+              } else {
+                // Still speaking — hold only the freshest note, drop older.
+                pending = chunk;
               }
             }
           },
@@ -505,10 +510,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
           bargedIn = true;
         } else {
           if (quiet) {
-            // Speak only the closing summary (the text after the last action),
-            // not the per-action narration that streamed by while it worked.
-            const summary = assistantText.slice(summaryOffset).trim();
-            if (summary) tts.enqueue(summary);
+            // Voice the freshest unspoken note plus any trailing summary, so the
+            // wrap-up always lands even if TTS was busy through the last action.
+            const tail = [pending, ...buffer.flush()].filter(Boolean).join(" ").trim();
+            if (tail) tts.enqueue(tail);
           } else {
             for (const tail of buffer.flush()) tts.enqueue(tail);
           }
@@ -1092,6 +1097,26 @@ export function useDex(options: UseDexOptions): UseDexResult {
     meterRef.current?.resume();
   }, []);
 
+  // Emergency stop: halt whatever the agent is doing right now (mid-reply or
+  // mid computer-use loop) without tearing down the session, then return to
+  // passive listening. Driven by the global hotkey (works regardless of which
+  // app has focus) and any in-UI stop control.
+  const interrupt = useCallback(() => {
+    const running = runningCommandRef.current;
+    if (!running) return; // nothing in flight
+    // Preserve the partial reply for conversational continuity.
+    const partial = running.getPartialReply().trim();
+    if (partial) messagesRef.current.push({ role: "assistant", content: partial });
+    running.abortController.abort();
+    runningCommandRef.current = null;
+    ttsRef.current?.stop();
+    stopBargeMonitor();
+    bargeOnSpeakingRef.current = null;
+    clearToolActivity();
+    if (mutedRef.current) setStatus("muted");
+    else startModeRef.current?.("wake");
+  }, [clearToolActivity, stopBargeMonitor]);
+
   const stop = useCallback(() => {
     restartGuardRef.current = true;
     clearTimers();
@@ -1167,6 +1192,12 @@ export function useDex(options: UseDexOptions): UseDexResult {
     return off;
   }, [pushToTalk]);
 
+  // Global emergency-stop hotkey (⌘/Ctrl+Esc) → abort the current command.
+  useEffect(() => {
+    const off = window.opendex.onInterrupt(() => interrupt());
+    return off;
+  }, [interrupt]);
+
   const canPushToTalk =
     options.wakeMode === "manual" &&
     (status === "listening_wake" || status === "idle");
@@ -1183,6 +1214,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     canPushToTalk,
     pushToTalk,
     submitText,
+    interrupt,
     toolActivity,
     getAmplitude,
     unlockAudio,

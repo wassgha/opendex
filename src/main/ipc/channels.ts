@@ -23,6 +23,8 @@ export const IPC = {
   getPicovoiceKey: "stt:picovoice-key",
   // main → renderer event: global push-to-talk hotkey pressed
   pushToTalk: "push-to-talk",
+  // main → renderer event: global emergency-stop hotkey pressed
+  interrupt: "interrupt",
   // Permission gate: main → renderer prompt, renderer → main answer
   permissionRequest: "permission:request",
   permissionRespond: "permission:respond",

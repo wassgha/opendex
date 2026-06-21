@@ -171,11 +171,26 @@ function registerPushToTalkHotkey() {
   }
 }
 
+function registerInterruptHotkey() {
+  // Global emergency stop — works even while another app has focus (essential
+  // during computer-use, where OpenDex isn't the focused window). Aborts the
+  // running command in the renderer.
+  const accelerator = "CommandOrControl+Escape";
+  try {
+    globalShortcut.register(accelerator, () => {
+      BrowserWindow.getAllWindows()[0]?.webContents.send(IPC.interrupt);
+    });
+  } catch (err) {
+    console.error("[opendex] failed to register interrupt hotkey", err);
+  }
+}
+
 app.whenReady().then(() => {
   initConfig();
   registerIpc();
   createWindow();
   registerPushToTalkHotkey();
+  registerInterruptHotkey();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

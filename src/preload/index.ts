@@ -128,6 +128,13 @@ const opendex = {
     return () => ipcRenderer.removeListener(IPC.pushToTalk, listener);
   },
 
+  /** Subscribe to the global emergency-stop hotkey. Returns an unsubscribe fn. */
+  onInterrupt(handler: () => void): () => void {
+    const listener = () => handler();
+    ipcRenderer.on(IPC.interrupt, listener);
+    return () => ipcRenderer.removeListener(IPC.interrupt, listener);
+  },
+
   /** Subscribe to permission prompts for sensitive tool calls. */
   onPermissionRequest(
     handler: (req: PermissionRequestPayload) => void,

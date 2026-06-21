@@ -1,5 +1,32 @@
 import type { ToolActivity } from "@/lib/dex/use-dex";
 
+const IS_MAC =
+  typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
+const STOP_HINT = IS_MAC ? "⌘⎋" : "Ctrl+Esc";
+
+// Always-available emergency stop, shown whenever the agent is busy. The global
+// ⌘/Ctrl+Esc hotkey does the same thing and works even when another app has
+// focus (during computer-use OpenDex isn't the focused window) — this button is
+// the visible reminder + a fallback for when OpenDex is in front.
+export function StopControl({ onStop }: { onStop: () => void }) {
+  return (
+    <div className="fixed inset-x-0 top-4 z-40 flex justify-center px-4">
+      <button
+        type="button"
+        onClick={onStop}
+        title="Stop the assistant"
+        className="pointer-events-auto flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-950/70 px-4 py-1.5 text-sm font-medium text-rose-100 shadow-lg backdrop-blur transition hover:bg-rose-900/80"
+      >
+        <span className="h-2.5 w-2.5 rounded-[2px] bg-rose-300" aria-hidden />
+        Stop
+        <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-100/70">
+          {STOP_HINT}
+        </kbd>
+      </button>
+    </div>
+  );
+}
+
 // A stack of transient banners showing what the agent is doing (tool calls),
 // rendered as global chrome over whichever theme is active. Newest at the
 // bottom; each entry self-expires from the hook's state.
