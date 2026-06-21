@@ -40,7 +40,7 @@ export function ThemeTopBar({
           size="icon-sm"
           onClick={onOpenSettings}
           aria-label="Settings"
-          className="rounded-full bg-card/50 text-muted-foreground backdrop-blur hover:text-foreground"
+          className="rounded-full bg-dex-surface/70 text-muted-foreground backdrop-blur hover:text-foreground"
         >
           <Settings />
         </Button>

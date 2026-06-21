@@ -25,7 +25,7 @@ export function StatusPill({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3.5 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground backdrop-blur",
+        "inline-flex items-center gap-2 rounded-full border border-border bg-dex-surface/70 px-3.5 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground backdrop-blur",
         className,
       )}
     >

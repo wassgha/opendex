@@ -45,7 +45,7 @@ export function TextComposer({
         onClick={() => setOpen(true)}
         title="Type a message instead"
         className={cn(
-          "rounded-full bg-card/40 text-[10px] uppercase tracking-[0.25em] text-muted-foreground backdrop-blur hover:text-foreground",
+          "rounded-full bg-dex-surface/60 text-[10px] uppercase tracking-[0.25em] text-muted-foreground backdrop-blur hover:text-foreground",
           className,
         )}
       >
@@ -62,7 +62,7 @@ export function TextComposer({
         submit();
       }}
       className={cn(
-        "flex w-full min-w-0 max-w-md items-center gap-1.5 rounded-full border border-input bg-card/70 py-1.5 pl-3 pr-1.5 backdrop-blur",
+        "flex w-full min-w-0 max-w-md items-center gap-1.5 rounded-full border border-input bg-dex-surface/80 py-1.5 pl-3 pr-1.5 backdrop-blur",
         className,
       )}
     >
