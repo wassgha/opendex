@@ -13,6 +13,27 @@ import type { DexThemeProps } from "./types";
 // light card below, and an accent dot that breathes with your voice. Everything
 // is driven by the editorial token palette in globals.css, so it reskins cleanly.
 
+// Long agentic turns stream one ever-growing assistant message (often with the
+// inter-sentence spaces dropped, e.g. "sir.It appears…"). Rendering the whole
+// blob as hero type floods the screen, so we surface only the freshest sentence
+// or two — large display type stays a headline, not a wall. We also re-insert the
+// missing spaces so the line reads cleanly.
+function heroDisplay(text: string, maxChars = 200): string {
+  const clean = text.replace(/([.!?])(?=[A-Z"'(])/g, "$1 ").trim();
+  const parts = clean
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return clean;
+  let out = parts[parts.length - 1];
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const next = `${parts[i]} ${out}`;
+    if (next.length > maxChars) break;
+    out = next;
+  }
+  return out;
+}
+
 // Amplitude-reactive accent dot; doubles as the tap-to-talk target in manual mode.
 function PulseDot({ status, getAmplitude }: Pick<DexThemeProps, "status" | "getAmplitude">) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -55,10 +76,13 @@ export function EditorialTheme(props: DexThemeProps) {
   const hero =
     isInterim
       ? liveCaption
-      : lastAssistant?.content ||
-        `Good to see you${name ? `, this is ${name}` : ""}. Say “${wakeWord}” or type below to begin.`;
+      : lastAssistant
+        ? heroDisplay(lastAssistant.content)
+        : `Good to see you${name ? `, this is ${name}` : ""}. Say “${wakeWord}” or type below to begin.`;
 
-  const recent = transcript.slice(-5);
+  // The latest reply already lives in the hero above; the Recent card is the
+  // history *behind* it, so drop that turn here to avoid showing it twice.
+  const recent = transcript.filter((t) => t.id !== lastAssistant?.id).slice(-4);
 
   const mark = (
     <span className="flex items-center gap-3">
@@ -77,6 +101,7 @@ export function EditorialTheme(props: DexThemeProps) {
         status={status}
         onOpenSettings={props.onOpenSettings}
         showBrand={false}
+        showStatus={false}
       />
 
       {/* Brand mark — top-left, with the live accent dot (tap-to-talk in manual mode). */}
