@@ -32,6 +32,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Gate the release on a typecheck so broken types can't ship via auto-update.
+      - name: Typecheck
+        run: pnpm typecheck
+
       # macOS: decode the App Store Connect API key used for notarization.
       - name: Setup Apple API key
         if: matrix.os == 'macos-latest'

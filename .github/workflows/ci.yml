@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Full electron-vite build (main + preload + renderer). Catches bundling
+      # and import errors that `tsc --noEmit` alone misses. No secrets required.
+      - name: Build
+        run: pnpm build
+
+      # Smoke-test the agent loop only when a gateway key is available (e.g. on
+      # pushes to main, not forked-PR runs). Skipped silently otherwise.
+      - name: Smoke-test agent
+        if: ${{ env.AI_GATEWAY_API_KEY != '' }}
+        run: pnpm smoke:chat

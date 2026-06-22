@@ -3,11 +3,16 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // George — deep British male
 
 let cachedClient: ElevenLabsClient | null = null;
+let cachedKey: string | null = null;
 function client() {
-  if (!cachedClient) {
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not configured.");
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not configured.");
+  // Rebuild when the key changes (e.g. the user rotates it in Settings, which
+  // updates process.env via applyToEnv) so credential changes take effect
+  // without an app restart.
+  if (!cachedClient || cachedKey !== apiKey) {
     cachedClient = new ElevenLabsClient({ apiKey });
+    cachedKey = apiKey;
   }
   return cachedClient;
 }

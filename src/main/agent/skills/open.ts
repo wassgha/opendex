@@ -18,14 +18,23 @@ function launchApp(name: string): Promise<{ ok: true } | { error: string }> {
       cmd = "gtk-launch";
       args = [name];
     }
+    let settled = false;
+    const settle = (result: { ok: true } | { error: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
     try {
       const child = spawn(cmd, args, { stdio: "ignore", detached: true });
-      child.on("error", (err) => resolve({ error: err.message }));
+      // A spawn error can fire after the optimistic resolve below; the `settled`
+      // guard ensures we report failure only if it arrives first, and never tell
+      // the model "launched" after an error already won.
+      child.on("error", (err) => settle({ error: err.message }));
       child.unref();
       // Resolve optimistically — most launchers exit immediately.
-      setTimeout(() => resolve({ ok: true }), 150);
+      setTimeout(() => settle({ ok: true }), 150);
     } catch (err) {
-      resolve({ error: err instanceof Error ? err.message : String(err) });
+      settle({ error: err instanceof Error ? err.message : String(err) });
     }
   });
 }
