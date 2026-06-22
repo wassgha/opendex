@@ -1,5 +1,11 @@
 import "./style.css";
-import "./hero-demo";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import { HeroDemo } from "./HeroDemo";
+
+// Mount the animated hero demo as a React island into the static page.
+const heroRoot = document.getElementById("hero-demo-root");
+if (heroRoot) createRoot(heroRoot).render(createElement(HeroDemo));
 
 // Always points at the newest release's assets (GitHub redirects `latest`).
 const REL = "https://github.com/wassgha/opendex/releases/latest/download";
