@@ -155,17 +155,18 @@ const tools: SkillTool[] = [
   {
     name: "click",
     description:
-      "Click the mouse at a point (in screenshot pixel coordinates). Optionally double-click or use the right/middle button. Returns a fresh screenshot by default.",
+      "Click the mouse at a point (in screenshot pixel coordinates). Pass x and y together to click a specific spot; omit both to click wherever the cursor already is (e.g. right after moveMouse). Optionally double-click or use the right/middle button. Returns a fresh screenshot by default.",
     inputSchema: z.object({
-      x: z.number().describe("X coordinate in the most recent screenshot's pixel space."),
-      y: z.number().describe("Y coordinate in the most recent screenshot's pixel space."),
+      x: z.number().optional().describe("X coordinate in the most recent screenshot's pixel space. Omit to click at the current cursor position."),
+      y: z.number().optional().describe("Y coordinate in the most recent screenshot's pixel space. Omit to click at the current cursor position."),
       button: z.enum(["left", "right", "middle"]).optional().describe("Defaults to left."),
       double: z.boolean().optional().describe("Double-click when true."),
       screenshot: z.boolean().optional().describe(SHOT_ARG),
     }),
     summarize: (i) => {
-      const { x, y, button, double } = i as { x: number; y: number; button?: string; double?: boolean };
-      return `${double ? "Double-" : ""}${button ?? "left"}-click at (${x}, ${y})`;
+      const { x, y, button, double } = i as { x?: number; y?: number; button?: string; double?: boolean };
+      const where = x != null && y != null ? ` at (${x}, ${y})` : "";
+      return `${double ? "Double-" : ""}${button ?? "left"}-click${where}`;
     },
     toModelOutput: withScreenshot,
     execute: async ({
@@ -175,8 +176,8 @@ const tools: SkillTool[] = [
       double,
       screenshot,
     }: {
-      x: number;
-      y: number;
+      x?: number;
+      y?: number;
       button?: "left" | "right" | "middle";
       double?: boolean;
       screenshot?: boolean;
@@ -184,13 +185,19 @@ const tools: SkillTool[] = [
       const access = ensureInputAccess();
       if ("error" in access) return access;
       ensureConfigured();
-      const ref = lastShot;
-      const p = ref ? toScreenPoint(x, y, ref) : { x, y };
-      await mouse.setPosition(new Point(p.x, p.y));
+      // Coordinates are optional: when both are given, move there first; when
+      // omitted, click wherever the cursor already is (no move).
+      const hasPoint = x != null && y != null;
+      if (hasPoint) {
+        const ref = lastShot;
+        const p = ref ? toScreenPoint(x, y, ref) : { x, y };
+        await mouse.setPosition(new Point(p.x, p.y));
+      }
       const btn = button === "right" ? Button.RIGHT : button === "middle" ? Button.MIDDLE : Button.LEFT;
       if (double) await mouse.doubleClick(btn);
       else await mouse.click(btn);
-      return finishAction(`Clicked at (${x}, ${y}).`, screenshot ?? true);
+      const where = hasPoint ? ` at (${x}, ${y})` : " at the current cursor position";
+      return finishAction(`Clicked${where}.`, screenshot ?? true);
     },
   },
   {

@@ -40,7 +40,8 @@ export function formatToolCall(call: ToolCallEvent): ToolActivityLabel {
       return { icon: "📸", label: "Looking at the screen" };
     case "click": {
       const kind = i.double ? "Double-click" : `${String(i.button ?? "left")}-click`;
-      return { icon: "🖱️", label: `${kind} at (${i.x}, ${i.y})` };
+      const where = i.x != null && i.y != null ? ` at (${i.x}, ${i.y})` : "";
+      return { icon: "🖱️", label: `${kind}${where}` };
     }
     case "moveMouse":
       return { icon: "🖱️", label: `Move cursor to (${i.x}, ${i.y})` };

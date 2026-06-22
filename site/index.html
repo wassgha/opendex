@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="./icon.png" />
+
+    <title>OpenDex — a voice-first AI assistant for your desktop</title>
+    <meta
+      name="description"
+      content="OpenDex is a voice-first, open-source AI assistant for your desktop. Wake it, talk to it, and a tool-using agent talks back — in a cinematic interface you choose."
+    />
+    <meta property="og:title" content="OpenDex" />
+    <meta
+      property="og:description"
+      content="A voice-first, open-source AI assistant for your desktop."
+    />
+    <meta property="og:image" content="./screenshots/jarvis.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+
+  <body class="flex min-h-full flex-col bg-white text-neutral-900">
+    <!-- Announcement bar -->
+    <a
+      href="https://github.com/wassgha/opendex/releases/latest"
+      class="block bg-neutral-900 py-2.5 text-center text-xs text-white/90 transition hover:text-white sm:text-sm"
+    >
+      OpenDex <span class="text-white/50">v0.3.3</span> — a voice-first,
+      open-source AI assistant <span aria-hidden="true">→</span>
+    </a>
+
+    <!-- Nav -->
+    <header class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
+      <a href="#top" class="flex items-center gap-2.5">
+        <img src="./icon.png" alt="" class="h-7 w-7 rounded-md" />
+        <span class="wordmark text-lg">OpenDex</span>
+      </a>
+      <nav class="flex items-center gap-5 text-sm text-neutral-500">
+        <a href="#features" class="hidden transition hover:text-neutral-900 sm:inline">Features</a>
+        <a href="#themes" class="hidden transition hover:text-neutral-900 sm:inline">Themes</a>
+        <a
+          href="https://github.com/wassgha/opendex#readme"
+          class="hidden transition hover:text-neutral-900 sm:inline"
+          >Docs</a
+        >
+        <a
+          href="https://github.com/wassgha/opendex/releases"
+          class="hidden transition hover:text-neutral-900 sm:inline"
+          >Changelog</a
+        >
+        <a
+          href="https://github.com/wassgha/opendex"
+          class="transition hover:text-neutral-900"
+          >GitHub</a
+        >
+        <a
+          href="#download"
+          class="inline-flex items-center gap-2 rounded-md bg-neutral-900 px-3.5 py-2 text-white transition hover:bg-neutral-700"
+        >
+          Download
+          <kbd
+            class="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/80"
+            >D</kbd
+          >
+        </a>
+      </nav>
+    </header>
+
+    <main id="top" class="flex-1">
+      <!-- Hero -->
+      <section class="mx-auto w-full max-w-6xl px-5 pt-16 pb-12 sm:px-8 sm:pt-24">
+        <a
+          href="https://github.com/wassgha/opendex/releases/latest"
+          class="text-sm text-neutral-500 transition hover:text-neutral-900"
+          >See what's new in 0.3.3 <span aria-hidden="true">→</span></a
+        >
+        <h1 class="wordmark mt-6 text-6xl sm:text-8xl">OPENDEX</h1>
+        <p class="mt-6 text-xl font-bold sm:text-2xl">
+          A voice-first AI assistant for your desktop.
+        </p>
+        <p class="mt-4 max-w-2xl text-neutral-500">
+          Wake it, talk to it, and a tool-using agent talks back — running any
+          model, working fully offline if you want, in a cinematic interface you
+          choose. Open source, secure by design, yours.
+        </p>
+
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <a
+            id="primary-download"
+            href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg"
+            class="inline-flex items-center gap-2.5 rounded-md bg-neutral-900 px-5 py-3 font-bold text-white transition hover:bg-neutral-700"
+          >
+            <span id="primary-download-label">Download for macOS</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+            </svg>
+          </a>
+          <a
+            href="https://github.com/wassgha/opendex"
+            class="inline-flex items-center gap-2 rounded-md px-5 py-3 text-neutral-600 transition hover:text-neutral-900"
+          >
+            View on GitHub <span aria-hidden="true">→</span>
+          </a>
+          <span id="primary-download-note" class="text-xs text-neutral-400"></span>
+        </div>
+      </section>
+
+      <!-- Product shot (swap src for a feature GIF later) -->
+      <section class="mx-auto w-full max-w-6xl px-5 pb-20 sm:px-8">
+        <div class="overflow-hidden rounded-xl border border-neutral-200 bg-neutral-950 shadow-2xl">
+          <img
+            src="./screenshots/jarvis.png"
+            alt="OpenDex running the Jarvis HUD theme"
+            class="w-full"
+            loading="lazy"
+          />
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section id="features" class="border-t border-neutral-100 bg-neutral-50/60">
+        <div class="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8">
+          <h2 class="text-sm font-bold uppercase tracking-[0.25em] text-neutral-400">
+            What it does
+          </h2>
+          <div class="mt-10 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-2">
+            <!-- feature -->
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">01</span>
+              <div>
+                <h3 class="font-bold">Voice-first loop</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  Wake word → listen → think (with tools) → speak. Natural
+                  follow-ups, plus opt-in barge-in to interrupt mid-reply.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">02</span>
+              <div>
+                <h3 class="font-bold">Any model</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  Routes through the Vercel AI Gateway, so one key gets you
+                  Claude, GPT, Gemini, and more.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">03</span>
+              <div>
+                <h3 class="font-bold">Free &amp; offline option</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  Vosk wake word + local Whisper transcription (WASM, no signup)
+                  and your OS's built-in voice. Nothing leaves the machine except
+                  the LLM call.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">04</span>
+              <div>
+                <h3 class="font-bold">Pluggable voice I/O</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  Wake via push-to-talk, Vosk, Porcupine, or Web Speech;
+                  transcribe locally or in the cloud; speak via ElevenLabs or
+                  system TTS.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">05</span>
+              <div>
+                <h3 class="font-bold">Full-interface themes</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  The theme <em>is</em> the whole UI: a cinematic Jarvis HUD, a
+                  minimal Talking Dot, a Typing Cursor terminal, or a warm
+                  Editorial layout — all reactive to your voice.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">06</span>
+              <div>
+                <h3 class="font-bold">Agentic skills, gated</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  The agent takes real actions (open apps &amp; URLs). Sensitive
+                  ones hit an Allow once / Always / Deny prompt, remembered per
+                  skill.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">07</span>
+              <div>
+                <h3 class="font-bold">Computer-use (opt-in)</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  Let it see the screen and drive the mouse &amp; keyboard to
+                  operate apps for you. Works with any vision model, behind the
+                  permission gate.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-5">
+              <span class="text-sm font-bold text-neutral-300">08</span>
+              <div>
+                <h3 class="font-bold">Secure by design</h3>
+                <p class="mt-1.5 text-sm text-neutral-500">
+                  API keys are encrypted with your OS keychain and live only in
+                  the main process — never in the UI.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Themes -->
+      <section id="themes" class="border-t border-neutral-100">
+        <div class="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8">
+          <h2 class="text-sm font-bold uppercase tracking-[0.25em] text-neutral-400">
+            Pick your interface
+          </h2>
+          <p class="mt-3 max-w-2xl text-neutral-500">
+            A theme renders the entire experience — visualization, transcript,
+            and controls. Switch any time.
+          </p>
+          <div class="mt-10 grid gap-6 sm:grid-cols-3">
+            <figure>
+              <div class="overflow-hidden rounded-lg border border-neutral-200 bg-neutral-950">
+                <img src="./screenshots/jarvis.png" alt="Jarvis HUD theme" class="aspect-video w-full object-cover" loading="lazy" />
+              </div>
+              <figcaption class="mt-3 text-sm">
+                <span class="font-bold">Jarvis HUD</span>
+                <span class="text-neutral-500"> — cyan Stark-style heads-up display.</span>
+              </figcaption>
+            </figure>
+            <figure>
+              <div class="overflow-hidden rounded-lg border border-neutral-200 bg-neutral-950">
+                <img src="./screenshots/typing-cursor.png" alt="Typing Cursor theme" class="aspect-video w-full object-cover" loading="lazy" />
+              </div>
+              <figcaption class="mt-3 text-sm">
+                <span class="font-bold">Typing Cursor</span>
+                <span class="text-neutral-500"> — a quiet terminal caret.</span>
+              </figcaption>
+            </figure>
+            <figure>
+              <div class="overflow-hidden rounded-lg border border-neutral-200 bg-neutral-950">
+                <img src="./screenshots/hud-selection.png" alt="Theme selection" class="aspect-video w-full object-cover" loading="lazy" />
+              </div>
+              <figcaption class="mt-3 text-sm">
+                <span class="font-bold">…and more</span>
+                <span class="text-neutral-500"> — Talking Dot &amp; warm Editorial.</span>
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <!-- Download -->
+      <section id="download" class="border-t border-neutral-100 bg-neutral-50/60">
+        <div class="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8">
+          <h2 class="wordmark text-3xl sm:text-4xl">Download OpenDex.</h2>
+          <p class="mt-3 text-neutral-500">
+            Free and open source. We picked the build for your system —
+            everything else is below.
+          </p>
+
+          <div class="mt-8 flex flex-wrap items-center gap-x-4 gap-y-4" id="download-buttons">
+            <a data-os="mac-arm64" href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg" class="inline-block rounded-md transition hover:opacity-80">
+              <img src="./download/download-macos-arm64.svg" alt="Download for macOS — Apple Silicon" height="48" class="h-12" />
+            </a>
+            <a data-os="mac-x64" href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg" class="inline-block rounded-md transition hover:opacity-80">
+              <img src="./download/download-macos-x64.svg" alt="Download for macOS — Intel" height="48" class="h-12" />
+            </a>
+            <a data-os="win" href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe" class="inline-block rounded-md transition hover:opacity-80">
+              <img src="./download/download-windows.svg" alt="Download for Windows" height="48" class="h-12" />
+            </a>
+            <a data-os="linux-appimage" href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage" class="inline-block rounded-md transition hover:opacity-80">
+              <img src="./download/download-linux-appimage.svg" alt="Download the AppImage for Linux" height="48" class="h-12" />
+            </a>
+            <a data-os="linux-deb" href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb" class="inline-block rounded-md transition hover:opacity-80">
+              <img src="./download/download-debian-deb.svg" alt="Download the .deb for Debian" height="48" class="h-12" />
+            </a>
+          </div>
+
+          <p class="mt-6 text-sm text-neutral-400">
+            Or browse every version on the
+            <a href="https://github.com/wassgha/opendex/releases" class="underline hover:text-neutral-900">Releases</a>
+            page.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-neutral-100 bg-neutral-50">
+      <div class="mx-auto grid w-full max-w-6xl grid-cols-2 gap-8 px-5 py-16 sm:grid-cols-4 sm:px-8">
+        <div>
+          <div class="text-sm text-neutral-400">[Project]</div>
+          <ul class="mt-4 space-y-3 text-sm">
+            <li><a href="https://github.com/wassgha/opendex" class="transition hover:text-neutral-500">GitHub</a></li>
+            <li><a href="https://github.com/wassgha/opendex/releases" class="transition hover:text-neutral-500">Releases</a></li>
+            <li><a href="https://github.com/wassgha/opendex#roadmap" class="transition hover:text-neutral-500">Roadmap</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-sm text-neutral-400">[Resources]</div>
+          <ul class="mt-4 space-y-3 text-sm">
+            <li><a href="https://github.com/wassgha/opendex#readme" class="transition hover:text-neutral-500">Docs</a></li>
+            <li><a href="https://github.com/wassgha/opendex/releases" class="transition hover:text-neutral-500">Changelog</a></li>
+            <li><a href="https://github.com/wassgha/opendex/blob/main/PRIVACY.md" class="transition hover:text-neutral-500">Privacy</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-sm text-neutral-400">[Connect]</div>
+          <ul class="mt-4 space-y-3 text-sm">
+            <li><a href="https://github.com/wassgha/opendex/issues" class="transition hover:text-neutral-500">Issues</a></li>
+            <li><a href="https://github.com/wassgha/opendex/discussions" class="transition hover:text-neutral-500">Discussions</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-sm text-neutral-400">[Get it]</div>
+          <ul class="mt-4 space-y-3 text-sm">
+            <li><a href="#download" class="transition hover:text-neutral-500">Download</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="mx-auto w-full max-w-6xl px-5 pb-12 text-sm text-neutral-400 sm:px-8">
+        © 2026 OpenDex · open source
+      </div>
+    </footer>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

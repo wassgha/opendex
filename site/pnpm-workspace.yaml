@@ -1,0 +1,7 @@
+# Makes site/ its own pnpm workspace root so it installs independently of the
+# Electron app at the repo root (own node_modules + lockfile, light CI install).
+packages: []
+
+# Allow esbuild (vite's bundler) to run its install script in CI.
+onlyBuiltDependencies:
+  - esbuild

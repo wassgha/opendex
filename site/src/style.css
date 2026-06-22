@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* Conductor-style: monospace everywhere, light ground. Map Tailwind's default
+   font family to a mono stack so all text is mono without per-element classes. */
+@theme {
+  --font-sans: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Blocky wordmark — heavy mono, tight tracking, echoes Conductor's pixel logo. */
+.wordmark {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+}

@@ -1,0 +1,9 @@
+# Landing-site build artifacts and deps (the root .gitignore anchors its rules
+# to the repo root, so these need to be ignored here too).
+node_modules/
+dist/
+
+# Keep pnpm-lock.yaml committed — the Pages workflow installs with --frozen-lockfile.
+
+*.tsbuildinfo
+.DS_Store

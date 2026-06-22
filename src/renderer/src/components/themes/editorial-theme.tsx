@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Asterisk } from "lucide-react";
 import { ThemeTopBar } from "./theme-top-bar";
 import { TextComposer } from "./text-composer";
@@ -84,6 +84,13 @@ export function EditorialTheme(props: DexThemeProps) {
   // history *behind* it, so drop that turn here to avoid showing it twice.
   const recent = transcript.filter((t) => t.id !== lastAssistant?.id).slice(-4);
 
+  // Keep the Recent card pinned to its newest row; otherwise growing content can
+  // leave it scrolled to the oldest turn at the top.
+  const recentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (recentRef.current) recentRef.current.scrollTop = recentRef.current.scrollHeight;
+  }, [recent.length, lastAssistant?.content]);
+
   const mark = (
     <span className="flex items-center gap-3">
       <Asterisk className="size-6 text-foreground" strokeWidth={2.4} />
@@ -124,7 +131,7 @@ export function EditorialTheme(props: DexThemeProps) {
       <section className="z-0 flex flex-1 flex-col justify-center pt-16">
         <p
           className={cn(
-            "max-w-2xl text-balance text-2xl font-light leading-snug tracking-tight sm:text-4xl",
+            "line-clamp-2 max-w-2xl text-balance text-2xl font-light leading-snug tracking-tight sm:text-4xl",
             isInterim ? "text-muted-foreground" : "text-foreground",
           )}
         >
@@ -138,7 +145,10 @@ export function EditorialTheme(props: DexThemeProps) {
 
       {/* Recent turns — a light card, like a page of activity (hidden when compact). */}
       {recent.length > 0 && (
-        <Card className="z-10 mb-24 hidden max-h-[28vh] w-full max-w-2xl overflow-y-auto bg-card/95 p-4 sm:block">
+        <Card
+          ref={recentRef}
+          className="z-10 mb-24 hidden max-h-[28vh] w-full max-w-2xl overflow-y-auto bg-card/95 p-4 sm:block"
+        >
           <div className="mb-2 text-[10px] uppercase tracking-[0.3em] text-card-foreground/40">
             Recent
           </div>
