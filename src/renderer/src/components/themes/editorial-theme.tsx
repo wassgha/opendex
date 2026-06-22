@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Asterisk } from "lucide-react";
+import { WavesHorizontal } from "lucide-react";
 import { ThemeTopBar } from "./theme-top-bar";
 import { TextComposer } from "./text-composer";
 import { useAmplitudeFrame, ACTIVE_STATES } from "./use-amplitude";
@@ -93,7 +93,7 @@ export function EditorialTheme(props: DexThemeProps) {
 
   const mark = (
     <span className="flex items-center gap-3">
-      <Asterisk className="size-6 text-foreground" strokeWidth={2.4} />
+      <WavesHorizontal className="size-6 text-foreground" strokeWidth={2.4} />
       <PulseDot status={status} getAmplitude={getAmplitude} />
     </span>
   );
