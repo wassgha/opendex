@@ -70,10 +70,6 @@ function apply(detected: Detected) {
   if (primary) primary.href = `${REL}/${FILES[detected.os]}`;
   if (label) label.textContent = detected.label;
   if (note) note.textContent = detected.note;
-
-  // Highlight the matching button in the all-platforms row.
-  const match = document.querySelector<HTMLElement>(`#download-buttons [data-os="${detected.os}"]`);
-  match?.classList.add("ring-2", "ring-neutral-900", "ring-offset-2", "ring-offset-neutral-50");
 }
 
 // Press "D" anywhere (outside inputs) to download — mirrors the nav's key hint.
