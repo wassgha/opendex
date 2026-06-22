@@ -43,9 +43,11 @@ const COMPUTER_TOOL_NAMES = new Set([
   "captureScreen",
   "click",
   "moveMouse",
+  "drag",
   "typeText",
   "pressKeys",
   "scroll",
+  "wait",
 ]);
 
 // A smooth, organic synthetic loudness envelope (0..1) used for speaking/

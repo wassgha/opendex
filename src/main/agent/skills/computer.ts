@@ -1,7 +1,21 @@
-import { Button, Key, Point, keyboard, mouse } from "@nut-tree-fork/nut-js";
-import { systemPreferences } from "electron";
+import {
+  Button,
+  Key,
+  Point,
+  keyboard,
+  mouse,
+  straightTo,
+} from "@nut-tree-fork/nut-js";
+import { clipboard, systemPreferences } from "electron";
 import { z } from "zod";
-import { captureScreen, toScreenPoint, type Screenshot } from "./screen-capture";
+import { getConfig } from "../../config/store";
+import {
+  captureScreen,
+  captureStable,
+  framesDiffer,
+  toScreenPoint,
+  type Screenshot,
+} from "./screen-capture";
 import type { Skill, SkillTool, ToModelOutput } from "./types";
 
 // nut.js defaults are slow & jittery; tighten them once on first use.
@@ -13,6 +27,8 @@ function ensureConfigured() {
   keyboard.config.autoDelayMs = 4;
   configured = true;
 }
+
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // macOS gates mouse/keyboard injection behind Accessibility permission. If we
 // call nut.js without it, the action silently no-ops (and libnut spams stderr),
@@ -35,9 +51,36 @@ function ensureInputAccess(): { ok: true } | { error: string } {
   };
 }
 
-// The pixel space of the most recent screenshot, so the coordinates the model
-// returns (in image space) can be mapped onto real display coordinates.
+// The most recent screenshot, so the coordinates the model returns (in image
+// space) can be mapped onto real display coordinates, and zoom regions can be
+// resolved relative to it.
 let lastShot: Screenshot | null = null;
+// Fingerprint of the last frame we actually sent to the model, so we can tell it
+// "no visible change" (and skip a redundant near-identical image) when an action
+// didn't alter the screen.
+let lastSentSig: Uint8Array | null = null;
+
+/** Move the cursor to a screenshot-space point, animating per config. */
+async function moveTo(x: number, y: number): Promise<void> {
+  const ref = lastShot;
+  const p = ref ? toScreenPoint(x, y, ref) : { x, y };
+  const animate = getConfig().computer?.animateCursor ?? true;
+  if (animate) await mouse.move(straightTo(new Point(p.x, p.y)));
+  else await mouse.setPosition(new Point(p.x, p.y));
+}
+
+/** Paste text via the clipboard (instant, avoids autocomplete corruption),
+ *  restoring whatever was on the clipboard before. */
+async function pasteText(text: string): Promise<void> {
+  const prev = clipboard.readText();
+  clipboard.writeText(text);
+  const mod = process.platform === "darwin" ? Key.LeftCmd : Key.LeftControl;
+  await keyboard.pressKey(mod, Key.V);
+  await keyboard.releaseKey(Key.V, mod);
+  // Let the paste consume our text before we put the old clipboard back.
+  await delay(120);
+  clipboard.writeText(prev);
+}
 
 // ── coordinate-bearing action results carry a fresh screenshot so the model can
 //    see the effect of what it just did (the standard computer-use loop) ──────
@@ -56,8 +99,9 @@ const withScreenshot: ToModelOutput = ({ output }) => {
   return { type: "content", value: parts };
 };
 
+/** Capture a settled frame and remember it for coordinate mapping. */
 async function shoot(): Promise<Screenshot | null> {
-  const shot = await captureScreen();
+  const shot = await captureStable();
   if ("error" in shot) return null;
   lastShot = shot;
   return shot;
@@ -68,6 +112,11 @@ async function shoot(): Promise<Screenshot | null> {
 // model can chain a few related steps (type a field, Tab, type the next) without
 // a round-trip per action. Clicks/scrolls capture by default since they change
 // what's on screen. Either way the model can override via the `screenshot` arg.
+//
+// When we do capture, we settle the frame first (so we never act on a half-loaded
+// screen) and diff it against the last frame the model saw: if nothing changed we
+// return a short text note instead of a near-identical image — cheaper, and a
+// useful signal that a click likely missed.
 async function finishAction(message: string, wantShot: boolean): Promise<ActionResult> {
   if (!wantShot) return { ok: true, message };
   const shot = await shoot();
@@ -77,6 +126,10 @@ async function finishAction(message: string, wantShot: boolean): Promise<ActionR
       message: `${message} (couldn't capture a screenshot — check Screen Recording permission)`,
     };
   }
+  if (lastSentSig && !framesDiffer(lastSentSig, shot.signature)) {
+    return { ok: true, message: `${message} (no visible change on screen)` };
+  }
+  lastSentSig = shot.signature;
   return { ok: true, message, shot };
 }
 
@@ -133,18 +186,45 @@ function keyFromToken(token: string): Key | null {
   return null;
 }
 
+function buttonOf(button?: "left" | "right" | "middle"): Button {
+  return button === "right" ? Button.RIGHT : button === "middle" ? Button.MIDDLE : Button.LEFT;
+}
+
 const tools: SkillTool[] = [
   {
     name: "captureScreen",
     description:
-      "Take a screenshot of the screen and look at it. Coordinates in the returned image are what you pass to moveMouse/click. Use this first to see what's on screen.",
-    inputSchema: z.object({}),
-    summarize: () => "Take a screenshot of the screen",
+      "Take a screenshot and look at it. Coordinates in the returned image are what you pass to moveMouse/click/drag. Use this first to see what's on screen. To read or precisely click something small, pass a `region` to zoom in — it renders that area at full detail (coordinates then refer to the zoomed image). Pass `displayId` to look at another monitor.",
+    inputSchema: z.object({
+      region: z
+        .object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() })
+        .optional()
+        .describe(
+          "Zoom into this rectangle of the most recent screenshot (its pixel space). Renders that area at higher detail; returned coordinates are in the zoomed image.",
+        ),
+      displayId: z
+        .number()
+        .optional()
+        .describe("Capture a specific display. Omit to use the display under the cursor."),
+    }),
+    summarize: (i) => ((i as { region?: unknown }).region ? "Zoom into a region of the screen" : "Take a screenshot of the screen"),
     toModelOutput: withScreenshot,
-    execute: async (): Promise<ActionResult> => {
-      const shot = await captureScreen();
+    execute: async ({
+      region,
+      displayId,
+    }: {
+      region?: { x: number; y: number; w: number; h: number };
+      displayId?: number;
+    }): Promise<ActionResult> => {
+      const ref = lastShot ?? undefined;
+      const shot = await captureScreen({
+        displayId,
+        region: region && ref ? region : undefined,
+        regionRef: region && ref ? ref : undefined,
+      });
       if ("error" in shot) return { error: shot.error };
       lastShot = shot;
+      lastSentSig = shot.signature;
       return {
         ok: true,
         message: `Screenshot taken (${shot.width}×${shot.height}). Coordinates are in this image's pixel space; (0,0) is top-left.`,
@@ -188,12 +268,8 @@ const tools: SkillTool[] = [
       // Coordinates are optional: when both are given, move there first; when
       // omitted, click wherever the cursor already is (no move).
       const hasPoint = x != null && y != null;
-      if (hasPoint) {
-        const ref = lastShot;
-        const p = ref ? toScreenPoint(x, y, ref) : { x, y };
-        await mouse.setPosition(new Point(p.x, p.y));
-      }
-      const btn = button === "right" ? Button.RIGHT : button === "middle" ? Button.MIDDLE : Button.LEFT;
+      if (hasPoint) await moveTo(x, y);
+      const btn = buttonOf(button);
       if (double) await mouse.doubleClick(btn);
       else await mouse.click(btn);
       const where = hasPoint ? ` at (${x}, ${y})` : " at the current cursor position";
@@ -215,18 +291,66 @@ const tools: SkillTool[] = [
       const access = ensureInputAccess();
       if ("error" in access) return access;
       ensureConfigured();
-      const ref = lastShot;
-      const p = ref ? toScreenPoint(x, y, ref) : { x, y };
-      await mouse.setPosition(new Point(p.x, p.y));
+      await moveTo(x, y);
       return { ok: true, message: `Moved mouse to (${x}, ${y}).` };
+    },
+  },
+  {
+    name: "drag",
+    description:
+      "Press and hold the mouse button at a start point, move to an end point, and release — for sliders, drag-and-drop, marquee selection, or moving windows. Coordinates are in screenshot pixel space. Omit from* to start the drag at the current cursor position. Returns a fresh screenshot by default.",
+    inputSchema: z.object({
+      fromX: z.number().optional(),
+      fromY: z.number().optional(),
+      toX: z.number(),
+      toY: z.number(),
+      button: z.enum(["left", "right", "middle"]).optional().describe("Defaults to left."),
+      screenshot: z.boolean().optional().describe(SHOT_ARG),
+    }),
+    summarize: (i) => {
+      const { toX, toY } = i as { toX: number; toY: number };
+      return `Drag to (${toX}, ${toY})`;
+    },
+    toModelOutput: withScreenshot,
+    execute: async ({
+      fromX,
+      fromY,
+      toX,
+      toY,
+      button,
+      screenshot,
+    }: {
+      fromX?: number;
+      fromY?: number;
+      toX: number;
+      toY: number;
+      button?: "left" | "right" | "middle";
+      screenshot?: boolean;
+    }): Promise<ActionResult> => {
+      const access = ensureInputAccess();
+      if ("error" in access) return access;
+      ensureConfigured();
+      const btn = buttonOf(button);
+      if (fromX != null && fromY != null) await moveTo(fromX, fromY);
+      const ref = lastShot;
+      const target = ref ? toScreenPoint(toX, toY, ref) : { x: toX, y: toY };
+      // Press, animate the move (so intermediate positions register), release.
+      await mouse.pressButton(btn);
+      await mouse.move(straightTo(new Point(target.x, target.y)));
+      await mouse.releaseButton(btn);
+      return finishAction(`Dragged to (${toX}, ${toY}).`, screenshot ?? true);
     },
   },
   {
     name: "typeText",
     description:
-      "Type a string of text at the current focus (as if typed on the keyboard). Does not press Enter unless the text contains a newline. By default returns NO screenshot, so you can chain typing/keys; pass screenshot:true when you want to see the result.",
+      "Type a string of text at the current focus. Long text is pasted via the clipboard for speed and reliability; short text is typed key-by-key. Does not press Enter unless the text contains a newline. By default returns NO screenshot, so you can chain typing/keys; pass screenshot:true when you want to see the result.",
     inputSchema: z.object({
       text: z.string().describe("The literal text to type."),
+      method: z
+        .enum(["type", "paste"])
+        .optional()
+        .describe("Force key-by-key typing or clipboard paste. Omit to auto-choose (paste for long text)."),
       screenshot: z.boolean().optional().describe(SHOT_ARG),
     }),
     summarize: (i) => {
@@ -234,11 +358,21 @@ const tools: SkillTool[] = [
       return `Type: "${t.length > 60 ? t.slice(0, 57) + "…" : t}"`;
     },
     toModelOutput: withScreenshot,
-    execute: async ({ text, screenshot }: { text: string; screenshot?: boolean }): Promise<ActionResult> => {
+    execute: async ({
+      text,
+      method,
+      screenshot,
+    }: {
+      text: string;
+      method?: "type" | "paste";
+      screenshot?: boolean;
+    }): Promise<ActionResult> => {
       const access = ensureInputAccess();
       if ("error" in access) return access;
       ensureConfigured();
-      await keyboard.type(text);
+      const usePaste = method === "paste" || (method !== "type" && text.length > 25);
+      if (usePaste) await pasteText(text);
+      else await keyboard.type(text);
       return finishAction(`Typed ${text.length} character(s).`, screenshot ?? false);
     },
   },
@@ -268,10 +402,12 @@ const tools: SkillTool[] = [
   {
     name: "scroll",
     description:
-      "Scroll the screen in a direction by an amount (in scroll steps). Returns a fresh screenshot by default.",
+      "Scroll the screen in a direction by an amount (in scroll steps). Pass x and y to scroll the pane under that point (the cursor moves there first); omit them to scroll wherever the cursor is. Returns a fresh screenshot by default.",
     inputSchema: z.object({
       direction: z.enum(["up", "down", "left", "right"]),
       amount: z.number().min(1).max(50).optional().describe("Scroll steps (default 5)."),
+      x: z.number().optional().describe("X coordinate to scroll at (screenshot pixel space)."),
+      y: z.number().optional().describe("Y coordinate to scroll at (screenshot pixel space)."),
       screenshot: z.boolean().optional().describe(SHOT_ARG),
     }),
     summarize: (i) => {
@@ -282,21 +418,42 @@ const tools: SkillTool[] = [
     execute: async ({
       direction,
       amount,
+      x,
+      y,
       screenshot,
     }: {
       direction: "up" | "down" | "left" | "right";
       amount?: number;
+      x?: number;
+      y?: number;
       screenshot?: boolean;
     }): Promise<ActionResult> => {
       const access = ensureInputAccess();
       if ("error" in access) return access;
       ensureConfigured();
+      if (x != null && y != null) await moveTo(x, y);
       const n = amount ?? 5;
       if (direction === "up") await mouse.scrollUp(n);
       else if (direction === "down") await mouse.scrollDown(n);
       else if (direction === "left") await mouse.scrollLeft(n);
       else await mouse.scrollRight(n);
       return finishAction(`Scrolled ${direction}.`, screenshot ?? true);
+    },
+  },
+  {
+    name: "wait",
+    description:
+      "Pause briefly to let the screen finish loading or animating, then look. Cheaper and clearer than repeatedly screenshotting while you wait.",
+    inputSchema: z.object({
+      ms: z.number().min(0).max(3000).optional().describe("Milliseconds to wait (default 500, max 3000)."),
+      screenshot: z.boolean().optional().describe(SHOT_ARG),
+    }),
+    summarize: (i) => `Wait ${(i as { ms?: number }).ms ?? 500}ms`,
+    toModelOutput: withScreenshot,
+    execute: async ({ ms, screenshot }: { ms?: number; screenshot?: boolean }): Promise<ActionResult> => {
+      const d = Math.min(ms ?? 500, 3000);
+      await delay(d);
+      return finishAction(`Waited ${d}ms.`, screenshot ?? true);
     },
   },
 ];

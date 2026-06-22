@@ -248,6 +248,23 @@ function SkillsSection({ data, setConfig }: SectionProps) {
                 }
               />
             )}
+            {enabled && skill.id === "computer" && (
+              <ToggleRow
+                title="Animate cursor"
+                description="Move the pointer smoothly so you can follow along. Turn off for the fastest actions (instant jumps)."
+              >
+                <SegmentedControl
+                  value={config.computer.animateCursor ? "on" : "off"}
+                  options={[
+                    { value: "on", label: "On" },
+                    { value: "off", label: "Off" },
+                  ]}
+                  onChange={(v) =>
+                    setConfig({ computer: { animateCursor: v === "on" } })
+                  }
+                />
+              </ToggleRow>
+            )}
           </div>
         );
       })}

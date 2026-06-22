@@ -37,7 +37,9 @@ export function formatToolCall(call: ToolCallEvent): ToolActivityLabel {
   const i = (call.input ?? {}) as Record<string, unknown>;
   switch (call.toolName) {
     case "captureScreen":
-      return { icon: "📸", label: "Looking at the screen" };
+      return i.region
+        ? { icon: "🔍", label: "Zooming into the screen" }
+        : { icon: "📸", label: "Looking at the screen" };
     case "click": {
       const kind = i.double ? "Double-click" : `${String(i.button ?? "left")}-click`;
       const where = i.x != null && i.y != null ? ` at (${i.x}, ${i.y})` : "";
@@ -45,6 +47,8 @@ export function formatToolCall(call: ToolCallEvent): ToolActivityLabel {
     }
     case "moveMouse":
       return { icon: "🖱️", label: `Move cursor to (${i.x}, ${i.y})` };
+    case "drag":
+      return { icon: "🖱️", label: `Drag to (${i.toX}, ${i.toY})` };
     case "typeText":
       return { icon: "⌨️", label: `Type “${truncate(String(i.text ?? ""))}”` };
     case "pressKeys": {
@@ -53,6 +57,8 @@ export function formatToolCall(call: ToolCallEvent): ToolActivityLabel {
     }
     case "scroll":
       return { icon: "📜", label: `Scroll ${String(i.direction ?? "down")}` };
+    case "wait":
+      return { icon: "⏳", label: "Waiting for the screen" };
     case "openUrl":
       return { icon: "🌐", label: `Open ${truncate(String(i.url ?? ""))}` };
     case "openApp":
