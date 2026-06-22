@@ -4,8 +4,6 @@ import { HudRing, HudGauge, HudWaveform } from "./hud-widgets";
 import { TextComposer } from "../text-composer";
 import { ThemeTopBar } from "../theme-top-bar";
 import { OverlayTranscript } from "../overlay-transcript";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { DexThemeProps } from "../types";
 import type { TranscriptTurn } from "@/lib/dex/state";
 
@@ -66,50 +64,6 @@ function HudLog({
   );
 }
 
-// Mute + barge-in toggles, shared by the wide right column and the narrow
-// bottom cluster.
-function HudControls({
-  isMuted,
-  bargeInEnabled,
-  toggleMute,
-  toggleBargeIn,
-  className,
-}: {
-  isMuted: boolean;
-  bargeInEnabled: boolean;
-  toggleMute: () => void;
-  toggleBargeIn: () => void;
-  className?: string;
-}) {
-  return (
-    <div className={cn("flex items-center gap-2 mb-12", className)}>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={toggleMute}
-        className="h-9 flex-1 border-primary/30 bg-primary/10 font-mono text-[11px] uppercase tracking-wider text-primary hover:bg-primary/20"
-      >
-        {isMuted ? "Unmute" : "Mute"}
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={toggleBargeIn}
-        aria-pressed={bargeInEnabled}
-        title="Allow interrupting mid-reply. Requires headphones."
-        className={cn(
-          "h-9 flex-1 font-mono text-[11px] uppercase tracking-wider",
-          bargeInEnabled
-            ? "border-primary/60 bg-primary/20 text-foreground"
-            : "border-primary/20 bg-primary/5 text-primary/60 hover:bg-primary/15",
-        )}
-      >
-        Interrupt {bargeInEnabled ? "On" : "Off"}
-      </Button>
-    </div>
-  );
-}
-
 const SOURCES = ["Google Analytics", "Product Analytics", "Stripe"];
 
 export function JarvisTheme(props: DexThemeProps) {
@@ -121,14 +75,12 @@ export function JarvisTheme(props: DexThemeProps) {
     liveCaption,
     getAmplitude,
     isMuted,
-    bargeInEnabled,
     briefingActive,
     unsupported,
     canPushToTalk,
     onPushToTalk,
     onSubmitText,
     toggleMute,
-    toggleBargeIn,
   } = props;
 
   const showControls = !unsupported && status !== "error";
@@ -178,6 +130,8 @@ export function JarvisTheme(props: DexThemeProps) {
         status={status}
         onOpenSettings={props.onOpenSettings}
         showBrand={false}
+        isMuted={isMuted}
+        onToggleMute={showControls ? toggleMute : undefined}
       />
 
       {/* Left HUD column: identity (wide screens) */}
@@ -227,21 +181,12 @@ export function JarvisTheme(props: DexThemeProps) {
           <HudLog turns={transcript} liveCaption={liveCaption} wakeWord={wakeWord} />
         </div>
 
-        {unsupported ? (
+        {unsupported && (
           <p className="font-mono text-[11px] leading-relaxed text-primary/50">
             Web Speech unavailable in the desktop app. Settings → Voice input →
             set Transcription to OpenAI Whisper (add an OpenAI key), or use
             Push-to-talk.
           </p>
-        ) : (
-          showControls && (
-            <HudControls
-              isMuted={isMuted}
-              bargeInEnabled={bargeInEnabled}
-              toggleMute={toggleMute}
-              toggleBargeIn={toggleBargeIn}
-            />
-          )
         )}
 
         <div className="flex min-w-0">
@@ -266,15 +211,6 @@ export function JarvisTheme(props: DexThemeProps) {
         </div>
       )}
       <div className="absolute inset-x-0 bottom-5 z-20 flex flex-col items-center gap-2 px-4 xl:hidden">
-        {showControls && (
-          <HudControls
-            isMuted={isMuted}
-            bargeInEnabled={bargeInEnabled}
-            toggleMute={toggleMute}
-            toggleBargeIn={toggleBargeIn}
-            className="w-full max-w-xs"
-          />
-        )}
         <TextComposer onSubmit={onSubmitText} className="font-mono" />
       </div>
     </div>

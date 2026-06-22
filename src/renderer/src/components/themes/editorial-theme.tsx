@@ -109,6 +109,8 @@ export function EditorialTheme(props: DexThemeProps) {
         onOpenSettings={props.onOpenSettings}
         showBrand={false}
         showStatus={false}
+        isMuted={props.isMuted}
+        onToggleMute={unsupported || status === "error" ? undefined : props.toggleMute}
       />
 
       {/* Brand mark — top-left, with the live accent dot (tap-to-talk in manual mode). */}
@@ -131,7 +133,7 @@ export function EditorialTheme(props: DexThemeProps) {
       <section className="z-0 flex flex-1 flex-col justify-center pt-16">
         <p
           className={cn(
-            "line-clamp-2 max-w-2xl text-balance text-2xl font-light leading-snug tracking-tight sm:text-4xl",
+            "line-clamp-2 max-w-2xl text-balance text-3xl font-light leading-snug tracking-tight sm:text-4xl",
             isInterim ? "text-muted-foreground" : "text-foreground",
           )}
         >

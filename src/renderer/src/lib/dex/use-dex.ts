@@ -398,6 +398,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
 
   const runCommand = useCallback(
     async (userText: string, opts?: { mode?: "briefing"; resumeMode?: Mode }) => {
+      // Don't start a command while on standby. A wake callback queued just
+      // before mute (e.g. vosk's onWake → briefing) can otherwise reach here
+      // after mute and start the agent despite the muted UI.
+      if (mutedRef.current) return;
       const isBriefing = opts?.mode === "briefing";
       // The briefing is proactive — we don't show the synthetic prompt as a
       // user turn, but we still record it for conversational continuity.
@@ -589,6 +593,17 @@ export function useDex(options: UseDexOptions): UseDexResult {
       stopWakeEngine();
       abortStt();
       clearTimers();
+
+      // Hard standby guard. A wake event that fired just before mute (vosk match,
+      // a queued Web Speech onresult, an awaiting porcupine start) runs its
+      // callback *after* mute tore everything down and re-enters startMode. While
+      // muted, refuse to (re)engage anything and pin the UI to "muted". Unmute
+      // clears mutedRef before calling startMode, so it's unaffected.
+      if (mutedRef.current && mode !== "off") {
+        modeRef.current = "off";
+        setStatus("muted");
+        return;
+      }
       modeRef.current = mode;
 
       if (mode === "off") {
@@ -1143,10 +1158,30 @@ export function useDex(options: UseDexOptions): UseDexResult {
       const next = !current;
       mutedRef.current = next;
       if (next) {
+        // Full standby. Muting must pause *every* input path and abort anything
+        // in flight — not just Web Speech. Otherwise a wake engine (vosk is the
+        // default), an in-progress STT capture, a pending follow-up timer, or a
+        // running command keeps the mic live and actions executing despite the
+        // "Muted" UI. We keep the mic stream + meter alive so unmuting is instant.
         restartGuardRef.current = true;
+        clearTimers();
         stopRecognition();
+        stopWakeEngine();
+        abortStt();
         stopBargeMonitor();
+        bargeOnSpeakingRef.current = null;
+        const running = runningCommandRef.current;
+        if (running) {
+          // Preserve the partial reply for conversational continuity (as interrupt does).
+          const partial = running.getPartialReply().trim();
+          if (partial) messagesRef.current.push({ role: "assistant", content: partial });
+          running.abortController.abort();
+          runningCommandRef.current = null;
+        }
         ttsRef.current?.stop();
+        clearToolActivity();
+        modeRef.current = "off";
+        setLiveCaption("");
         restartGuardRef.current = false;
         setStatus("muted");
       } else {
@@ -1154,7 +1189,15 @@ export function useDex(options: UseDexOptions): UseDexResult {
       }
       return next;
     });
-  }, [startMode, stopBargeMonitor, stopRecognition]);
+  }, [
+    abortStt,
+    clearTimers,
+    clearToolActivity,
+    startMode,
+    stopBargeMonitor,
+    stopRecognition,
+    stopWakeEngine,
+  ]);
 
   // Auto-engage on mount. We guard against double-fire from React strict mode
   // and only attempt this once per page lifecycle.

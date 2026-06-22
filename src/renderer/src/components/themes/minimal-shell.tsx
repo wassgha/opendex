@@ -23,8 +23,16 @@ export function MinimalShell({
   /** Suppress the bottom transcript overlay (e.g. the cursor theme types it inline). */
   hideTranscript?: boolean;
 }) {
-  const { name, status, unsupported, canPushToTalk, onPushToTalk, briefingActive } =
-    props;
+  const {
+    name,
+    status,
+    unsupported,
+    canPushToTalk,
+    onPushToTalk,
+    briefingActive,
+    isMuted,
+    toggleMute,
+  } = props;
   const hasTranscript =
     !hideTranscript &&
     (props.transcript.length > 0 || props.liveCaption.length > 0);
@@ -40,6 +48,8 @@ export function MinimalShell({
         name={name}
         status={status}
         onOpenSettings={props.onOpenSettings}
+        isMuted={isMuted}
+        onToggleMute={unsupported || status === "error" ? undefined : toggleMute}
       />
 
       <section className="z-10 flex flex-col items-center gap-6">
