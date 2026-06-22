@@ -55,7 +55,7 @@
   <main id="top" class="flex-1">
     <!-- Hero -->
     <section class="mx-auto w-full max-w-6xl px-5 pt-14 pb-16 sm:px-8 sm:pt-16">
-      <div class="grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12">
+      <div class="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
         <div>
           <a href="https://github.com/wassgha/opendex/releases/latest"
             class="text-sm text-neutral-500 transition hover:text-neutral-900">See what's new in 0.3.3 <span
@@ -65,7 +65,7 @@
             A voice-first AI for your desktop.
           </p>
           <p class="mt-4 max-w-2xl text-neutral-500">
-            Speak, and Dex acts: local, free, open source and fully customizable.
+            Speak, and Dex acts; local, free, open source and fully customizable.
           </p>
 
           <div class="mt-8 flex flex-wrap items-center gap-3">
@@ -92,10 +92,10 @@
                No frame — the windows float directly on the page. -->
           <div id="dex-demo" class="dex-stage absolute left-0 top-0 h-[625px] w-[1000px] origin-top-left text-[#f5efe6]"
             aria-hidden="true">
-            <!-- Spreadsheet window — pops in overlapping Dex, front-right -->
+            <!-- Spreadsheet window — pops in to the right, pushing Dex aside -->
             <div id="demo-sheet"
-              class="win absolute right-[4%] top-1/2 z-30 w-[460px] origin-right overflow-hidden rounded-xl border border-black/10 bg-[#f3ede3] text-[#1a1714] opacity-0 shadow-2xl"
-              style="transform: translate(24px, -50%) scale(0.96)">
+              class="win absolute left-[548px] top-1/2 w-[440px] origin-left overflow-hidden rounded-xl border border-black/10 bg-[#f3ede3] text-[#1a1714] opacity-0 shadow-2xl"
+              style="transform: translate(28px, -50%) scale(0.96)">
               <div class="flex items-center gap-1.5 border-b border-black/10 bg-[#e7e0d4] px-3 py-2">
                 <span class="h-2.5 w-2.5 rounded-full bg-[#ec6a5e]"></span>
                 <span class="h-2.5 w-2.5 rounded-full bg-[#f4bf4f]"></span>
@@ -127,7 +127,10 @@
               class="win absolute left-1/2 top-[52px] z-20 w-[452px] rounded-[22px] border border-white/15 bg-black/55 p-4 opacity-0 shadow-2xl backdrop-blur-2xl"
               style="transform: translate(-50%, -12px) scale(0.95)">
               <div class="flex items-center gap-3.5">
-                <img src="./demo/cover.jpg" alt="" class="h-14 w-14 shrink-0 rounded-md object-cover shadow-md" />
+                <div class="grid h-14 w-14 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-md shadow-md">
+                  <span class="bg-[#d6493b]"></span><span class="bg-[#e7b23c]"></span>
+                  <span class="bg-[#3f6fae]"></span><span class="bg-[#2fa39a]"></span>
+                </div>
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-[15px] font-bold text-white">The Time (Dirty Bit)</div>
                   <div class="truncate text-[13px] text-white/55">The Beginning (Deluxe)</div>
@@ -169,37 +172,36 @@
               </div>
             </div>
 
-            <!-- Dex window (Editorial theme) — fills the stage; other windows overlap it -->
+            <!-- Dex window (Editorial theme) — centred; shifts aside for side windows -->
             <div id="demo-dex"
-              class="absolute inset-[3%] z-10 flex flex-col overflow-hidden rounded-[20px] border border-white/10 bg-[#16130f] shadow-2xl ring-1 ring-black/50">
-              <div class="flex items-center gap-2 px-6 pt-5">
-                <span class="h-3.5 w-3.5 rounded-full bg-[#ec6a5e]"></span>
-                <span class="h-3.5 w-3.5 rounded-full bg-[#f4bf4f]"></span>
-                <span class="h-3.5 w-3.5 rounded-full bg-[#61c554]"></span>
+              class="win absolute left-1/2 top-1/2 z-10 w-[500px] overflow-hidden rounded-2xl border border-white/10 bg-[#16130f] shadow-2xl ring-1 ring-black/50"
+              style="transform: translate(-50%, -50%)">
+              <div class="flex items-center gap-2 px-4 pt-3.5">
+                <span class="h-3 w-3 rounded-full bg-[#ec6a5e]"></span>
+                <span class="h-3 w-3 rounded-full bg-[#f4bf4f]"></span>
+                <span class="h-3 w-3 rounded-full bg-[#61c554]"></span>
               </div>
-              <div class="flex items-center gap-3 px-9 pt-5">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f5efe6" stroke-width="2.4"
-                  stroke-linecap="round" aria-hidden="true">
-                  <path d="M12 4v16M4.5 7.5l15 9M19.5 7.5l-15 9" />
-                </svg>
-                <span class="demo-dot block h-3 w-3 rounded-full bg-[#e8916f]"></span>
-                <span
-                  class="ml-auto grid h-8 w-8 place-items-center rounded-full border border-white/10 text-[15px] text-white/30">⚙</span>
-              </div>
-              <div class="flex flex-1 flex-col justify-center px-9">
+              <div class="px-7 pb-6 pt-3">
+                <div class="flex items-center gap-3 py-2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f5efe6" stroke-width="2.4"
+                    stroke-linecap="round" aria-hidden="true">
+                    <path d="M12 4v16M4.5 7.5l15 9M19.5 7.5l-15 9" />
+                  </svg>
+                  <span class="demo-dot block h-2.5 w-2.5 rounded-full bg-[#e8916f]"></span>
+                  <span
+                    class="ml-auto grid h-6 w-6 place-items-center rounded-full border border-white/10 text-white/30">⚙</span>
+                </div>
                 <p
-                  class="demo-narration min-h-[2.4em] max-w-[80%] font-light leading-snug tracking-tight text-[#f5efe6]">
+                  class="demo-narration mt-2 min-h-[2.3em] max-w-[420px] font-light leading-snug tracking-tight text-[#f5efe6]">
                   <span data-narration>Good to see you, this is Dex.</span><span class="demo-caret"></span>
                 </p>
-                <div class="mt-5 flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-[#a89a87]">
-                  <span class="h-1.5 w-1.5 rounded-full bg-[#da7756]"></span>
+                <div class="mt-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-[#a89a87]">
+                  <span class="h-1 w-1 rounded-full bg-[#da7756]"></span>
                   <span data-status>Standing by…</span>
                 </div>
-              </div>
-              <div class="flex justify-center px-9 pb-7">
                 <div
-                  class="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[14px] text-[#a89a87]">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                  class="mt-5 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[13px] text-[#a89a87]">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
                     aria-hidden="true">
                     <rect x="2" y="6" width="20" height="12" rx="2" />
                     <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />

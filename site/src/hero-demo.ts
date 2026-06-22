@@ -57,6 +57,7 @@ if (ready) {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const Q3_VALUES = ["$50.2k", "$44.0k", "$37.8k", "$15.1k"];
   const FINAL_NARRATION = "Done. Q3 is up 18% over Q2 — APAC led the jump.";
+  const DEX_SHIFT = -235; // px Dex slides left to make room for the spreadsheet
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -73,13 +74,19 @@ if (ready) {
     statusEl!.textContent = s;
   };
 
+  function setDexShift(px: number) {
+    dexWin!.style.transform = `translate(calc(-50% + ${px}px), -50%)`;
+  }
+
   function openSheet() {
+    setDexShift(DEX_SHIFT);
     sheet!.style.opacity = "1";
     sheet!.style.transform = "translate(0, -50%) scale(1)";
   }
   function closeSheet() {
+    setDexShift(0);
     sheet!.style.opacity = "0";
-    sheet!.style.transform = "translate(24px, -50%) scale(0.96)";
+    sheet!.style.transform = "translate(28px, -50%) scale(0.96)";
   }
 
   function openMusic() {
