@@ -27,13 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here — pnpm/action-setup reads it from the root
+      # package.json `packageManager` field (pnpm@10.8.1). Setting both errors.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: site/pnpm-lock.yaml
 
