@@ -120,8 +120,8 @@ export function JarvisTheme(props: DexThemeProps) {
         />
       </div>
 
-      <Corner className="left-5 top-5 border-l-2 border-t-2" />
-      <Corner className="right-5 top-5 border-r-2 border-t-2" />
+      <Corner className="left-5 top-20 border-l-2 border-t-2" />
+      <Corner className="right-5 top-20 border-r-2 border-t-2" />
       <Corner className="bottom-5 left-5 border-b-2 border-l-2" />
       <Corner className="bottom-5 right-5 border-b-2 border-r-2" />
 
