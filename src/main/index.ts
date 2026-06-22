@@ -34,8 +34,8 @@ const isDev = !app.isPackaged;
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 420,
-    height: 640,
+    width: 480,
+    height: 480,
     minWidth: 360,
     minHeight: 420,
     backgroundColor: "#0a0a0a",
