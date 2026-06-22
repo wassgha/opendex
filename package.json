@@ -1,6 +1,6 @@
 {
   "name": "opendex",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "OpenDex — a voice-first agentic harness for the desktop.",
   "private": true,
   "packageManager": "pnpm@10.8.1",
