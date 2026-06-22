@@ -23,6 +23,23 @@ const Q3 = ["$50.2k", "$44.0k", "$37.8k", "$15.1k"];
 const FINAL = "Done. Q3 is up 18% over Q2 — APAC led the jump.";
 const EASE = [0.22, 0.7, 0.18, 1] as const;
 
+// Horizontal centre (design px) of each window — the mobile "camera" pans here.
+type Focus = "dex" | "sheet" | "music";
+const FOCUS_X: Record<Focus, number> = {
+  dex: DEX_LEFT + DEX_W / 2,
+  sheet: 505 + 460 / 2,
+  music: 420 + 328 / 2,
+};
+const MOBILE_BP = 640;
+
+// Desktop: fit the whole 985-wide surface to the column. Mobile: scale up so the
+// Dex window is ~94% of the width (readable) and let the camera pan between
+// windows, clipping the overflow.
+function zoomFor(w: number) {
+  if (!w) return 1;
+  return w < MOBILE_BP ? (w * 0.94) / DEX_W : w / DESIGN_W;
+}
+
 const Caret = () => <span className="demo-caret" />;
 
 export function HeroDemo() {
@@ -32,6 +49,8 @@ export function HeroDemo() {
   const cellRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scaleRef = useRef(1);
   const [scale, setScale] = useState(1);
+  const [cw, setCw] = useState(0);
+  const [focus, setFocus] = useState<Focus>("dex");
 
   const [narration, setNarration] = useState("Good to see you, this is Dex.");
   const [command, setCommand] = useState("");
@@ -51,9 +70,11 @@ export function HeroDemo() {
     const c = containerRef.current;
     if (!c) return;
     const fit = () => {
-      const s = c.clientWidth / DESIGN_W;
+      const width = c.clientWidth;
+      const s = zoomFor(width);
       scaleRef.current = s;
       setScale(s);
+      setCw(width);
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -116,6 +137,7 @@ export function HeroDemo() {
     };
 
     const sceneSpreadsheet = async () => {
+      setFocus("dex");
       setStatus("Standing by…");
       setCommand("");
       setTyping(false);
@@ -131,6 +153,7 @@ export function HeroDemo() {
       await type(setNarration, "On it — opening Quarterly.numbers.", 18);
       setBanner({ icon: "▸", text: "Open · Numbers" });
       setShowSheet(true);
+      setFocus("sheet"); // mobile camera pans to the spreadsheet
       await delay(950);
 
       setBanner({ icon: "▸", text: "Screenshot" });
@@ -146,6 +169,7 @@ export function HeroDemo() {
       }
 
       setBanner(null);
+      setFocus("dex"); // pan back to Dex for the spoken summary
       await type(setNarration, FINAL, 18);
       setStatus("Standing by…");
       await delay(2600);
@@ -154,12 +178,14 @@ export function HeroDemo() {
     };
 
     const sceneMusic = async () => {
+      setFocus("dex");
       await runCommand("play something upbeat", 320);
 
       setStatus("Working…");
       await type(setNarration, "Putting on a playlist.");
       setBanner({ icon: "▸", text: "Open · Music" });
       setShowMusic(true);
+      setFocus("music"); // mobile camera pans to the player
       setPlaying(false);
       await delay(380);
       setPlaying(true);
@@ -186,8 +212,18 @@ export function HeroDemo() {
     };
   }, []);
 
+  const mobile = cw > 0 && cw < MOBILE_BP;
+  // On mobile the surface is wider than the screen; pan it so the focused window
+  // is centred. On desktop it fits, so no pan.
+  const offsetX = mobile ? cw / 2 - FOCUS_X[focus] * scale : 0;
+
   return (
-    <div ref={containerRef} className="w-full">
+    <div ref={containerRef} className="w-full overflow-x-clip">
+      <motion.div
+        style={{ width: DESIGN_W * scale, height: DESIGN_H * scale }}
+        animate={{ x: offsetX }}
+        transition={{ duration: 0.6, ease: EASE }}
+      >
       <div
         ref={stageRef}
         className="dex-stage relative text-[#f5efe6]"
@@ -344,6 +380,7 @@ export function HeroDemo() {
           <path d="M5 3l14 7-6 1.6L10 18z" fill="#fff" stroke="#000" strokeWidth="1.2" strokeLinejoin="round" />
         </motion.svg>
       </div>
+      </motion.div>
 
       {/* Action hints — the computer-use steps as a dark pill under the demo */}
       <div className="mt-6 flex h-8 items-center justify-center">
