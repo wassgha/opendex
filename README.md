@@ -14,7 +14,7 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 [![Stars](https://img.shields.io/github/stars/wassgha/notjarvis?style=flat-square&color=111)](https://github.com/wassgha/notjarvis/stargazers)
 [![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square&color=111)](https://github.com/wassgha/opendex/releases/latest)
 
-![OpenDex — Jarvis HUD theme](screenshots/jarvis.png)
+![OpenDex — Control your computer with voice](screenshots/open-music.png)
 
 </div>
 
@@ -45,6 +45,12 @@ It's a **harness**, not a single bot: the model, the voice, the wake/transcripti
 - 🛠️ **Agentic skills with a permission gate** — the agent can take real actions (e.g. open apps & URLs); sensitive actions pop an **Allow once / Always / Deny** prompt that's remembered per skill.
 - 🖥️ **Computer-use (opt-in)** — let it *see the screen and drive the mouse & keyboard* to operate apps for you. Works with any vision model (screenshots stream back as images), and stays behind the permission gate.
 - 🔐 **Secure by design** — API keys are encrypted with your OS keychain and live only in the main process, never in the UI.
+
+## Themability
+
+OpenDex is fully theamable, you can change anything about the user interface and make it yours.
+
+![OpenDex — Jarvis HUD theme](screenshots/jarvis.png)
 
 ## Screenshots
 
