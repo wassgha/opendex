@@ -1,4 +1,5 @@
 import "./style.css";
+import "./hero-demo";
 
 // Always points at the newest release's assets (GitHub redirects `latest`).
 const REL = "https://github.com/wassgha/opendex/releases/latest/download";

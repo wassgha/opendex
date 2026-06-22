@@ -28,3 +28,82 @@ body {
   letter-spacing: -0.04em;
   line-height: 0.9;
 }
+
+/* ── Hero live-demo ──────────────────────────────────────────────────────── */
+.dex-stage {
+  font-family: var(--font-mono);
+}
+
+.demo-narration {
+  font-size: 30px;
+}
+
+.demo-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: currentColor;
+  animation: demo-blink 1.05s steps(1, end) infinite;
+}
+
+.demo-cursor {
+  transition:
+    left 0.7s cubic-bezier(0.5, 0, 0.2, 1),
+    top 0.7s cubic-bezier(0.5, 0, 0.2, 1),
+    transform 0.12s ease;
+}
+.demo-cursor.is-clicking {
+  transform: scale(0.78);
+}
+
+.demo-dot {
+  animation: demo-pulse 1.5s ease-in-out infinite;
+}
+
+.eq span {
+  height: 30%;
+  animation: demo-eq 0.9s ease-in-out infinite;
+}
+.eq span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.eq span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+.eq span:nth-child(4) {
+  animation-delay: 0.54s;
+}
+
+.cell-pop {
+  animation: demo-cellpop 0.4s ease-out;
+}
+
+@keyframes demo-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0.1; }
+}
+@keyframes demo-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.55); opacity: 0.5; }
+}
+@keyframes demo-eq {
+  0%, 100% { height: 25%; }
+  50% { height: 100%; }
+}
+@keyframes demo-cellpop {
+  from { background: rgba(218, 119, 86, 0.35); }
+  to { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-caret,
+  .demo-dot,
+  .eq span {
+    animation: none;
+  }
+  .demo-cursor {
+    transition: none;
+  }
+}
