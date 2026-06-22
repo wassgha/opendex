@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { app, safeStorage } from "electron";
 import {
@@ -174,4 +174,23 @@ export function setSecret(name: SecretName, value: string): PublicConfig {
 
 export function completeOnboarding(): PublicConfig {
   return updateConfig({ onboarding: { completed: true } });
+}
+
+/** Factory reset: delete persisted prefs + secrets and fall back to defaults.
+ *  Since onboarding.completed reverts to its default (false), the app re-runs
+ *  onboarding. Secrets still present in a dev .env remain as a fallback (they're
+ *  only cleared from the encrypted store, not from process.env). */
+export function resetConfig(): PublicConfig {
+  ensurePaths();
+  for (const path of [configPath, secretsPath]) {
+    try {
+      if (existsSync(path)) rmSync(path);
+    } catch (err) {
+      console.error(`[opendex config] failed to delete ${path}`, err);
+    }
+  }
+  cachedSecrets = {};
+  cachedConfig = structuredClone(DEFAULT_CONFIG);
+  applyToEnv();
+  return getPublicConfig();
 }

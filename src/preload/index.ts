@@ -114,6 +114,11 @@ const opendex = {
     return ipcRenderer.invoke(IPC.onboardingComplete);
   },
 
+  /** Factory reset: wipe stored prefs + secrets and re-run onboarding. */
+  resetConfig(): Promise<PublicConfig> {
+    return ipcRenderer.invoke(IPC.configReset);
+  },
+
   /** Open the dedicated settings window (creates it, or focuses if already open). */
   openSettings(): Promise<void> {
     return ipcRenderer.invoke(IPC.settingsOpen);

@@ -17,6 +17,7 @@ export const IPC = {
   configGet: "config:get",
   configSet: "config:set",
   secretSet: "secret:set",
+  configReset: "config:reset",
   onboardingComplete: "onboarding:complete",
   // main → renderer event: config changed (broadcast to all windows)
   configChanged: "config:changed",

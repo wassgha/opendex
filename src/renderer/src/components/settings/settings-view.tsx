@@ -8,7 +8,7 @@ import { SETTINGS_SECTIONS } from "./sections";
 // loaded + mutated through the same IPC as the main window, and the main process
 // broadcasts changes so both windows stay in sync live.
 export function SettingsApp() {
-  const { data, loading, setConfig, setSecret } = useConfig();
+  const { data, loading, setConfig, setSecret, resetConfig } = useConfig();
   const [active, setActive] = useState(SETTINGS_SECTIONS[0].id);
 
   if (loading || !data) {
@@ -61,7 +61,12 @@ export function SettingsApp() {
             </h2>
           </div>
           <div className="flex flex-col gap-4">
-            <Active data={data} setConfig={setConfig} setSecret={setSecret} />
+            <Active
+              data={data}
+              setConfig={setConfig}
+              setSecret={setSecret}
+              resetConfig={resetConfig}
+            />
           </div>
         </div>
       </main>

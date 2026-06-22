@@ -12,6 +12,7 @@ export interface UseConfigResult {
   setConfig: (patch: DeepPartial<OpenDexConfig>) => Promise<void>;
   setSecret: (name: SecretName, value: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  resetConfig: () => Promise<void>;
   reload: () => Promise<void>;
 }
 
@@ -59,5 +60,17 @@ export function useConfig(): UseConfigResult {
     setData(await window.opendex.completeOnboarding());
   }, []);
 
-  return { data, loading, setConfig, setSecret, completeOnboarding, reload };
+  const resetConfig = useCallback(async () => {
+    setData(await window.opendex.resetConfig());
+  }, []);
+
+  return {
+    data,
+    loading,
+    setConfig,
+    setSecret,
+    completeOnboarding,
+    resetConfig,
+    reload,
+  };
 }

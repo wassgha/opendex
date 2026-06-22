@@ -19,6 +19,7 @@ import {
   getPicovoiceKey,
   getPublicConfig,
   initConfig,
+  resetConfig,
   setSecret,
   updateConfig,
 } from "./config/store";
@@ -197,6 +198,13 @@ function registerIpc() {
   ipcMain.handle(IPC.secretSet, (_event, name: SecretName, value: string) => {
     const result = setSecret(name, value);
     broadcastConfig();
+    return result;
+  });
+
+  ipcMain.handle(IPC.configReset, () => {
+    const result = resetConfig();
+    broadcastConfig();
+    track("config_reset");
     return result;
   });
 

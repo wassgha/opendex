@@ -398,10 +398,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
 
   const runCommand = useCallback(
     async (userText: string, opts?: { mode?: "briefing"; resumeMode?: Mode }) => {
-      // Don't start a command while on standby. A wake callback queued just
-      // before mute (e.g. vosk's onWake → briefing) can otherwise reach here
-      // after mute and start the agent despite the muted UI.
-      if (mutedRef.current) return;
       const isBriefing = opts?.mode === "briefing";
       // The briefing is proactive — we don't show the synthetic prompt as a
       // user turn, but we still record it for conversational continuity.
@@ -630,6 +626,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
         // Fire the proactive greeting on first wake (if enabled), else listen
         // for a command.
         const onWake = () => {
+          // A wake detection queued just before mute can fire after the engine
+          // was torn down. Ignore it so voice never re-engages while on standby.
+          if (mutedRef.current) return;
           if (!hasBriefedRef.current && opts.greetingEnabled) {
             hasBriefedRef.current = true;
             void runCommand("Give me my briefing.", { mode: "briefing" });
@@ -700,6 +699,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
         recognitionRef.current = rec;
         let resultBaseline = 0;
         rec.onresult = (event) => {
+          if (mutedRef.current) return; // ignore late results while on standby
           const { finalText, interimText } = joinTranscript(
             event.results,
             resultBaseline,

@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import {
   User,
   Mic,
@@ -8,8 +8,10 @@ import {
   AudioLines,
   MessageSquare,
   ShieldCheck,
+  RotateCcw,
   type LucideIcon,
 } from "lucide-react";
+import { Button } from "../ui/button";
 import type { PublicConfig } from "../../../../main/config/schema";
 import type {
   DeepPartial,
@@ -31,6 +33,7 @@ export interface SectionProps {
   data: PublicConfig;
   setConfig: (patch: DeepPartial<OpenDexConfig>) => void;
   setSecret: (name: SecretName, value: string) => void;
+  resetConfig: () => Promise<void>;
 }
 
 // A labelled control with an inline toggle/segmented control on the right.
@@ -380,6 +383,54 @@ function PrivacySection({ data, setConfig }: SectionProps) {
   );
 }
 
+function ResetSection({ data, resetConfig }: SectionProps) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const onReset = async () => {
+    setBusy(true);
+    try {
+      await resetConfig();
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="text-sm text-muted-foreground">
+        Restore every setting to its defaults and re-run first-time onboarding.
+        This clears your assistant name, theme, voice, model, and skill choices
+        {data.encryptionAvailable
+          ? ", and removes any API keys saved in the app"
+          : ""}
+        . This can’t be undone.
+      </div>
+      {confirming ? (
+        <div className="flex items-center gap-2">
+          <Button variant="destructive" onClick={onReset} disabled={busy}>
+            {busy ? "Resetting…" : "Yes, reset everything"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setConfirming(false)}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <div>
+          <Button variant="destructive" onClick={() => setConfirming(true)}>
+            Reset to defaults
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
 export interface SettingsSection {
   id: string;
   label: string;
@@ -396,4 +447,5 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "tts", label: "Voice (TTS)", Icon: AudioLines, Component: TtsSection },
   { id: "greeting", label: "Greeting", Icon: MessageSquare, Component: GreetingSection },
   { id: "privacy", label: "Privacy", Icon: ShieldCheck, Component: PrivacySection },
+  { id: "reset", label: "Reset", Icon: RotateCcw, Component: ResetSection },
 ];
