@@ -9,7 +9,8 @@ import { AnimatePresence, motion } from "motion/react";
 
 const DESIGN_W = 985;
 const DESIGN_H = 400;
-const DEX_LEFT = Math.round((DESIGN_W - 520) / 2); // centred when alone
+const DEX_W = 560;
+const DEX_LEFT = Math.round((DESIGN_W - DEX_W) / 2); // centred when alone
 const DEX_SHIFT = -150; // slides left only when the spreadsheet is up
 
 const ROWS = [
@@ -27,6 +28,7 @@ const Caret = () => <span className="demo-caret" />;
 export function HeroDemo() {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
   const cellRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scaleRef = useRef(1);
   const [scale, setScale] = useState(1);
@@ -81,12 +83,11 @@ export function HeroDemo() {
       }
     };
 
-    const cursorTo = async (i: number) => {
-      const cell = cellRefs.current[i];
+    const moveTo = async (el: HTMLElement | null) => {
       const stage = stageRef.current;
-      if (cell && stage) {
+      if (el && stage) {
         const sr = stage.getBoundingClientRect();
-        const r = cell.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
         const s = scaleRef.current || 1;
         setCursor({
           x: (r.left + r.width / 2 - sr.left) / s,
@@ -103,6 +104,17 @@ export function HeroDemo() {
       await delay(110);
     };
 
+    // Move the cursor to the Dex composer, click it, then type the command.
+    const runCommand = async (text: string, pause = 420) => {
+      await moveTo(composerRef.current);
+      await click();
+      setTyping(true);
+      await type(setCommand, text, 30);
+      await delay(pause);
+      setCommand("");
+      setTyping(false);
+    };
+
     const sceneSpreadsheet = async () => {
       setStatus("Standing by…");
       setCommand("");
@@ -113,26 +125,22 @@ export function HeroDemo() {
       await type(setNarration, "Good to see you, this is Dex.");
       await delay(900);
 
-      setTyping(true);
-      await type(setCommand, "fill in Q3 revenue by region", 30);
-      await delay(420);
-      setCommand("");
-      setTyping(false);
+      await runCommand("fill in Q3 revenue by region");
 
       setStatus("Working…");
       await type(setNarration, "On it — opening Quarterly.numbers.", 18);
-      setBanner({ icon: "▸", text: "openApp · Numbers" });
+      setBanner({ icon: "▸", text: "Open · Numbers" });
       setShowSheet(true);
       await delay(950);
 
-      setBanner({ icon: "▸", text: "captureScreen" });
+      setBanner({ icon: "▸", text: "Screenshot" });
       await delay(420);
       for (let i = 0; i < 4; i++) {
-        await cursorTo(i);
+        await moveTo(cellRefs.current[i]);
         if (cancelled) return;
-        setBanner({ icon: "▸", text: `click · C${i + 2}` });
+        setBanner({ icon: "▸", text: `Click · C${i + 2}` });
         await click();
-        setBanner({ icon: "⌨", text: `type · ${Q3[i]}` });
+        setBanner({ icon: "⌨", text: `Type · ${Q3[i]}` });
         setQ3((p) => p.map((v, j) => (j === i ? Q3[i] : v)));
         await delay(520);
       }
@@ -146,15 +154,11 @@ export function HeroDemo() {
     };
 
     const sceneMusic = async () => {
-      setTyping(true);
-      await type(setCommand, "play something upbeat", 30);
-      await delay(320);
-      setCommand("");
-      setTyping(false);
+      await runCommand("play something upbeat", 320);
 
       setStatus("Working…");
       await type(setNarration, "Putting on a playlist.");
-      setBanner({ icon: "▸", text: "openApp · Music" });
+      setBanner({ icon: "▸", text: "Open · Music" });
       setShowMusic(true);
       setPlaying(false);
       await delay(380);
@@ -192,7 +196,7 @@ export function HeroDemo() {
         {/* Dex window (Editorial theme) — centred; slides left when the sheet is up */}
         <motion.div
           className="absolute z-10 overflow-hidden rounded-2xl border border-white/10 bg-[#16130f] shadow-2xl ring-1 ring-black/50"
-          style={{ left: DEX_LEFT, top: 50, width: 520 }}
+          style={{ left: DEX_LEFT, top: 50, width: DEX_W }}
           animate={{ x: showSheet ? DEX_SHIFT : 0 }}
           transition={{ duration: 0.6, ease: EASE }}
         >
@@ -209,7 +213,7 @@ export function HeroDemo() {
               <span className="demo-dot block h-2.5 w-2.5 rounded-full bg-[#e8916f]" />
               <span className="ml-auto grid h-6 w-6 place-items-center rounded-full border border-white/10 text-white/30">⚙</span>
             </div>
-            <p className="demo-narration mt-2 min-h-[2.3em] max-w-[380px] font-light leading-snug tracking-tight text-[#f5efe6]">
+            <p className="demo-narration mt-2 h-[2.7em] max-w-[420px] overflow-hidden font-light leading-snug tracking-tight text-[#f5efe6]">
               {narration}
               <Caret />
             </p>
@@ -217,7 +221,7 @@ export function HeroDemo() {
               <span className="h-1 w-1 rounded-full bg-[#da7756]" />
               <span>{status}</span>
             </div>
-            <div className="mt-5 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[13px] text-[#a89a87]">
+            <div ref={composerRef} className="mt-5 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[13px] text-[#a89a87]">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
                 <rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
               </svg>
@@ -236,16 +240,16 @@ export function HeroDemo() {
             <motion.div
               key="sheet"
               className="absolute z-20 overflow-hidden rounded-xl border border-black/10 bg-[#f3ede3] text-[#1a1714] shadow-2xl"
-              style={{ left: 505, top: 36, width: 460 }}
+              style={{ left: 505, top: 0, width: 460 }}
               initial={{ opacity: 0, x: 26, scale: 0.96 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 26, scale: 0.96 }}
               transition={{ duration: 0.5, ease: EASE }}
             >
-              <div className="flex items-center gap-1.5 border-b border-black/10 bg-[#e7e0d4] px-3 py-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#ec6a5e]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#f4bf4f]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#61c554]" />
+              <div className="flex items-center gap-2 border-b border-black/10 bg-[#e7e0d4] px-4 py-2.5">
+                <span className="h-3 w-3 rounded-full bg-[#ec6a5e]" />
+                <span className="h-3 w-3 rounded-full bg-[#f4bf4f]" />
+                <span className="h-3 w-3 rounded-full bg-[#61c554]" />
                 <span className="ml-2 text-[12px] font-bold text-black/60">Quarterly.numbers</span>
               </div>
               <div className="grid grid-cols-[1.5fr_1fr_1fr] text-[13px]">
@@ -281,7 +285,7 @@ export function HeroDemo() {
             <motion.div
               key="music"
               className="absolute z-30 rounded-[18px] border border-white/15 bg-black/55 p-3 shadow-2xl backdrop-blur-2xl"
-              style={{ left: 360, top: 12, width: 408 }}
+              style={{ left: 420, top: 0, width: 328 }}
               initial={{ opacity: 0, y: -14, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -14, scale: 0.95 }}
@@ -341,19 +345,21 @@ export function HeroDemo() {
         </motion.svg>
       </div>
 
-      {/* Action hints — the computer-use steps, captioned under the demo */}
-      <div className="mt-5 flex h-5 items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+      {/* Action hints — the computer-use steps as a dark pill under the demo */}
+      <div className="mt-6 flex h-8 items-center justify-center">
         <AnimatePresence mode="wait">
           {banner && (
-            <motion.span
+            <motion.div
               key={banner.text}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-neutral-900 px-3.5 py-1.5 text-[12px] text-white/85 shadow-md"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18 }}
             >
-              <span className="text-neutral-300">{banner.icon}</span> {banner.text}
-            </motion.span>
+              <span className="text-white/60">{banner.icon}</span>
+              <span>{banner.text}</span>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
