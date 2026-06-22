@@ -14,6 +14,7 @@ import {
 } from "../ui/fields";
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
+import { Dot } from "lucide-react";
 
 interface Step {
   key: string;
@@ -40,14 +41,15 @@ export function OnboardingWizard({
   const steps: Step[] = [
     {
       key: "welcome",
-      title: "Welcome to OpenDex",
-      subtitle: "A voice-first agentic assistant for your desktop. Let's set it up — about a minute.",
+      title: "Hi, I'm OpenDex",
+      subtitle: "A voice-first AI for your desktop.",
       render: () => (
         <div className="flex flex-col items-center gap-3 py-6 text-center text-white/60">
-          <div className="text-6xl">🎙️</div>
+          <div className="text-6xl">
+            <Dot className="size-24 text-white animate-pulse" />
+          </div>
           <p className="max-w-sm text-sm">
-            You'll choose a language model, a voice, and what OpenDex says when you
-            first wake it. Everything here can be changed later in Settings.
+            Let's get set up.
           </p>
         </div>
       ),
@@ -224,46 +226,12 @@ export function OnboardingWizard({
             value={config.assistant.name}
             onChange={(v) => setConfig({ assistant: { name: v } })}
           />
-          <SelectField
-            label="How it should address you"
-            hint="Neutral avoids “sir” / “ma’am”. Changeable anytime in Settings."
-            value={config.assistant.userGender}
-            options={[
-              { value: "unspecified", label: "Neutral — no honorific" },
-              { value: "male", label: "“Sir”" },
-              { value: "female", label: "“Ma’am”" },
-            ]}
-            onChange={(v) => setConfig({ assistant: { userGender: v } })}
-          />
           <TextField
             label="Wake word"
             hint="Say this to start talking. Single, distinct words work best."
             value={config.assistant.wakeWord}
             onChange={(v) => setConfig({ assistant: { wakeWord: v } })}
           />
-          <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-            <input
-              type="checkbox"
-              checked={config.analytics.enabled}
-              onChange={(e) => setConfig({ analytics: { enabled: e.target.checked } })}
-              className="mt-0.5 h-4 w-4 accent-white"
-            />
-            <span className="text-xs text-white/60">
-              <span className="font-medium text-white/90">Share anonymous usage data</span>
-              <br />
-              Helps improve OpenDex. No voice, transcripts, prompts, or keys are ever
-              sent.{" "}
-              <a
-                href="https://github.com/wassgha/opendex/blob/main/PRIVACY.md"
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="underline hover:text-white/80"
-              >
-                Learn more
-              </a>
-            </span>
-          </label>
         </>
       ),
     },
@@ -274,14 +242,13 @@ export function OnboardingWizard({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a] p-6">
-      <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-white/10 bg-[#0e0e0e] p-7 shadow-2xl">
-        <div className="flex gap-1.5">
+      <div className="flex w-full h-full md:h-auto md:max-w-md flex-1 flex-col gap-5 md:rounded-2xl md:border md:border-white/10 md:bg-[#0e0e0e] md:p-7 md:shadow-2xl">
+        <div className="flex gap-1.5 mt-8 md:mt-0">
           {steps.map((s, i) => (
             <div
               key={s.key}
-              className={`h-1 flex-1 rounded-full transition ${
-                i <= stepIndex ? "bg-white" : "bg-white/10"
-              }`}
+              className={`h-1 flex-1 rounded-full transition ${i <= stepIndex ? "bg-white" : "bg-white/10"
+                }`}
             />
           ))}
         </div>
@@ -291,7 +258,7 @@ export function OnboardingWizard({
           <p className="mt-1 text-sm text-white/50">{step.subtitle}</p>
         </div>
 
-        <div className="flex flex-col gap-4">{step.render()}</div>
+        <div className="flex flex-1 flex-col gap-4">{step.render()}</div>
 
         <div className="mt-2 flex items-center justify-between">
           <button
