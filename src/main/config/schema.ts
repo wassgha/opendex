@@ -94,11 +94,11 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
   voiceInput: {
     // Free, offline defaults: Vosk wake word + local Whisper transcription.
     wakeMode: "vosk",
-    porcupineKeyword: "jarvis",
+    porcupineKeyword: "dex",
     sttProvider: "whisper-local",
     whisperModel: "Xenova/whisper-base.en",
   },
-  appearance: { theme: "jarvis", showToolActivity: true },
+  appearance: { theme: "editorial", showToolActivity: true },
   skills: {
     // `computer` is opt-in (off until the user enables it in Settings).
     enabled: { open: true, computer: false },

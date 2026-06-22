@@ -78,6 +78,12 @@ function MainExperience({ data }: { data: PublicConfig }) {
 
   return (
     <div className="relative flex flex-1 flex-col">
+      {/* Frameless title bar: a draggable strip across the top, inset from the
+          corner controls (brand mark, settings gear) so they stay clickable. */}
+      {window.opendex.platform === "darwin" && (
+        <div className="titlebar-drag fixed inset-x-[72px] top-0 z-30 h-9" />
+      )}
+
       <ThemeComponent
         name={cfg.assistant.name}
         wakeWord={cfg.assistant.wakeWord}

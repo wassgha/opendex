@@ -201,3 +201,21 @@ body {
 .bg-gradient-radial {
   background-image: radial-gradient(circle at center, var(--tw-gradient-stops));
 }
+
+/* ── Frameless title bar (main window) ────────────────────────────────────
+   The main window hides its title bar (titleBarStyle: "hidden"), so the UI
+   fills to the top edge. These let the top bar stay draggable and keep the
+   theme's top-left brand clear of the macOS traffic lights. */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+}
+/* Drop the top-left brand below the traffic lights (rather than beside them),
+   only where they actually render: the frameless main window on macOS. */
+[data-platform="darwin"][data-window="main"] .traffic-light-pad {
+  /* Shift via transform so the brand drops without growing the flex row (which
+     would also nudge the right-hand status pill + settings gear down). */
+  transform: translateY(28px);
+}

@@ -24,7 +24,7 @@ export function ThemeTopBar({
 }) {
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 px-5 py-4 sm:px-6 sm:py-5">
-      <div className="min-w-0">
+      <div className="traffic-light-pad min-w-0">
         {showBrand && (
           <div className="truncate text-xs uppercase tracking-[0.4em] text-muted-foreground">
             {name || "OpenDex"}

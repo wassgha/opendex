@@ -112,7 +112,7 @@ export function EditorialTheme(props: DexThemeProps) {
       />
 
       {/* Brand mark — top-left, with the live accent dot (tap-to-talk in manual mode). */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center px-6 py-4 sm:px-10 sm:py-5">
+      <div className="traffic-light-pad pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center px-6 py-4 sm:px-10 sm:py-5">
         {canPushToTalk ? (
           <button
             type="button"

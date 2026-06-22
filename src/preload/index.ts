@@ -30,6 +30,10 @@ export interface ChatHandle {
 }
 
 const opendex = {
+  /** The host OS platform (e.g. "darwin"), so the renderer can adapt its chrome
+   *  to the frameless title bar (traffic-light clearance, drag regions). */
+  platform: process.platform as NodeJS.Platform,
+
   /**
    * Stream a chat reply. Text deltas arrive via `onDelta`; the returned promise
    * resolves with the generated messages (or rejects on error). `cancel()`

@@ -41,6 +41,11 @@ function createWindow() {
     backgroundColor: "#0a0a0a",
     title: "OpenDex",
     show: false,
+    // Frameless, native-feeling chrome on macOS: hide the title bar and let the
+    // renderer fill to the top edge, keeping the traffic lights inset over it.
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 16, y: 18 } }
+      : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
