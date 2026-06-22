@@ -20,6 +20,8 @@ html {
 body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Final safety net: nothing on the page should ever scroll horizontally. */
+  overflow-x: hidden;
 }
 
 /* Blocky wordmark — heavy mono, tight tracking, echoes Conductor's pixel logo. */
@@ -32,14 +34,6 @@ body {
 /* ── Hero live-demo ──────────────────────────────────────────────────────── */
 .dex-stage {
   font-family: var(--font-mono);
-}
-
-/* Floating windows: smooth pop in/out + slide when Dex makes room. */
-.win {
-  transition:
-    opacity 0.45s ease,
-    transform 0.6s cubic-bezier(0.22, 0.7, 0.18, 1);
-  will-change: opacity, transform;
 }
 
 .demo-narration {
@@ -56,22 +50,8 @@ body {
   animation: demo-blink 1.05s steps(1, end) infinite;
 }
 
-.demo-cursor {
-  transition:
-    left 0.7s cubic-bezier(0.5, 0, 0.2, 1),
-    top 0.7s cubic-bezier(0.5, 0, 0.2, 1),
-    transform 0.12s ease;
-}
-.demo-cursor.is-clicking {
-  transform: scale(0.78);
-}
-
 .demo-dot {
   animation: demo-pulse 1.5s ease-in-out infinite;
-}
-
-.cell-pop {
-  animation: demo-cellpop 0.4s ease-out;
 }
 
 @keyframes demo-blink {
@@ -82,18 +62,10 @@ body {
   0%, 100% { transform: scale(1); opacity: 0.95; }
   50% { transform: scale(1.55); opacity: 0.5; }
 }
-@keyframes demo-cellpop {
-  from { background: rgba(218, 119, 86, 0.35); }
-  to { background: transparent; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .demo-caret,
   .demo-dot {
     animation: none;
-  }
-  .demo-cursor,
-  .win {
-    transition: none;
   }
 }

@@ -1,18 +1,12 @@
-import "./style.css";
-import { createElement } from "react";
-import { createRoot } from "react-dom/client";
-import { HeroDemo } from "./HeroDemo";
-
-// Mount the animated hero demo as a React island into the static page.
-const heroRoot = document.getElementById("hero-demo-root");
-if (heroRoot) createRoot(heroRoot).render(createElement(HeroDemo));
+import { useEffect, useState } from "react";
 
 // Always points at the newest release's assets (GitHub redirects `latest`).
-const REL = "https://github.com/wassgha/opendex/releases/latest/download";
+export const REL = "https://github.com/wassgha/opendex/releases/latest/download";
+export const REPO = "https://github.com/wassgha/opendex";
 
-type OSKey = "mac-arm64" | "mac-x64" | "win" | "linux-appimage" | "linux-deb";
+export type OSKey = "mac-arm64" | "mac-x64" | "win" | "linux-appimage" | "linux-deb";
 
-const FILES: Record<OSKey, string> = {
+export const FILES: Record<OSKey, string> = {
   "mac-arm64": "OpenDex-mac-arm64.dmg",
   "mac-x64": "OpenDex-mac-x64.dmg",
   win: "OpenDex-Setup.exe",
@@ -20,11 +14,15 @@ const FILES: Record<OSKey, string> = {
   "linux-deb": "OpenDex-linux.deb",
 };
 
-interface Detected {
+export const downloadUrl = (os: OSKey) => `${REL}/${FILES[os]}`;
+
+export interface Detected {
   os: OSKey;
   label: string;
   note: string;
 }
+
+const DEFAULT: Detected = { os: "mac-arm64", label: "Download for macOS", note: "" };
 
 // userAgentData is not in the default TS DOM lib; treat it as optional.
 type UAData = {
@@ -66,31 +64,37 @@ async function detect(): Promise<Detected> {
       : { os: "mac-x64", label: "Download for macOS", note: "Intel — Apple Silicon below" };
   }
   // Unknown platform: fall back to the most common desktop target.
-  return { os: "mac-arm64", label: "Download for macOS", note: "" };
+  return DEFAULT;
 }
 
-function apply(detected: Detected) {
-  const primary = document.getElementById("primary-download") as HTMLAnchorElement | null;
-  const label = document.getElementById("primary-download-label");
-  const note = document.getElementById("primary-download-note");
-
-  if (primary) primary.href = `${REL}/${FILES[detected.os]}`;
-  if (label) label.textContent = detected.label;
-  if (note) note.textContent = detected.note;
+// Detect the visitor's OS once, returning the best-guess primary download.
+export function useDetectedDownload(): Detected {
+  const [detected, setDetected] = useState<Detected>(DEFAULT);
+  useEffect(() => {
+    let alive = true;
+    void detect().then((d) => {
+      if (alive) setDetected(d);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return detected;
 }
 
 // Press "D" anywhere (outside inputs) to download — mirrors the nav's key hint.
-function bindHotkey() {
-  document.addEventListener("keydown", (e) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const el = e.target as HTMLElement | null;
-    if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
-    if (e.key.toLowerCase() === "d") {
-      e.preventDefault();
-      (document.getElementById("primary-download") as HTMLAnchorElement | null)?.click();
-    }
-  });
+export function useDownloadHotkey(href: string) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        window.location.href = href;
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [href]);
 }
-
-void detect().then(apply);
-bindHotkey();
