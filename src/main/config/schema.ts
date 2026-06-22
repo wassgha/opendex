@@ -3,6 +3,9 @@
 
 export type TtsEngine = "elevenlabs" | "system";
 export type GreetingMode = "example" | "custom" | "none";
+/** How the assistant addresses the user. Drives honorifics ("sir"/"ma'am") and
+ *  is "unspecified" by default so we never presume a gender. */
+export type UserGender = "male" | "female" | "unspecified";
 export type WakeMode = "webspeech" | "manual" | "porcupine" | "vosk";
 export type SttProvider = "webspeech" | "openai" | "whisper-local" | "vosk-local";
 export type SecretName =
@@ -19,6 +22,11 @@ export interface OpenDexConfig {
     name: string;
     /** Word that triggers active listening. */
     wakeWord: string;
+    /** How the assistant addresses the user (honorifics). */
+    userGender: UserGender;
+    /** Custom persona/system prompt. Empty = built-in persona. The fixed
+     *  spoken-output rules are always appended regardless. */
+    persona: string;
   };
   llm: {
     /** AI Gateway model id, e.g. "anthropic/claude-sonnet-4-6". */
@@ -83,7 +91,7 @@ export interface PublicConfig {
 
 export const DEFAULT_CONFIG: OpenDexConfig = {
   version: 1,
-  assistant: { name: "Dex", wakeWord: "dex" },
+  assistant: { name: "Dex", wakeWord: "dex", userGender: "unspecified", persona: "" },
   llm: { model: "anthropic/claude-sonnet-4-6" },
   tts: {
     engine: "elevenlabs",

@@ -224,6 +224,17 @@ export function OnboardingWizard({
             value={config.assistant.name}
             onChange={(v) => setConfig({ assistant: { name: v } })}
           />
+          <SelectField
+            label="How it should address you"
+            hint="Neutral avoids “sir” / “ma’am”. Changeable anytime in Settings."
+            value={config.assistant.userGender}
+            options={[
+              { value: "unspecified", label: "Neutral — no honorific" },
+              { value: "male", label: "“Sir”" },
+              { value: "female", label: "“Ma’am”" },
+            ]}
+            onChange={(v) => setConfig({ assistant: { userGender: v } })}
+          />
           <TextField
             label="Wake word"
             hint="Say this to start talking. Single, distinct words work best."

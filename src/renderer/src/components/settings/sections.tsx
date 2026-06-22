@@ -67,11 +67,29 @@ function AssistantSection({ data, setConfig }: SectionProps) {
         value={config.assistant.name}
         onChange={(v) => setConfig({ assistant: { name: v } })}
       />
+      <SelectField
+        label="How it should address you"
+        hint="Controls honorifics. Choose neutral to avoid “sir” / “ma’am” entirely."
+        value={config.assistant.userGender}
+        options={[
+          { value: "unspecified", label: "Neutral — no honorific" },
+          { value: "male", label: "“Sir”" },
+          { value: "female", label: "“Ma’am”" },
+        ]}
+        onChange={(v) => setConfig({ assistant: { userGender: v } })}
+      />
       <TextField
         label="Wake word"
         hint="Used by the Web Speech wake mode."
         value={config.assistant.wakeWord}
         onChange={(v) => setConfig({ assistant: { wakeWord: v } })}
+      />
+      <TextArea
+        label="Personality (custom system prompt)"
+        hint="Replaces the built-in persona. The spoken-output rules (short replies, no markdown, etc.) and your address preference are always kept. Leave blank for the default."
+        value={config.assistant.persona}
+        placeholder="e.g. You are Dex, a warm, concise, no-nonsense assistant who keeps things casual and gets to the point."
+        onChange={(v) => setConfig({ assistant: { persona: v } })}
       />
     </>
   );

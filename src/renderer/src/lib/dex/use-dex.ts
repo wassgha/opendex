@@ -409,6 +409,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
       messagesRef.current.push({ role: "user", content: userText });
 
       const tts = ttsRef.current!;
+      // Muting disables speech *output* as well as input — a typed command run
+      // while on standby shows in the transcript but is never voiced.
+      const speak = (text: string) => {
+        if (!mutedRef.current) tts.enqueue(text);
+      };
       const buffer = createSentenceBuffer();
       const abortController = new AbortController();
       let assistantText = "";
@@ -464,7 +469,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
             addToolActivity(call);
             // First on-screen action: flush the opener to TTS, then go quiet.
             if (COMPUTER_TOOL_NAMES.has(call.toolName) && !quiet) {
-              for (const tail of buffer.flush()) tts.enqueue(tail);
+              for (const tail of buffer.flush()) speak(tail);
               quiet = true;
             }
           },
@@ -478,10 +483,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
             }
             for (const chunk of buffer.push(value)) {
               if (!quiet) {
-                tts.enqueue(chunk);
+                speak(chunk);
               } else if (!tts.isSpeaking) {
                 // Caught up — voice this note now and forget any stale one.
-                tts.enqueue(chunk);
+                speak(chunk);
                 pending = null;
               } else {
                 // Still speaking — hold only the freshest note, drop older.
@@ -513,9 +518,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
             // Voice the freshest unspoken note plus any trailing summary, so the
             // wrap-up always lands even if TTS was busy through the last action.
             const tail = [pending, ...buffer.flush()].filter(Boolean).join(" ").trim();
-            if (tail) tts.enqueue(tail);
+            if (tail) speak(tail);
           } else {
-            for (const tail of buffer.flush()) tts.enqueue(tail);
+            for (const tail of buffer.flush()) speak(tail);
           }
           // Record the real assistant + tool messages so the model remembers
           // what it already did (and won't re-trigger gated actions next turn).
@@ -533,11 +538,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
           runningCommandRef.current = null;
           return;
         }
-      } finally {
-        if (runningCommandRef.current?.abortController === abortController) {
-          runningCommandRef.current = null;
-        }
       }
+      // NB: we intentionally do NOT release runningCommandRef here. The turn
+      // isn't over until TTS finishes draining below, and interrupt()/Stop must
+      // have a command to abort during the "speaking" phase (when the stream is
+      // already done but audio is still playing).
 
       if (bargedIn) {
         // Barge handler has already kicked off the next runCommand call.
@@ -562,6 +567,16 @@ export function useDex(options: UseDexOptions): UseDexResult {
       if (isBriefing) setBriefingActive(false);
 
       await new Promise((r) => setTimeout(r, POST_TTS_COOLDOWN_MS));
+
+      // Turn fully complete — release the slot (unless a newer command already
+      // took it, e.g. via barge-in or a typed command).
+      if (runningCommandRef.current?.abortController === abortController) {
+        runningCommandRef.current = null;
+      }
+
+      // Interrupted during streaming or the drain phase (Stop / mute / stop()):
+      // those handlers have already set the target status, so don't resume.
+      if (abortController.signal.aborted) return;
 
       if (mutedRef.current) {
         setStatus("muted");
@@ -1117,17 +1132,22 @@ export function useDex(options: UseDexOptions): UseDexResult {
   // passive listening. Driven by the global hotkey (works regardless of which
   // app has focus) and any in-UI stop control.
   const interrupt = useCallback(() => {
-    const running = runningCommandRef.current;
-    if (!running) return; // nothing in flight
-    // Preserve the partial reply for conversational continuity.
-    const partial = running.getPartialReply().trim();
-    if (partial) messagesRef.current.push({ role: "assistant", content: partial });
-    running.abortController.abort();
-    runningCommandRef.current = null;
+    // Stop audio unconditionally — when status is "speaking" the stream is
+    // already done and only TTS is draining, so gating on a running command
+    // would make Stop a no-op exactly when the user can hear it talking.
     ttsRef.current?.stop();
     stopBargeMonitor();
     bargeOnSpeakingRef.current = null;
     clearToolActivity();
+    const running = runningCommandRef.current;
+    if (running) {
+      // Preserve the partial reply for conversational continuity, and abort so
+      // the drain-phase resume guard in runCommand bails instead of re-listening.
+      const partial = running.getPartialReply().trim();
+      if (partial) messagesRef.current.push({ role: "assistant", content: partial });
+      running.abortController.abort();
+      runningCommandRef.current = null;
+    }
     if (mutedRef.current) setStatus("muted");
     else startModeRef.current?.("wake");
   }, [clearToolActivity, stopBargeMonitor]);
