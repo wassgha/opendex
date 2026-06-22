@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { PermissionPrompt } from "@/components/permission-prompt";
 import { ToolActivityBanner, StopControl } from "@/components/tool-activity-banner";
+import { UpdateBanner } from "@/components/update-banner";
 import { getDexTheme } from "@/components/themes/registry";
 import { useConfig } from "@/lib/use-config";
 import { usePermission } from "@/lib/use-permission";
@@ -113,6 +114,8 @@ function MainExperience({ data }: { data: PublicConfig }) {
           </div>
         </div>
       )}
+
+      <UpdateBanner />
 
       {cfg.appearance.showToolActivity && (
         <ToolActivityBanner activity={dex.toolActivity} />

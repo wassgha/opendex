@@ -33,7 +33,24 @@ export const IPC = {
   // Permission gate: main → renderer prompt, renderer → main answer
   permissionRequest: "permission:request",
   permissionRespond: "permission:respond",
+  // main → renderer event: auto-update lifecycle (download progress, errors)
+  updateStatus: "update:status",
 } as const;
+
+export interface UpdateStatusPayload {
+  /**
+   * `available` → an update was found and is downloading; `downloading` carries
+   * `percent`; `downloaded` → ready to install (a restart dialog also fires);
+   * `error` carries `message`. `checking`/`up-to-date` are not emitted (they'd
+   * be hourly noise) — the renderer only surfaces an active download or failure.
+   */
+  state: "available" | "downloading" | "downloaded" | "error";
+  version?: string;
+  /** 0..100, present while `state === "downloading"`. */
+  percent?: number;
+  /** Human-readable failure reason, present while `state === "error"`. */
+  message?: string;
+}
 
 export interface ChatStartPayload {
   requestId: string;

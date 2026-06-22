@@ -5,6 +5,7 @@ import {
   type ChatMessage,
   type PermissionRequestPayload,
   type ToolCallEvent,
+  type UpdateStatusPayload,
 } from "../main/ipc/channels";
 import type { PermissionDecision } from "../main/agent/permissions";
 import type {
@@ -166,6 +167,15 @@ const opendex = {
       handler(req);
     ipcRenderer.on(IPC.permissionRequest, listener);
     return () => ipcRenderer.removeListener(IPC.permissionRequest, listener);
+  },
+
+  /** Subscribe to auto-update lifecycle events (download progress, errors,
+   *  ready-to-install). Returns an unsubscribe fn. */
+  onUpdateStatus(handler: (status: UpdateStatusPayload) => void): () => void {
+    const listener = (_e: IpcRendererEvent, status: UpdateStatusPayload) =>
+      handler(status);
+    ipcRenderer.on(IPC.updateStatus, listener);
+    return () => ipcRenderer.removeListener(IPC.updateStatus, listener);
   },
 
   /** Answer a permission prompt. */
