@@ -14,7 +14,7 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 [![Stars](https://img.shields.io/github/stars/wassgha/notjarvis?style=flat-square&color=111)](https://github.com/wassgha/notjarvis/stargazers)
 [![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square&color=111)](https://github.com/wassgha/opendex/releases/latest)
 
-![OpenDex — Control your computer with voice](screenshots/open-music.png)
+<img alt="OpenDex — Control your computer with voice" src="screenshots/open-music.png" style="max-width: 90%;" />
 
 </div>
 
