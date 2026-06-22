@@ -44,9 +44,9 @@ export function OnboardingWizard({
       title: "Hi, I'm OpenDex",
       subtitle: "A voice-first AI for your desktop.",
       render: () => (
-        <div className="flex flex-col items-center gap-3 py-6 text-center text-white/60">
+        <div className="flex flex-1 flex-col items-center gap-3 py-6 text-center text-white/60">
           <div className="text-6xl">
-            <Dot className="size-24 text-white animate-pulse" />
+            <Dot className="size-32 text-white animate-pulse" />
           </div>
           <p className="max-w-sm text-sm">
             Let's get set up.

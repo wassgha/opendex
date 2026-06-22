@@ -65,7 +65,7 @@ function TypedLine({ status, transcript, liveCaption }: DexThemeProps) {
       <span className={`text-3xl font-light leading-snug tracking-tight ${tone}`}>
         {line}
         <span
-          className={`ml-0.5 inline-block h-7 w-[3px] translate-y-1 rounded-[1px] bg-foreground align-middle ${
+          className={`ml-0.5 inline-block h-[0.9em] w-[3px] -translate-y-[0.05em] rounded-[1px] bg-foreground align-middle ${
             done ? "animate-caret-blink" : ""
           } ${status === "muted" || status === "error" ? "opacity-30" : ""}`}
         />
