@@ -7,6 +7,8 @@ export type GreetingMode = "example" | "custom" | "none";
  *  is "unspecified" by default so we never presume a gender. */
 export type UserGender = "male" | "female" | "unspecified";
 export type WakeMode = "webspeech" | "manual" | "vosk";
+/** Window layout: the full themed experience, or a slim top-pinned bar. */
+export type WindowMode = "full" | "notch";
 export type SttProvider = "webspeech" | "openai" | "whisper-local" | "vosk-local";
 /** Which provider routes chat completions. `apple` is free + on-device (macOS);
  *  `openai`/`anthropic` are bring-your-own-key; `gateway` is the Vercel AI
@@ -68,6 +70,10 @@ export interface OpenDexConfig {
     /** Show transient banners for each tool the agent calls. */
     showToolActivity: boolean;
   };
+  hotkeys: {
+    /** Global accelerator that summons / hides the main window (Spotlight-style). */
+    summon: string;
+  };
   skills: {
     /** Per-skill enablement; a skill is on unless explicitly false. */
     enabled: Record<string, boolean>;
@@ -123,6 +129,10 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     whisperModel: "Xenova/whisper-base.en",
   },
   appearance: { theme: "editorial", showToolActivity: true },
+  // `Alt+Space` reads as ⌥Space on macOS (low-conflict). On Windows Alt+Space
+  // opens the system window menu and won't register; the registrar falls back to
+  // a secondary accelerator in that case (see registerSummonHotkey in index.ts).
+  hotkeys: { summon: "Alt+Space" },
   skills: {
     // `computer` is opt-in (off until the user enables it in Settings).
     enabled: { open: true, computer: false },

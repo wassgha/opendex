@@ -15,6 +15,22 @@ const DOT: Record<DexStatus, string> = {
   unsupported: "bg-dex-idle/60",
 };
 
+// Just the status dot (no label) — for tight chrome like the notch bar.
+export function StatusDot({
+  status,
+  className,
+}: {
+  status: DexStatus;
+  className?: string;
+}) {
+  return (
+    <span
+      title={STATUS_LABELS[status]}
+      className={cn("h-2.5 w-2.5 shrink-0 rounded-full", DOT[status], className)}
+    />
+  );
+}
+
 export function StatusPill({
   status,
   className,

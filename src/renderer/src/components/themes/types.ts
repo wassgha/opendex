@@ -16,7 +16,6 @@ export interface DexThemeProps {
   /** 0..1 voice loudness, sampled via requestAnimationFrame. */
   getAmplitude: () => number;
   isMuted: boolean;
-  bargeInEnabled: boolean;
   briefingActive: boolean;
   unsupported: boolean;
   /** Manual wake mode + ready: the visualization is tap-to-talk. */
@@ -25,7 +24,6 @@ export interface DexThemeProps {
   /** Submit a typed command (the concealed text-input alternative to voice). */
   onSubmitText: (text: string) => void;
   toggleMute: () => void;
-  toggleBargeIn: () => void;
   /** Open the settings panel — rendered by the theme's shared top bar. */
   onOpenSettings: () => void;
 }

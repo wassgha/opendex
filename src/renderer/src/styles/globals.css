@@ -202,6 +202,15 @@ body {
   background-image: radial-gradient(circle at center, var(--tw-gradient-stops));
 }
 
+/* ── Overlay HUD window ────────────────────────────────────────────────────
+   The action-hint HUD is a transparent, click-through window. Its body must be
+   fully transparent (no background/gradient) so only the banners + Stop pill
+   paint over the desktop. */
+[data-window="overlay"] body,
+[data-window="permission"] body {
+  background: transparent;
+}
+
 /* ── Frameless title bar (main window) ────────────────────────────────────
    The main window hides its title bar (titleBarStyle: "hidden"), so the UI
    fills to the top edge. These let the top bar stay draggable and keep the

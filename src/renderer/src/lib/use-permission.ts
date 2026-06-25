@@ -18,6 +18,14 @@ export function usePermission(): UsePermissionResult {
     });
   }, []);
 
+  // A prompt can settle without the user answering (timeout, or the requesting
+  // window died) — drop it from the queue so the popup doesn't show a stale one.
+  useEffect(() => {
+    return window.opendex.onPermissionDismiss((id) => {
+      setQueue((q) => q.filter((r) => r.id !== id));
+    });
+  }, []);
+
   const current = queue[0] ?? null;
 
   const respond = (decision: PermissionDecision) => {

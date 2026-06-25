@@ -2,6 +2,7 @@
 // (handlers) and the preload bridge so the contract stays in one place.
 
 import type { ChatMessage } from "../agent/chat";
+import type { WindowMode } from "../config/schema";
 
 export const IPC = {
   chatStart: "chat:start",
@@ -31,9 +32,29 @@ export const IPC = {
   pushToTalk: "push-to-talk",
   // main → renderer event: global emergency-stop hotkey pressed
   interrupt: "interrupt",
-  // Permission gate: main → renderer prompt, renderer → main answer
+  // Session-state relay: the main window pushes a snapshot of the live voice
+  // session (what the assistant is doing right now) to main, which re-broadcasts
+  // it to the overlay HUD and any other view-only surface.
+  sessionUpdate: "session:update",
+  sessionChanged: "session:changed",
+  // Window mode (full ↔ notch) + Spotlight-style summon:
+  // renderer → main: request a window mode; main → renderer: mode applied
+  windowSetMode: "window:set-mode",
+  windowMode: "window:mode",
+  // main → renderer event: the summon hotkey brought the window forward
+  windowSummoned: "window:summoned",
+  // Overlay HUD: renderer → main, toggle click-through so the Stop button is
+  // clickable while the rest of the overlay stays pass-through.
+  overlaySetInteractive: "overlay:set-interactive",
+  // Overlay HUD → main: emergency stop pressed in the floating HUD (relayed to
+  // the main window's interrupt path).
+  overlayInterrupt: "overlay:interrupt",
+  // Permission gate: main → permission popup prompt, popup → main answer.
+  // `permissionDismiss` tells the popup to drop a prompt that settled without an
+  // answer (timed out, or the requesting window died).
   permissionRequest: "permission:request",
   permissionRespond: "permission:respond",
+  permissionDismiss: "permission:dismiss",
   // main → renderer event: auto-update lifecycle (download progress, errors)
   updateStatus: "update:status",
 } as const;
@@ -64,6 +85,29 @@ export interface ToolCallEvent {
   toolName: string;
   input: unknown;
 }
+
+/** One transient action hint (mirrors the renderer's `ToolActivity`). */
+export interface SessionActivity {
+  id: string;
+  icon: string;
+  label: string;
+}
+
+/**
+ * A snapshot of the live voice session, broadcast from the main window to
+ * view-only surfaces (overlay HUD, notch). `status` is the renderer's
+ * `DexStatus` as a string (kept loose here to avoid coupling the shared IPC
+ * layer to a renderer type).
+ */
+export interface SessionState {
+  status: string;
+  muted: boolean;
+  activity: SessionActivity[];
+  liveCaption: string;
+  spokenCaption: string;
+}
+
+export type { WindowMode };
 
 export interface PermissionRequestPayload {
   id: string;

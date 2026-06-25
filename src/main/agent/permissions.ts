@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { WebContents } from "electron";
-import { IPC } from "../ipc/channels";
+import type { PermissionRequestPayload } from "../ipc/channels";
 import { getConfig, updateConfig } from "../config/store";
 import type { PermissionRequester } from "./skills/types";
 
@@ -11,6 +11,27 @@ export type PermissionDecision = "allow_once" | "always" | "deny" | "never";
 const PERMISSION_TIMEOUT_MS = 120_000;
 
 const pending = new Map<string, (decision: PermissionDecision) => void>();
+
+/** How prompts are surfaced. The main process wires this to the dedicated
+ *  always-on-top permission popup so a prompt is visible regardless of the main
+ *  window's state — and answering it never disturbs the main window's layout. */
+export interface PermissionUi {
+  /** Show a prompt (create/raise the popup, send the request to it). */
+  present: (req: PermissionRequestPayload) => void;
+  /** A prompt settled (answered, timed out, or window died) — let the popup
+   *  drop it, and the popup hosts can hide once `pendingPermissions()` is 0. */
+  dismiss: (id: string) => void;
+}
+
+let permissionUi: PermissionUi | null = null;
+export function setPermissionUi(ui: PermissionUi) {
+  permissionUi = ui;
+}
+
+/** Number of prompts still awaiting an answer (drives popup show/hide). */
+export function pendingPermissions(): number {
+  return pending.size;
+}
 
 /** Called by the IPC handler when the renderer answers a permission prompt. */
 export function resolvePermission(id: string, decision: PermissionDecision) {
@@ -52,6 +73,8 @@ export function makePermissionRequester(sender: WebContents): PermissionRequeste
         clearTimeout(timer);
         pending.delete(id);
         if (!sender.isDestroyed()) sender.off("destroyed", onDestroyed);
+        // Drop the prompt from the popup (no-op if the user just answered it).
+        permissionUi?.dismiss(id);
         const allowed = decision === "allow_once" || decision === "always";
         if (allowed) sessionAllow.add(skillId);
         resolve(allowed);
@@ -60,7 +83,10 @@ export function makePermissionRequester(sender: WebContents): PermissionRequeste
       pending.set(id, settle);
       sender.once("destroyed", onDestroyed);
       timer = setTimeout(() => settle("deny"), PERMISSION_TIMEOUT_MS);
-      sender.send(IPC.permissionRequest, { id, skillId, label, detail });
+      // Surface the prompt in the dedicated always-on-top popup so it can't be
+      // missed (the main window may be hidden, in notch, or behind the app the
+      // agent is driving) — without disturbing the main window's layout.
+      permissionUi?.present({ id, skillId, label, detail });
     });
 }
 

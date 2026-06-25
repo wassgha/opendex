@@ -91,11 +91,12 @@ const POST_TTS_COOLDOWN_MS = 800;
 // dropped, regardless of confidence.
 const FOLLOW_UP_ECHO_WINDOW_MS = 4500;
 const FOLLOW_UP_ECHO_REJECT_RATIO = 0.45;
-// Barge-in (interrupting the assistant while it speaks) is opt-in. Without proper
-// hardware AEC, listening while audio plays produces echo-induced loops.
-const BARGE_COOLDOWN_MS = 1200;
-const BARGE_MIN_CHARS = 16;
-const BARGE_NEW_WORD_RATIO = 0.8;
+// Barge-in (interrupting the assistant while it speaks) is wake-word triggered:
+// the same offline keyword spotter used for wake runs during playback. Because
+// it only fires on the wake word — not arbitrary speech — it can't echo-loop on
+// the assistant's own audio, so it's always on (no AEC gymnastics needed). Brief
+// cooldown so the tail of the previous turn can't immediately re-trigger it.
+const BARGE_COOLDOWN_MS = 600;
 
 type Mode = "off" | "wake" | "command" | "follow_up";
 
@@ -119,6 +120,8 @@ export interface UseDexOptions {
   ttsEngine: SpeechEngineKind;
   /** System-TTS voice settings (used when ttsEngine === "system"). */
   systemVoice: SystemVoiceOptions;
+  /** Whether to surface tool-call action hints (drives the overlay HUD). */
+  showToolActivity?: boolean;
 }
 
 export interface UseDexResult {
@@ -130,7 +133,6 @@ export interface UseDexResult {
   spokenCaption: string;
   isMuted: boolean;
   audioBlocked: boolean;
-  bargeInEnabled: boolean;
   briefingActive: boolean;
   /** Local model download/load progress (Whisper / Vosk). */
   loadingModel: ModelLoadingState;
@@ -149,7 +151,6 @@ export interface UseDexResult {
   unlockAudio: () => void;
   stop: () => void;
   toggleMute: () => void;
-  toggleBargeIn: () => void;
 }
 
 export function useDex(options: UseDexOptions): UseDexResult {
@@ -171,7 +172,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const spokenFreshRef = useRef(true);
   const [isMuted, setIsMuted] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
-  const [bargeInEnabled, setBargeInEnabled] = useState(false);
   const [briefingActive, setBriefingActive] = useState(false);
   const [loadingModel, setLoadingModel] = useState<ModelLoadingState>({
     active: false,
@@ -198,7 +198,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
   }, []);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const bargeRef = useRef<SpeechRecognitionInstance | null>(null);
+  // Wake-word barge monitor (runs during speaking). A small disposable handle,
+  // since the underlying engine may attach asynchronously (Vosk WASM import).
+  const bargeRef = useRef<{ dispose: () => void } | null>(null);
   // Phase 4 engines (instantiated only for their respective modes).
   const wakeEngineRef = useRef<WakeEngine | null>(null);
   const sttEngineRef = useRef<{ provider: SttProvider; engine: SttEngine } | null>(null);
@@ -215,7 +217,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const mutedRef = useRef(false);
   const startedRef = useRef(false);
   const hasBriefedRef = useRef(false);
-  const bargeInEnabledRef = useRef(false);
   // Consecutive wake-recognition network failures. The Web Speech API depends
   // on a remote service that is unavailable in packaged Electron; rather than
   // hammer it in a tight restart loop, we back off and bail to "unsupported"
@@ -228,9 +229,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
   // capture which uses its own internal track.
   const micStreamRef = useRef<MediaStream | null>(null);
   // Words spoken by the assistant in the current reply — used as the echo
-  // filter for both the barge-in monitor and the follow-up listening window.
+  // filter for the follow-up listening window.
   const assistantWordsRef = useRef<Set<string>>(new Set());
-  const bargeTriggeredRef = useRef(false);
 
   // Web Speech is only required when it's the chosen wake or STT backend.
   const needsWebSpeech =
@@ -343,72 +343,87 @@ export function useDex(options: UseDexOptions): UseDexResult {
   }, []);
 
   const stopBargeMonitor = useCallback(() => {
-    const rec = bargeRef.current;
-    if (!rec) return;
-    rec.onresult = null;
-    rec.onerror = null;
-    rec.onend = null;
-    try {
-      rec.abort();
-    } catch {
-      // ignore
-    }
+    const monitor = bargeRef.current;
     bargeRef.current = null;
+    monitor?.dispose();
   }, []);
 
+  // Listen for the wake word *while the assistant is speaking* so the user can
+  // cut in by name. Uses the configured wake engine (Vosk offline by default);
+  // on a hit it fires `onBarge` exactly once. Manual mode has no voice wake, so
+  // it relies on the Stop control / hotkey instead.
   const startBargeMonitor = useCallback(
-    (onBarge: (text: string) => void) => {
+    (onBarge: () => void) => {
       stopBargeMonitor();
-      const rec = createRecognition({
-        continuous: true,
-        interimResults: true,
-        lang: "en-US",
-      });
-      if (!rec) return;
-      bargeRef.current = rec;
-      bargeTriggeredRef.current = false;
       const startedAt = Date.now();
+      let fired = false;
 
-      rec.onresult = (event) => {
-        if (bargeTriggeredRef.current) return;
+      // A handle so teardown disposes whichever engine ends up attached (the
+      // Vosk import resolves async). `dispose` is idempotent.
+      const handle: { engine: { dispose: () => void } | null; dispose: () => void } = {
+        engine: null,
+        dispose() {
+          this.engine?.dispose();
+          this.engine = null;
+        },
+      };
+      bargeRef.current = handle;
+
+      const trigger = () => {
+        if (fired || mutedRef.current) return;
         if (Date.now() - startedAt < BARGE_COOLDOWN_MS) return;
-        const { finalText, interimText } = joinTranscript(event.results);
-        const heard = (finalText + " " + interimText).trim();
-        if (heard.length < BARGE_MIN_CHARS) return;
-
-        // Echo filter: reject heard text where most words appear in
-        // the assistant's own recent reply.
-        const heardWords = heard
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((w) => w.length > 3);
-        if (heardWords.length === 0) return;
-        const newWordCount = heardWords.filter(
-          (w) => !assistantWordsRef.current.has(w),
-        ).length;
-        const newRatio = newWordCount / heardWords.length;
-        if (newRatio < BARGE_NEW_WORD_RATIO) return;
-
-        bargeTriggeredRef.current = true;
+        fired = true;
         stopBargeMonitor();
-        onBarge(heard);
+        onBarge();
       };
-      rec.onerror = () => {
-        // 'no-speech', 'aborted' — silently let onend handle restart
-      };
-      rec.onend = () => {
-        if (bargeRef.current === rec && !bargeTriggeredRef.current) {
+
+      const opts = optionsRef.current;
+      if (opts.wakeMode === "vosk") {
+        void (async () => {
+          const { VoskWakeEngine } = await import("./engines/vosk-wake");
+          // Speaking may have ended (and this monitor been torn down) while the
+          // WASM loaded — bail if a newer monitor/teardown superseded us.
+          if (bargeRef.current !== handle) return;
+          const engine = new VoskWakeEngine(opts.wakeWord, undefined, () => {}, () => {});
+          handle.engine = engine;
+          await engine.start(trigger);
+        })();
+      } else if (opts.wakeMode === "webspeech") {
+        const rec = createRecognition({
+          continuous: true,
+          interimResults: true,
+          lang: "en-US",
+        });
+        if (rec) {
+          handle.engine = {
+            dispose: () => {
+              try {
+                rec.abort();
+              } catch {
+                /* already stopped */
+              }
+            },
+          };
+          rec.onresult = (event) => {
+            const { finalText, interimText } = joinTranscript(event.results);
+            const heard = `${finalText} ${interimText}`.trim();
+            if (buildWakeRegex(opts.wakeWord).test(heard)) trigger();
+          };
+          rec.onend = () => {
+            if (bargeRef.current === handle && !fired) {
+              try {
+                rec.start();
+              } catch {
+                /* speaking will tear this down soon */
+              }
+            }
+          };
           try {
             rec.start();
           } catch {
-            // give up — speaking state will tear this down soon anyway
+            /* noop */
           }
         }
-      };
-      try {
-        rec.start();
-      } catch (err) {
-        console.error("[opendex] failed to start barge monitor", err);
       }
     },
     [stopBargeMonitor],
@@ -460,10 +475,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
       // Reset the assistant-word filter for the new reply.
       assistantWordsRef.current = new Set();
 
-      // Start barge-in monitor as soon as TTS begins. We arm it here once;
-      // the first audio clip will trigger speaking → monitor starts.
-      const handleBarge = (heardText: string) => {
-        // Save partial reply if any, then run a new command with the heard text.
+      // Wake-word barge-in: when the user says the wake word mid-reply, stop the
+      // assistant, keep the partial reply for context, and drop straight into
+      // active listening for their new command. Armed once here; the monitor
+      // actually starts when TTS transitions to "speaking" (bargeOnSpeakingRef).
+      const handleBarge = () => {
         const partial = assistantText.trim();
         if (partial) {
           messagesRef.current.push({ role: "assistant", content: partial });
@@ -472,18 +488,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
         abortController.abort();
         runningCommandRef.current = null;
         stopBargeMonitor();
-        // Kick off the new turn.
-        void runCommand(heardText);
+        // Listen for the follow-up command they're about to speak.
+        startModeRef.current?.("command");
       };
 
-      // Only arm the barge monitor if the user has opted into interruption.
-      // Without proper hardware AEC, listening while the assistant speaks produces
-      // self-triggered loops.
-      if (bargeInEnabledRef.current) {
-        bargeOnSpeakingRef.current = () => startBargeMonitor(handleBarge);
-      } else {
-        bargeOnSpeakingRef.current = null;
-      }
+      bargeOnSpeakingRef.current = () => startBargeMonitor(handleBarge);
 
       let bargedIn = false;
       let loggedFirstToken = false;
@@ -642,6 +651,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
       stopWakeEngine();
       abortStt();
       clearTimers();
+      // Tear down the wake-word barge monitor too — any transition out of the
+      // speaking phase should release its mic (no-op if not running).
+      stopBargeMonitor();
 
       // Hard standby guard. A wake event that fired just before mute (vosk match,
       // a queued Web Speech onresult) runs its callback *after* mute tore
@@ -1008,7 +1020,15 @@ export function useDex(options: UseDexOptions): UseDexResult {
         console.error("[opendex] failed to start command recognition", err);
       }
     },
-    [abortStt, clearTimers, ensureSttEngine, runCommand, stopWakeEngine, stopRecognition],
+    [
+      abortStt,
+      clearTimers,
+      ensureSttEngine,
+      runCommand,
+      stopBargeMonitor,
+      stopWakeEngine,
+      stopRecognition,
+    ],
   );
 
   startModeRef.current = startMode;
@@ -1204,20 +1224,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
     return 0;
   }, []);
 
-  const toggleBargeIn = useCallback(() => {
-    setBargeInEnabled((current) => {
-      const next = !current;
-      bargeInEnabledRef.current = next;
-      // If we're currently speaking and the user just disabled it, kill any
-      // active monitor immediately.
-      if (!next) {
-        stopBargeMonitor();
-        bargeOnSpeakingRef.current = null;
-      }
-      return next;
-    });
-  }, [stopBargeMonitor]);
-
   const unlockAudio = useCallback(() => {
     setAudioBlocked(false);
     ttsRef.current?.unlock();
@@ -1358,6 +1364,24 @@ export function useDex(options: UseDexOptions): UseDexResult {
     return off;
   }, [interrupt]);
 
+  // Publish a snapshot of the live session to main, which re-broadcasts it to
+  // the overlay HUD / notch surfaces (the only place this state lives, since the
+  // voice loop runs solely in this window). Cheap; fires only on real changes.
+  const showToolActivity = options.showToolActivity ?? true;
+  useEffect(() => {
+    window.opendex.publishSessionState({
+      status,
+      muted: isMuted,
+      // Respect the user's "show tool activity" toggle: when off, the overlay
+      // still shows status/Stop but no per-action hints.
+      activity: showToolActivity
+        ? toolActivity.map((t) => ({ id: t.id, icon: t.icon, label: t.label }))
+        : [],
+      liveCaption,
+      spokenCaption,
+    });
+  }, [status, isMuted, toolActivity, liveCaption, spokenCaption, showToolActivity]);
+
   const canPushToTalk =
     options.wakeMode === "manual" &&
     (status === "listening_wake" || status === "idle");
@@ -1369,7 +1393,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
     spokenCaption,
     isMuted,
     audioBlocked,
-    bargeInEnabled,
     briefingActive,
     loadingModel,
     canPushToTalk,
@@ -1381,6 +1404,5 @@ export function useDex(options: UseDexOptions): UseDexResult {
     unlockAudio,
     stop,
     toggleMute,
-    toggleBargeIn,
   };
 }

@@ -24,6 +24,17 @@ export function TextComposer({
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  // The summon hotkey (⌥Space) fires this window-level signal; reveal + focus
+  // the input so the user can type immediately, Spotlight-style.
+  useEffect(() => {
+    const reveal = () => {
+      setOpen(true);
+      inputRef.current?.focus();
+    };
+    window.addEventListener("opendex:summon", reveal);
+    return () => window.removeEventListener("opendex:summon", reveal);
+  }, []);
+
   const submit = () => {
     const text = value.trim();
     if (!text) return;

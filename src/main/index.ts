@@ -1,7 +1,22 @@
 import { join } from "node:path";
 import { config as loadEnv } from "dotenv";
-import { app, BrowserWindow, globalShortcut, ipcMain, shell } from "electron";
-import { IPC, type ChatStartPayload } from "./ipc/channels";
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  screen,
+  shell,
+  Tray,
+} from "electron";
+import {
+  IPC,
+  type ChatStartPayload,
+  type SessionState,
+  type WindowMode,
+} from "./ipc/channels";
 import { streamChat } from "./agent/chat";
 import { resolveModel, checkAppleAvailability } from "./agent/llm/resolve-model";
 import { buildSystemPrompt } from "./agent/system-prompt";
@@ -9,7 +24,9 @@ import { buildToolSet, isSkillEnabled } from "./agent/skills/registry";
 import { computerSkill } from "./agent/skills/computer";
 import {
   makePermissionRequester,
+  pendingPermissions,
   recordAndResolve,
+  setPermissionUi,
   type PermissionDecision,
 } from "./agent/permissions";
 import { synthesizeSpeech } from "./tts/elevenlabs";
@@ -33,6 +50,27 @@ loadEnv();
 
 const isDev = !app.isPackaged;
 
+// The single main window hosts the entire voice session (mic/STT/TTS run only
+// in its renderer). We hide it rather than destroy it (see the close handler +
+// summon hotkey) so the session survives while out of sight; the overlay HUD
+// and notch bar are how the user sees/drives it when it isn't on screen.
+let mainWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
+let permissionWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+
+// Window layout state. `savedFullBounds` remembers the full-mode geometry so we
+// can restore it when leaving notch mode.
+let windowMode: WindowMode = "full";
+let savedFullBounds: Electron.Rectangle | null = null;
+
+// Last session snapshot, replayed to view surfaces (overlay) as they load so a
+// freshly-created window paints immediately instead of waiting for the next change.
+let latestSessionState: SessionState | null = null;
+
+const NOTCH_SIZE = { width: 520, height: 40 };
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 480,
@@ -52,10 +90,31 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // The window is often hidden/occluded while the agent works; without this,
+      // the OS throttles its timers + rAF to ~1fps, stalling wake-word polling,
+      // the amplitude meter, and STT endpointing. Keep the voice loop full-speed.
+      backgroundThrottling: false,
     },
   });
 
+  mainWindow = win;
+
   win.once("ready-to-show", () => win.show());
+
+  // Closing the window (red traffic light / Ctrl+W) hides it instead of tearing
+  // down the renderer — that would kill the live voice session. A real quit goes
+  // through the tray or ⌘Q (isQuitting), and only then do we let it close.
+  win.on("close", (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    win.hide();
+  });
+
+  win.on("closed", () => {
+    if (mainWindow === win) mainWindow = null;
+  });
+
+  attachAutoModeListeners(win);
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
@@ -74,6 +133,203 @@ function loadRenderer(win: BrowserWindow, hash?: string) {
   } else {
     void win.loadFile(join(__dirname, "../renderer/index.html"), { hash });
   }
+}
+
+// ── Overlay HUD ─────────────────────────────────────────────────────────────
+// A transparent, click-through, always-on-top window that floats the action
+// hints + Stop button over the whole desktop — visible even when the main
+// window is hidden/behind another app (the normal case during computer-use). It
+// renders the `#overlay` experience (see src/renderer/src/main.tsx).
+function createOverlayWindow() {
+  const overlay = new BrowserWindow({
+    // Spans the work area of the primary display as a thin top strip; the
+    // renderer centers its content and stays otherwise empty/transparent.
+    width: 100,
+    height: 100,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    backgroundColor: "#00000000",
+    // Keep it off mission-control / app-switcher; it's pure chrome.
+    type: process.platform === "darwin" ? "panel" : undefined,
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      backgroundThrottling: false,
+    },
+  });
+
+  overlayWindow = overlay;
+  // Click-through by default; the renderer flips this off while the pointer is
+  // over the Stop button (forward:true is what lets it receive the hover events).
+  overlay.setIgnoreMouseEvents(true, { forward: true });
+  // Float above everything, including another app's fullscreen space, and follow
+  // the user across Spaces — essential while driving a fullscreen app.
+  overlay.setAlwaysOnTop(true, "screen-saver");
+  overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  positionOverlay(overlay);
+  overlay.on("closed", () => {
+    if (overlayWindow === overlay) overlayWindow = null;
+  });
+
+  // Paint the last-known state as soon as the renderer is ready.
+  overlay.webContents.on("did-finish-load", () => {
+    if (latestSessionState) overlay.webContents.send(IPC.sessionChanged, latestSessionState);
+  });
+
+  loadRenderer(overlay, "overlay");
+}
+
+// Size/position the overlay to a top strip on the display under the cursor (so
+// it tracks whichever monitor is being controlled during computer-use).
+function positionOverlay(overlay: BrowserWindow) {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { x, y, width } = display.workArea;
+  // Start below where the notch bar sits so the HUD's banners never collide with
+  // it when both are on screen during a command.
+  overlay.setBounds({ x, y: y + NOTCH_SIZE.height + 8, width, height: 160 });
+}
+
+// ── Permission popup ──────────────────────────────────────────────────────────
+// A dedicated, always-on-top, focusable window for sensitive-tool prompts. Lives
+// outside the main window so a prompt is visible whatever the main window is
+// doing (hidden / notch / behind the driven app), and answering it never changes
+// the main window's layout. Created hidden; shown on demand, hidden when no
+// prompts remain. Renders the `#permission` experience (src/renderer/src/main.tsx).
+const PERMISSION_SIZE = { width: 460, height: 360 };
+
+function createPermissionWindow() {
+  const win = new BrowserWindow({
+    ...PERMISSION_SIZE,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  permissionWindow = win;
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.on("closed", () => {
+    if (permissionWindow === win) permissionWindow = null;
+  });
+  loadRenderer(win, "permission");
+  return win;
+}
+
+function showPermissionWindow() {
+  const win =
+    permissionWindow && !permissionWindow.isDestroyed()
+      ? permissionWindow
+      : createPermissionWindow();
+  // Center on the display under the cursor and float above everything (incl. a
+  // fullscreen app being driven), then take focus so it can be answered.
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { x, y, width, height } = display.workArea;
+  win.setBounds({
+    x: Math.round(x + (width - PERMISSION_SIZE.width) / 2),
+    y: Math.round(y + (height - PERMISSION_SIZE.height) / 2),
+    ...PERMISSION_SIZE,
+  });
+  win.setAlwaysOnTop(true, "screen-saver");
+  win.show();
+  win.focus();
+}
+
+// ── Notch / full window transform ────────────────────────────────────────────
+// Notch mode reshapes the main window into a slim, top-pinned, always-on-top
+// bar; full mode restores the prior geometry + normal stacking. The renderer
+// swaps its layout in response to the `windowMode` event (App.tsx). Notch is
+// engaged automatically when OpenDex loses focus / the agent drives another app
+// (see attachAutoModeListeners); leaving it is explicit (expand button), so
+// focusing the bar to type doesn't blow it back up. Not a user setting.
+function applyWindowMode(mode: WindowMode) {
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+  if (mode === windowMode) return;
+
+  if (mode === "notch") {
+    // Only capture full bounds from a real full-size window (not mid-resize).
+    if (win.isNormal()) savedFullBounds = win.getBounds();
+    win.setResizable(false);
+    // The full-mode minimum size (420 tall) would otherwise clamp the slim bar
+    // straight back up — drop the floor before resizing, restore it for full.
+    win.setMinimumSize(NOTCH_SIZE.width, NOTCH_SIZE.height);
+    applyNotchPlacement(win);
+    win.setAlwaysOnTop(true, "screen-saver");
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // No drop shadow in notch mode — it reads as a flush top bar, not a floating
+    // pill. Hide the macOS traffic lights too (they'd overlap the slim content).
+    win.setHasShadow(false);
+    if (process.platform === "darwin") win.setWindowButtonVisibility(false);
+  } else {
+    win.setAlwaysOnTop(false);
+    win.setVisibleOnAllWorkspaces(false);
+    win.setMinimumSize(360, 420);
+    win.setResizable(true);
+    win.setHasShadow(true);
+    if (process.platform === "darwin") win.setWindowButtonVisibility(true);
+    if (savedFullBounds) win.setBounds(savedFullBounds);
+  }
+
+  windowMode = mode;
+  win.webContents.send(IPC.windowMode, mode);
+}
+
+// Auto-engage notch when OpenDex loses focus — i.e. the user clicked away or the
+// agent is driving another app during computer-use (which steals focus). Only
+// after onboarding, so the wizard always runs full. Returning to full is
+// explicit, so focusing the bar to type into it doesn't expand it.
+function attachAutoModeListeners(win: BrowserWindow) {
+  win.on("blur", () => {
+    if (getConfig().onboarding.completed) applyWindowMode("notch");
+  });
+}
+
+// Bring the main window forward (Spotlight-style). Toggles when already focused.
+function summonWindow({ toggle = true }: { toggle?: boolean } = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  const win = mainWindow;
+  if (!win) return;
+  if (toggle && win.isVisible() && win.isFocused()) {
+    win.hide();
+    return;
+  }
+  if (process.platform === "darwin") app.dock?.show();
+  if (windowMode === "notch") applyNotchPlacement(win);
+  win.show();
+  win.focus();
+  win.webContents.send(IPC.windowSummoned);
+}
+
+// Pin the bar flush to the very top-center of the display under the cursor —
+// using full display bounds (not workArea), so it sits at the physical top edge
+// and floats over the menu bar via the screen-saver always-on-top level.
+function applyNotchPlacement(win: BrowserWindow) {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { x, y, width } = display.bounds;
+  win.setBounds({
+    x: Math.round(x + (width - NOTCH_SIZE.width) / 2),
+    y,
+    width: NOTCH_SIZE.width,
+    height: NOTCH_SIZE.height,
+  });
 }
 
 let settingsWindow: BrowserWindow | null = null;
@@ -119,6 +375,27 @@ function broadcastConfig() {
   const cfg = getPublicConfig();
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(IPC.configChanged, cfg);
+  }
+}
+
+// Re-broadcast the latest session snapshot to view-only surfaces, and show/hide
+// the overlay HUD: it only appears while the agent is actively working (or has a
+// live action hint), so it's invisible at rest.
+function broadcastSessionState(state: SessionState) {
+  latestSessionState = state;
+  const busy =
+    state.status === "thinking" ||
+    state.status === "speaking" ||
+    state.activity.length > 0;
+  const overlay = overlayWindow;
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.webContents.send(IPC.sessionChanged, state);
+    if (busy && !overlay.isVisible()) {
+      positionOverlay(overlay);
+      overlay.showInactive(); // never steals focus from the app being controlled
+    } else if (!busy && overlay.isVisible()) {
+      overlay.hide();
+    }
   }
 }
 
@@ -196,6 +473,8 @@ function registerIpc() {
   ipcMain.handle(IPC.configSet, (_event, patch: DeepPartial<OpenDexConfig>) => {
     const result = updateConfig(patch);
     broadcastConfig();
+    // Re-bind the global summon shortcut if the user rebound it in Settings.
+    if (patch.hotkeys?.summon) registerSummonHotkey();
     return result;
   });
 
@@ -248,15 +527,34 @@ function registerIpc() {
       recordAndResolve(payload.id, payload.skillId, payload.decision);
     },
   );
+
+  // Session-state relay: the main window publishes, main re-broadcasts to views.
+  ipcMain.on(IPC.sessionUpdate, (_event, state: SessionState) => {
+    broadcastSessionState(state);
+  });
+
+  // Window mode (full ↔ notch), requested from the renderer.
+  ipcMain.on(IPC.windowSetMode, (_event, mode: WindowMode) => {
+    applyWindowMode(mode);
+  });
+
+  // Overlay HUD: toggle click-through, and relay its Stop button to the main
+  // window's interrupt path (the same channel the global hotkey uses).
+  ipcMain.on(IPC.overlaySetInteractive, (_event, interactive: boolean) => {
+    overlayWindow?.setIgnoreMouseEvents(!interactive, { forward: true });
+  });
+  ipcMain.on(IPC.overlayInterrupt, () => {
+    mainWindow?.webContents.send(IPC.interrupt);
+  });
 }
 
 function registerPushToTalkHotkey() {
-  // Global push-to-talk for manual wake mode. Forwarded to the focused window;
-  // the renderer ignores it unless wakeMode === "manual".
+  // Global push-to-talk for manual wake mode. The renderer ignores it unless
+  // wakeMode === "manual".
   const accelerator = "CommandOrControl+Shift+Space";
   try {
     globalShortcut.register(accelerator, () => {
-      BrowserWindow.getAllWindows()[0]?.webContents.send(IPC.pushToTalk);
+      mainWindow?.webContents.send(IPC.pushToTalk);
     });
   } catch (err) {
     console.error("[opendex] failed to register push-to-talk hotkey", err);
@@ -270,11 +568,68 @@ function registerInterruptHotkey() {
   const accelerator = "CommandOrControl+Escape";
   try {
     globalShortcut.register(accelerator, () => {
-      BrowserWindow.getAllWindows()[0]?.webContents.send(IPC.interrupt);
+      mainWindow?.webContents.send(IPC.interrupt);
     });
   } catch (err) {
     console.error("[opendex] failed to register interrupt hotkey", err);
   }
+}
+
+let summonAccelerator = "";
+
+// Spotlight/Siri-style summon: toggle the main window from anywhere. Tries the
+// configured accelerator first; if it can't be registered (e.g. Alt+Space is
+// reserved for the system window menu on Windows), falls back to a safe chord.
+function registerSummonHotkey() {
+  if (summonAccelerator) {
+    globalShortcut.unregister(summonAccelerator);
+    summonAccelerator = "";
+  }
+  const configured = getConfig().hotkeys.summon;
+  const candidates = [configured, "Control+Alt+Space", "Control+Shift+Space"];
+  for (const accelerator of candidates) {
+    if (!accelerator || globalShortcut.isRegistered(accelerator)) continue;
+    try {
+      const ok = globalShortcut.register(accelerator, () => summonWindow());
+      if (ok) {
+        summonAccelerator = accelerator;
+        return;
+      }
+    } catch {
+      // try the next candidate
+    }
+  }
+  console.error("[opendex] failed to register a summon hotkey");
+}
+
+function createTray() {
+  if (tray) return;
+  // A 1px transparent image is a safe cross-platform placeholder; a real
+  // template icon ships in build resources later. An empty tray still works as
+  // the anchor + menu when every window is hidden.
+  const icon = nativeImage.createEmpty();
+  try {
+    tray = new Tray(icon);
+  } catch (err) {
+    console.error("[opendex] failed to create tray", err);
+    return;
+  }
+  tray.setToolTip("OpenDex");
+  const menu = Menu.buildFromTemplate([
+    { label: "Show OpenDex", click: () => summonWindow({ toggle: false }) },
+    { type: "separator" },
+    { label: "Settings…", click: () => openSettingsWindow() },
+    { type: "separator" },
+    {
+      label: "Quit OpenDex",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+  tray.setContextMenu(menu);
+  tray.on("click", () => summonWindow());
 }
 
 app.whenReady().then(() => {
@@ -284,16 +639,45 @@ app.whenReady().then(() => {
   if (!getConfig().onboarding.completed) track("onboarding_started");
   registerIpc();
   createWindow();
+  createOverlayWindow();
+  createPermissionWindow();
+  createTray();
+
+  // Route sensitive-tool prompts to the dedicated popup window.
+  setPermissionUi({
+    present: (req) => {
+      showPermissionWindow();
+      const win = permissionWindow;
+      if (!win) return;
+      const send = () => {
+        if (!win.isDestroyed()) win.webContents.send(IPC.permissionRequest, req);
+      };
+      // If the popup is still loading (first open), defer until it's ready.
+      if (win.webContents.isLoading()) win.webContents.once("did-finish-load", send);
+      else send();
+    },
+    dismiss: (id) => {
+      permissionWindow?.webContents.send(IPC.permissionDismiss, id);
+      // Once nothing is awaiting an answer, tuck the popup away again.
+      if (pendingPermissions() === 0) permissionWindow?.hide();
+    },
+  });
+
   registerPushToTalkHotkey();
   registerInterruptHotkey();
+  registerSummonHotkey();
   initAutoUpdater();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    // Dock click / re-activate: bring the existing window forward (it's hidden,
+    // not destroyed) rather than spawning a duplicate.
+    summonWindow({ toggle: false });
   });
 });
 
 app.on("before-quit", () => {
+  // Let the main window actually close instead of hiding (see its close handler).
+  isQuitting = true;
   // Best-effort — the process may exit before the request lands.
   track("app_quit");
 });

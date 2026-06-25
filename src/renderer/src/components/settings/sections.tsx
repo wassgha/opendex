@@ -163,8 +163,8 @@ function AppearanceSection({ data, setConfig }: SectionProps) {
         onChange={(id) => setConfig({ appearance: { theme: id } })}
       />
       <ToggleRow
-        title="Tool activity banners"
-        description="Show what the assistant is doing (each tool it calls) as it works."
+        title="Tool activity hints"
+        description="Show what the assistant is doing (each tool it calls) in the floating overlay as it works."
       >
         <SegmentedControl
           value={config.appearance.showToolActivity ? "on" : "off"}
@@ -175,7 +175,67 @@ function AppearanceSection({ data, setConfig }: SectionProps) {
           onChange={(v) => setConfig({ appearance: { showToolActivity: v === "on" } })}
         />
       </ToggleRow>
+      <HotkeyField
+        label="Summon hotkey"
+        hint="Global shortcut to show / hide OpenDex from anywhere (Spotlight-style)."
+        value={config.hotkeys.summon}
+        onChange={(accelerator) => setConfig({ hotkeys: { summon: accelerator } })}
+      />
     </>
+  );
+}
+
+// Captures a key chord and stores it as an Electron accelerator string
+// ("CommandOrControl+Shift+Space"). Focus the box and press the combination.
+function HotkeyField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (accelerator: string) => void;
+}) {
+  const [capturing, setCapturing] = useState(false);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    e.preventDefault();
+    const key = e.key;
+    // Ignore lone modifier presses — wait for a real key.
+    if (["Control", "Shift", "Alt", "Meta"].includes(key)) return;
+    const parts: string[] = [];
+    if (e.metaKey || e.ctrlKey) parts.push("CommandOrControl");
+    if (e.altKey) parts.push("Alt");
+    if (e.shiftKey) parts.push("Shift");
+    const main =
+      key === " "
+        ? "Space"
+        : key.length === 1
+          ? key.toUpperCase()
+          : key;
+    parts.push(main);
+    onChange(parts.join("+"));
+    setCapturing(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <div className="text-sm font-medium text-foreground/90">{label}</div>
+        <div className="text-xs text-muted-foreground">{hint}</div>
+      </div>
+      <button
+        type="button"
+        onClick={() => setCapturing(true)}
+        onBlur={() => setCapturing(false)}
+        onKeyDown={capturing ? onKeyDown : undefined}
+        className="min-w-[160px] rounded-md border border-input bg-dex-surface/60 px-3 py-1.5 text-center font-mono text-xs text-foreground/90 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {capturing ? "Press a key combination…" : value}
+      </button>
+    </div>
   );
 }
 

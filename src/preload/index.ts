@@ -4,8 +4,10 @@ import {
   IPC,
   type ChatMessage,
   type PermissionRequestPayload,
+  type SessionState,
   type ToolCallEvent,
   type UpdateStatusPayload,
+  type WindowMode,
 } from "../main/ipc/channels";
 import type { PermissionDecision } from "../main/agent/permissions";
 import type {
@@ -158,6 +160,54 @@ const opendex = {
     return () => ipcRenderer.removeListener(IPC.interrupt, listener);
   },
 
+  // ── Session state relay (main window → view surfaces) ─────────────────────
+
+  /** Main window: publish a fresh snapshot of the live voice session. */
+  publishSessionState(state: SessionState): void {
+    ipcRenderer.send(IPC.sessionUpdate, state);
+  },
+
+  /** View surfaces (overlay/notch): subscribe to session-state snapshots. The
+   *  handler fires immediately with the last-known state on (re)subscribe. */
+  onSessionState(handler: (state: SessionState) => void): () => void {
+    const listener = (_e: IpcRendererEvent, state: SessionState) => handler(state);
+    ipcRenderer.on(IPC.sessionChanged, listener);
+    return () => ipcRenderer.removeListener(IPC.sessionChanged, listener);
+  },
+
+  // ── Window mode + summon ──────────────────────────────────────────────────
+
+  /** Request a window layout (full themed experience ↔ slim notch bar). */
+  setWindowMode(mode: WindowMode): void {
+    ipcRenderer.send(IPC.windowSetMode, mode);
+  },
+
+  /** Subscribe to window-mode changes applied by main. Returns an unsubscribe fn. */
+  onWindowMode(handler: (mode: WindowMode) => void): () => void {
+    const listener = (_e: IpcRendererEvent, mode: WindowMode) => handler(mode);
+    ipcRenderer.on(IPC.windowMode, listener);
+    return () => ipcRenderer.removeListener(IPC.windowMode, listener);
+  },
+
+  /** Subscribe to the summon hotkey bringing the window forward (focus input). */
+  onSummoned(handler: () => void): () => void {
+    const listener = () => handler();
+    ipcRenderer.on(IPC.windowSummoned, listener);
+    return () => ipcRenderer.removeListener(IPC.windowSummoned, listener);
+  },
+
+  // ── Overlay HUD ───────────────────────────────────────────────────────────
+
+  /** Overlay: toggle click-through so the Stop button is clickable on hover. */
+  setOverlayInteractive(interactive: boolean): void {
+    ipcRenderer.send(IPC.overlaySetInteractive, interactive);
+  },
+
+  /** Overlay: trigger the emergency stop (relayed to the main window). */
+  overlayInterrupt(): void {
+    ipcRenderer.send(IPC.overlayInterrupt);
+  },
+
   /** Subscribe to permission prompts for sensitive tool calls. */
   onPermissionRequest(
     handler: (req: PermissionRequestPayload) => void,
@@ -166,6 +216,13 @@ const opendex = {
       handler(req);
     ipcRenderer.on(IPC.permissionRequest, listener);
     return () => ipcRenderer.removeListener(IPC.permissionRequest, listener);
+  },
+
+  /** Subscribe to prompt dismissals (a prompt settled without an answer). */
+  onPermissionDismiss(handler: (id: string) => void): () => void {
+    const listener = (_e: IpcRendererEvent, id: string) => handler(id);
+    ipcRenderer.on(IPC.permissionDismiss, listener);
+    return () => ipcRenderer.removeListener(IPC.permissionDismiss, listener);
   },
 
   /** Subscribe to auto-update lifecycle events (download progress, errors,
