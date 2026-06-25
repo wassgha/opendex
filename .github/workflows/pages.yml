@@ -9,6 +9,10 @@ on:
     paths:
       - "site/**"
       - ".github/workflows/pages.yml"
+    # Also redeploy on every release tag so the site picks up the new version
+    # (the version is injected at build time from the newest tag — see below).
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 permissions:
@@ -25,7 +29,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 pulls full history + tags so `git describe` can find the
+      # latest release tag (the default shallow clone has none).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # No `version:` here — pnpm/action-setup reads it from the root
       # package.json `packageManager` field (pnpm@10.8.1). Setting both errors.
@@ -40,6 +48,18 @@ jobs:
       - name: Install
         working-directory: site
         run: pnpm install --frozen-lockfile
+
+      # Inject the newest release tag (e.g. v1.1.1 → 1.1.1) so the site shows the
+      # current version. Falls back to the site.ts default if no tag is found.
+      - name: Resolve latest release version
+        run: |
+          VERSION="$(git describe --tags --abbrev=0 --match 'v*.*.*' 2>/dev/null | sed 's/^v//')"
+          echo "Resolved OpenDex version: ${VERSION:-<none, using fallback>}"
+          # Only export when found — an empty string wouldn't trigger the
+          # nullish-coalescing fallback in site.ts.
+          if [ -n "$VERSION" ]; then
+            echo "VITE_OPENDEX_VERSION=$VERSION" >> "$GITHUB_ENV"
+          fi
 
       - name: Build
         working-directory: site
