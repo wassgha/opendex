@@ -21,13 +21,38 @@ import {
 } from "@/components/llm/provider-picker";
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
-import { Dot } from "lucide-react";
+import { Dot, Pencil } from "lucide-react";
 
 interface Step {
   key: string;
   title: string;
   subtitle: string;
   render: () => React.ReactNode;
+}
+
+/** Inline, auto-sizing name field rendered mid-sentence ("…my name is Dex").
+ *  The bright text, dashed underline, blinking caret (autofocus) and pencil all
+ *  signal it's editable without a separate label. */
+function EditableName({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <span className="relative inline-flex items-center align-baseline">
+      <input
+        spellCheck={false}
+        aria-label="Assistant name"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        className="[field-sizing:content] min-w-[1ch] max-w-[10ch] border-b-2 border-dashed border-white/40 bg-transparent text-center font-semibold text-white caret-white outline-none transition-colors focus:border-solid focus:border-white"
+      />
+      <Pencil className="pointer-events-none ml-1.5 size-4 text-white/40" />
+    </span>
+  );
 }
 
 export function OnboardingWizard({
@@ -52,16 +77,21 @@ export function OnboardingWizard({
   const steps: Step[] = [
     {
       key: "welcome",
-      title: "Hi, I'm OpenDex",
-      subtitle: "A voice-first AI for your desktop.",
+      title: "",
+      subtitle: "",
       render: () => (
-        <div className="flex flex-1 flex-col items-center gap-3 py-6 text-center text-white/60">
-          <div className="text-6xl">
-            <Dot className="size-32 text-white animate-pulse" />
-          </div>
-          <p className="max-w-sm text-sm">
-            Let's get set up.
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-8 text-center">
+          <Dot className="size-24 text-white animate-pulse" />
+          <p className="text-3xl font-medium leading-relaxed text-white/45">
+            Hi, I'm {" "}
+            <EditableName
+              value={config.assistant.name}
+              // The name doubles as the wake word; power users can split them
+              // later in Settings.
+              onChange={(v) => setConfig({ assistant: { name: v, wakeWord: v } })}
+            />
           </p>
+          <p className="text-xs text-white/20">You can rename me anytime in Settings.</p>
         </div>
       ),
     },
@@ -223,26 +253,6 @@ export function OnboardingWizard({
         </>
       ),
     },
-    {
-      key: "wake",
-      title: "Wake word & name",
-      subtitle: "Finally, how you summon it.",
-      render: () => (
-        <>
-          <TextField
-            label="Name"
-            value={config.assistant.name}
-            onChange={(v) => setConfig({ assistant: { name: v } })}
-          />
-          <TextField
-            label="Wake word"
-            hint="Say this to start talking. Single, distinct words work best."
-            value={config.assistant.wakeWord}
-            onChange={(v) => setConfig({ assistant: { wakeWord: v } })}
-          />
-        </>
-      ),
-    },
   ];
 
   const step = steps[stepIndex];
@@ -252,7 +262,13 @@ export function OnboardingWizard({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a] p-0 md:p-6">
-      <div className="flex w-full h-full md:h-auto md:max-h-[85vh] md:max-w-md flex-1 flex-col gap-5 overflow-hidden px-6 pt-6 md:rounded-2xl md:border md:border-white/10 md:bg-[#0e0e0e] md:p-7 md:shadow-2xl">
+      {/* Frameless title bar: a draggable strip across the top, inset from the
+          corner controls (brand mark, settings gear) so they stay clickable. */}
+      {window.opendex.platform === "darwin" && (
+        <div className="titlebar-drag fixed inset-x-[72px] top-0 z-30 h-9" />
+      )}
+
+      <div className="flex w-full h-full md:h-auto md:max-h-[85vh] md:max-w-md flex-1 flex-col gap-5 overflow-hidden px-6 pt-6 md:rounded-2xl md:border md:border-white/10 md:bg-[#0e0e0e] md:px-7 md:pt-7 md:shadow-2xl">
         <div className="flex gap-1.5 mt-8 md:mt-0">
           {steps.map((s, i) => (
             <div
@@ -263,16 +279,18 @@ export function OnboardingWizard({
           ))}
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold text-white">{step.title}</h2>
-          <p className="mt-1 text-sm text-white/50">{step.subtitle}</p>
-        </div>
+        {step.title && (
+          <div>
+            <h2 className="text-xl font-semibold text-white">{step.title}</h2>
+            <p className="mt-1 text-sm text-white/50">{step.subtitle}</p>
+          </div>
+        )}
 
         {/* Scrollable body with an overlaid, blurred bottom bar: content scrolls
             *under* the bar, which stays pinned to the bottom of the card. */}
         <div className="relative -mx-6 min-h-0 flex-1 md:-mx-7">
           <div className="h-full overflow-y-auto px-6 pb-20 md:px-7">
-            <div className="flex flex-col gap-4">{step.render()}</div>
+            <div className="flex flex-1 min-h-full flex-col gap-4">{step.render()}</div>
           </div>
 
           {/* Fade so scrolling content dissolves into the bar instead of clipping. */}
