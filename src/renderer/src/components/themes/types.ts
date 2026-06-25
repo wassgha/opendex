@@ -10,6 +10,9 @@ export interface DexThemeProps {
   status: DexStatus;
   transcript: TranscriptTurn[];
   liveCaption: string;
+  /** Assistant text spoken so far this turn — lags the token stream so display
+   *  can stay in sync with the voice rather than racing ahead. */
+  spokenCaption: string;
   /** 0..1 voice loudness, sampled via requestAnimationFrame. */
   getAmplitude: () => number;
   isMuted: boolean;

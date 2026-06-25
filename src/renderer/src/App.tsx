@@ -91,6 +91,7 @@ function MainExperience({ data }: { data: PublicConfig }) {
         status={dex.status}
         transcript={dex.transcript}
         liveCaption={dex.liveCaption}
+        spokenCaption={dex.spokenCaption}
         getAmplitude={dex.getAmplitude}
         isMuted={dex.isMuted}
         bargeInEnabled={dex.bargeInEnabled}

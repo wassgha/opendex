@@ -1,5 +1,6 @@
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { frameRms } from "./wav";
+import { vlog } from "../voice-timing";
 import type { CaptureOptions } from "./types";
 
 // Shared mic-capture helper built on WebVoiceProcessor's 16kHz Int16 frames.
@@ -49,7 +50,14 @@ export async function captureUtterance(
       }
       if (cancelled || speechFrames < MIN_SPEECH_FRAMES) return resolve("");
       try {
-        resolve((await transcribe(frames)).trim());
+        vlog("transcribe:start", { frames: frames.length });
+        const transcribeStart = performance.now();
+        const text = (await transcribe(frames)).trim();
+        vlog("transcribe:done", {
+          ms: Math.round(performance.now() - transcribeStart),
+          chars: text.length,
+        });
+        resolve(text);
       } catch (err) {
         reject(err);
       }
@@ -60,11 +68,24 @@ export async function captureUtterance(
     const poll = setInterval(() => {
       const now = performance.now();
       const elapsed = now - started;
-      if (elapsed > opts.hardTimeoutMs) return void finish(false);
+      if (elapsed > opts.hardTimeoutMs) {
+        vlog("endpoint:hard-timeout", {
+          captureMs: Math.round(elapsed),
+          speechFrames,
+        });
+        return void finish(false);
+      }
       if (speechFrames >= MIN_SPEECH_FRAMES) {
         // Heard speech, then a trailing silence → end and transcribe.
-        if (now - lastVoiceAt > opts.silenceMs) void finish(false);
-      } else if (elapsed > opts.silenceMs) {
+        if (now - lastVoiceAt > opts.silenceMs) {
+          vlog("endpoint:silence", {
+            silenceMs: opts.silenceMs,
+            captureMs: Math.round(elapsed),
+            speechFrames,
+          });
+          void finish(false);
+        }
+      } else if (elapsed > opts.noSpeechMs) {
         // Nothing meaningful within the listen window → give up quietly (no
         // transcription) instead of waiting out the hard timeout.
         void finish(true);

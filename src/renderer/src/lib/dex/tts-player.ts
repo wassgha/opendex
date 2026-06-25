@@ -14,6 +14,8 @@ interface QueuedClip {
 export interface TtsPlayerCallbacks {
   onStateChange: (speaking: boolean) => void;
   onAudioBlocked: () => void;
+  /** Fires when a queued clip actually starts playing (for spoken-progress UI). */
+  onChunkStart?: (text: string) => void;
 }
 
 export class TtsPlayer {
@@ -51,7 +53,7 @@ export class TtsPlayer {
     this.cb.onStateChange(true);
     try {
       const blob = await next.blobPromise;
-      await this.playBlob(blob);
+      await this.playBlob(blob, next.text);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         console.error("[opendex tts] playback error", err);
@@ -66,13 +68,15 @@ export class TtsPlayer {
     }
   }
 
-  private playBlob(blob: Blob): Promise<void> {
+  private playBlob(blob: Blob, text: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const tryPlay = async () => {
         if (this.audioBlocked) await this.waitForUnlock();
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         this.currentAudio = audio;
+        // Report spoken progress when the clip actually begins playing.
+        audio.onplay = () => this.cb.onChunkStart?.(text);
         audio.onended = () => {
           URL.revokeObjectURL(url);
           if (this.currentAudio === audio) this.currentAudio = null;

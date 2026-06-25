@@ -8,11 +8,13 @@ import {
 import { createSentenceBuffer } from "./sentence-buffer";
 import {
   createSpeechEngine,
+  SystemSpeechEngine,
   type SpeechEngine,
   type SpeechEngineKind,
   type SystemVoiceOptions,
 } from "./speech-engine";
 import { AudioMeter } from "./audio-meter";
+import { vlog } from "./voice-timing";
 import { CloudSttEngine } from "./engines/cloud-stt";
 import type { SttEngine, WakeEngine } from "./engines/types";
 import type { DexStatus, TranscriptTurn } from "./state";
@@ -71,8 +73,15 @@ function buildWakeRegex(word: string): RegExp {
   return new RegExp(`\\b${escapeRegExp(cleaned)}\\b`, "i");
 }
 
-const COMMAND_SILENCE_MS = 6000;
-const FOLLOW_UP_SILENCE_MS = 10000;
+// Trailing silence (after speech is heard) that ends an utterance so we can
+// transcribe and act. Kept short — this is the main lever on the gap between
+// "user stopped talking" and "assistant starts". A natural between-word pause
+// is well under this.
+const END_SILENCE_MS = 1000;
+// How long to wait for the user to *start* speaking before giving up quietly.
+// Longer for follow-ups (the user may take a beat before continuing).
+const COMMAND_NO_SPEECH_MS = 6000;
+const FOLLOW_UP_NO_SPEECH_MS = 10000;
 const COMMAND_HARD_TIMEOUT_MS = 15000;
 // After TTS finishes we wait this long before resuming listening, to give
 // speaker output time to flush and the browser's AEC chain to settle.
@@ -118,6 +127,9 @@ export interface UseDexResult {
   status: DexStatus;
   transcript: TranscriptTurn[];
   liveCaption: string;
+  /** Assistant text spoken so far this turn (lags the token stream; for
+   *  speech-synced display). */
+  spokenCaption: string;
   isMuted: boolean;
   audioBlocked: boolean;
   bargeInEnabled: boolean;
@@ -153,6 +165,12 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const meterRef = useRef<AudioMeter | null>(null);
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [liveCaption, setLiveCaption] = useState("");
+  // The assistant text *spoken so far* this turn. Tracks TTS playback (which lags
+  // the model's faster token stream) so UIs can show speech-synced text instead
+  // of racing ahead. Replaced on the first spoken chunk of a new turn (not at
+  // turn start) so the previous reply stays on screen during the thinking gap.
+  const [spokenCaption, setSpokenCaption] = useState("");
+  const spokenFreshRef = useRef(true);
   const [isMuted, setIsMuted] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [bargeInEnabled, setBargeInEnabled] = useState(false);
@@ -401,6 +419,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const runCommand = useCallback(
     async (userText: string, opts?: { mode?: "briefing"; resumeMode?: Mode }) => {
       const isBriefing = opts?.mode === "briefing";
+      vlog("runCommand:start", { chars: userText.length, briefing: isBriefing });
+      // Next spoken chunk replaces the (now-stale) spoken caption rather than
+      // appending — but we leave the prior reply on screen until then.
+      spokenFreshRef.current = true;
       // The briefing is proactive — we don't show the synthetic prompt as a
       // user turn, but we still record it for conversational continuity.
       if (!isBriefing) appendTurn("user", userText);
@@ -411,10 +433,16 @@ export function useDex(options: UseDexOptions): UseDexResult {
       messagesRef.current.push({ role: "user", content: userText });
 
       const tts = ttsRef.current!;
+      let loggedFirstTts = false;
       // Muting disables speech *output* as well as input — a typed command run
       // while on standby shows in the transcript but is never voiced.
       const speak = (text: string) => {
-        if (!mutedRef.current) tts.enqueue(text);
+        if (mutedRef.current) return;
+        if (!loggedFirstTts) {
+          loggedFirstTts = true;
+          vlog("tts:first-enqueue");
+        }
+        tts.enqueue(text);
       };
       const buffer = createSentenceBuffer();
       const abortController = new AbortController();
@@ -460,6 +488,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
       }
 
       let bargedIn = false;
+      let loggedFirstToken = false;
+      let loggedFirstTool = false;
       try {
         // Stream the reply from the main process over IPC. Each delta feeds the
         // sentence buffer (→ TTS) and the live transcript, exactly as the old
@@ -468,6 +498,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
           messages: messagesRef.current,
           mode: isBriefing ? "briefing" : undefined,
           onToolCall: (call) => {
+            if (!loggedFirstTool) {
+              loggedFirstTool = true;
+              vlog("tool:first", { tool: call.toolName });
+            }
             addToolActivity(call);
             // First on-screen action: flush the opener to TTS, then go quiet.
             if (COMPUTER_TOOL_NAMES.has(call.toolName) && !quiet) {
@@ -477,6 +511,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
           },
           onDelta: (value) => {
             if (!value) return;
+            if (!loggedFirstToken) {
+              loggedFirstToken = true;
+              vlog("model:first-token");
+            }
             assistantText += value;
             updateLastAssistant(assistantText);
             // Refresh the echo-filter word set as new text arrives.
@@ -799,8 +837,14 @@ export function useDex(options: UseDexOptions): UseDexResult {
       // ---- Command / follow-up capture ----
       setStatus(mode === "follow_up" ? "follow_up_listening" : "active_listening");
       setLiveCaption("");
-      const silenceMs =
-        mode === "follow_up" ? FOLLOW_UP_SILENCE_MS : COMMAND_SILENCE_MS;
+      const noSpeechMs =
+        mode === "follow_up" ? FOLLOW_UP_NO_SPEECH_MS : COMMAND_NO_SPEECH_MS;
+      vlog("capture:start", {
+        mode,
+        provider: opts.sttProvider,
+        endSilenceMs: END_SILENCE_MS,
+        noSpeechMs,
+      });
 
       // Cloud / local STT: capture an utterance via the chosen engine, then run
       // it. (openai = main-process Whisper; whisper-local / vosk-local = offline
@@ -813,7 +857,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
             const engine = await ensureSttEngine(opts.sttProvider, opts.whisperModel);
             if (ac.signal.aborted) return;
             const text = await engine.capture({
-              silenceMs,
+              silenceMs: END_SILENCE_MS,
+              noSpeechMs,
               hardTimeoutMs: COMMAND_HARD_TIMEOUT_MS,
               signal: ac.signal,
             });
@@ -873,6 +918,11 @@ export function useDex(options: UseDexOptions): UseDexResult {
         clearTimers();
         stopRecognition();
         const cleaned = text.trim();
+        vlog("endpoint:webspeech", {
+          fromTimeout,
+          captureMs: Date.now() - startedAt,
+          chars: cleaned.length,
+        });
         if (cleaned.length === 0) {
           // Nothing heard. Follow-up rolls back to wake; command does the same.
           if (fromTimeout && mode === "follow_up") {
@@ -890,11 +940,14 @@ export function useDex(options: UseDexOptions): UseDexResult {
         COMMAND_HARD_TIMEOUT_MS,
       );
 
+      // Before any speech, wait the (longer) no-speech window for the user to
+      // start; once we've heard something, end on the short trailing silence so
+      // execution starts promptly.
       const resetSilenceTimer = () => {
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = setTimeout(
           () => settle(finalTranscript, true),
-          silenceMs,
+          heardAnything ? END_SILENCE_MS : noSpeechMs,
         );
       };
       resetSilenceTimer();
@@ -1012,12 +1065,75 @@ export function useDex(options: UseDexOptions): UseDexResult {
             // waitForDrain, which is responsible for the next status.
           },
           onAudioBlocked: () => setAudioBlocked(true),
+          onChunkStart: (text) => {
+            setSpokenCaption((prev) => {
+              if (spokenFreshRef.current) {
+                spokenFreshRef.current = false;
+                return text;
+              }
+              return prev ? `${prev} ${text}` : text;
+            });
+          },
         },
       });
       ttsKindRef.current = ttsEngine;
+    } else if (ttsEngine === "system" && ttsRef.current instanceof SystemSpeechEngine) {
+      // Engine kept across the session — push any updated voice/rate/pitch so a
+      // settings change applies on the next utterance without a restart.
+      ttsRef.current.setOptions(systemVoice);
     }
     return ttsRef.current;
   }, []);
+
+  // ---- Live settings reconciliation ----
+  // The voice engines are built once per session (at engage) and several capture
+  // their settings at construction. Without these effects, changing a voice,
+  // model, or wake word in settings would only take effect after a restart.
+
+  // Output: rebuild on engine-kind change, otherwise push new voice settings.
+  // Only touches an already-created engine (engage() owns lazy creation).
+  useEffect(() => {
+    if (ttsRef.current) ensureTts();
+  }, [
+    options.ttsEngine,
+    options.systemVoice.voiceURI,
+    options.systemVoice.rate,
+    options.systemVoice.pitch,
+    ensureTts,
+  ]);
+
+  // Input (STT): drop the cached engine so the next capture rebuilds with the new
+  // provider/model. ensureSttEngine caches by provider alone, so a model swap on
+  // the same provider would otherwise be ignored. Abort any in-flight capture
+  // first so we don't dispose an engine it's still using, then re-arm wake (which
+  // also preloads local models) if we're passively waiting.
+  useEffect(() => {
+    if (!startedRef.current) return;
+    const wasCapturing = sttAbortRef.current !== null;
+    abortStt();
+    sttEngineRef.current?.engine.dispose();
+    sttEngineRef.current = null;
+    // Re-arm passive wake so the new engine preloads. If we aborted an in-flight
+    // capture, fall back to wake too — the aborted capture won't re-arm itself.
+    if (!mutedRef.current && (modeRef.current === "wake" || wasCapturing)) {
+      startModeRef.current?.("wake");
+    }
+  }, [options.sttProvider, options.whisperModel, abortStt]);
+
+  // Wake: Vosk/Porcupine capture their keyword at construction. If we're sitting
+  // in passive wake, restart so the new wake engine takes over. Don't interrupt
+  // an in-flight command or reply.
+  useEffect(() => {
+    if (!startedRef.current) return;
+    const s = statusRef.current;
+    if (
+      modeRef.current === "wake" &&
+      !mutedRef.current &&
+      (s === "listening_wake" || s === "idle")
+    ) {
+      startModeRef.current?.("wake");
+    }
+  }, [options.wakeMode, options.wakeWord, options.porcupineKeyword]);
 
   const engage = useCallback(async () => {
     if (!isSpeechRecognitionSupported()) {
@@ -1271,6 +1387,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     status,
     transcript,
     liveCaption,
+    spokenCaption,
     isMuted,
     audioBlocked,
     bargeInEnabled,

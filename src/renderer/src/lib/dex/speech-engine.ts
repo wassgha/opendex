@@ -13,6 +13,10 @@ export interface SpeechEngine {
 export interface SpeechEngineCallbacks {
   onStateChange: (speaking: boolean) => void;
   onAudioBlocked: () => void;
+  /** Fires when a queued chunk actually *starts* being spoken (not when it's
+   *  enqueued). Lets the UI track spoken progress, which lags the model's much
+   *  faster token stream. */
+  onChunkStart?: (text: string) => void;
 }
 
 export interface SystemVoiceOptions {
@@ -35,8 +39,14 @@ export class SystemSpeechEngine implements SpeechEngine {
 
   constructor(
     private readonly cb: SpeechEngineCallbacks,
-    private readonly opts: SystemVoiceOptions,
+    private opts: SystemVoiceOptions,
   ) {}
+
+  /** Apply new voice settings to a live engine (no rebuild needed — the next
+   *  utterance picks them up). Lets settings changes take effect mid-session. */
+  setOptions(opts: SystemVoiceOptions) {
+    this.opts = opts;
+  }
 
   private pickVoice(): SpeechSynthesisVoice | null {
     const voices = window.speechSynthesis.getVoices();
@@ -75,6 +85,7 @@ export class SystemSpeechEngine implements SpeechEngine {
         this.cb.onStateChange(false);
       }
     };
+    utterance.onstart = () => this.cb.onChunkStart?.(trimmed);
     utterance.onend = settle;
     utterance.onerror = settle;
 

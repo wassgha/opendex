@@ -12,8 +12,12 @@ export interface WakeEngine {
 }
 
 export interface CaptureOptions {
-  /** End the utterance after this much trailing silence. */
+  /** End the utterance after this much trailing silence *once speech was heard*.
+   *  Kept short so execution starts promptly after you finish talking. */
   silenceMs: number;
+  /** How long to wait for speech to *begin* before giving up quietly (no
+   *  transcription). Longer than `silenceMs` so a slow start isn't cut off. */
+  noSpeechMs: number;
   /** Absolute cap on capture length. */
   hardTimeoutMs: number;
   signal?: AbortSignal;

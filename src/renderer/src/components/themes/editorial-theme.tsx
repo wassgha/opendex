@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { WavesHorizontal } from "lucide-react";
 import { ThemeTopBar } from "./theme-top-bar";
 import { TextComposer } from "./text-composer";
@@ -13,25 +13,13 @@ import type { DexThemeProps } from "./types";
 // light card below, and an accent dot that breathes with your voice. Everything
 // is driven by the editorial token palette in globals.css, so it reskins cleanly.
 
-// Long agentic turns stream one ever-growing assistant message (often with the
-// inter-sentence spaces dropped, e.g. "sir.It appears…"). Rendering the whole
-// blob as hero type floods the screen, so we surface only the freshest sentence
-// or two — large display type stays a headline, not a wall. We also re-insert the
-// missing spaces so the line reads cleanly.
-function heroDisplay(text: string, maxChars = 200): string {
-  const clean = text.replace(/([.!?])(?=[A-Z"'(])/g, "$1 ").trim();
-  const parts = clean
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (parts.length === 0) return clean;
-  let out = parts[parts.length - 1];
-  for (let i = parts.length - 2; i >= 0; i--) {
-    const next = `${parts[i]} ${out}`;
-    if (next.length > maxChars) break;
-    out = next;
-  }
-  return out;
+// Long agentic turns stream one ever-growing assistant message with the
+// inter-sentence spaces dropped (e.g. "sir.It appears…"). Re-insert a space after
+// terminal punctuation that's immediately followed by a capital/quote so both the
+// hero and the Recent card read cleanly. (The hero renders the whole message and
+// lets its fixed two-line frame clip older text off the top — no ellipsis.)
+function cleanText(text: string): string {
+  return text.replace(/([.!?])(?=[A-Z"'(])/g, "$1 ").trim();
 }
 
 // Amplitude-reactive accent dot; doubles as the tap-to-talk target in manual mode.
@@ -64,6 +52,7 @@ export function EditorialTheme(props: DexThemeProps) {
     status,
     transcript,
     liveCaption,
+    spokenCaption,
     getAmplitude,
     canPushToTalk,
     onPushToTalk,
@@ -73,23 +62,37 @@ export function EditorialTheme(props: DexThemeProps) {
 
   const isInterim = liveCaption.length > 0;
   const lastAssistant = [...transcript].reverse().find((t) => t.role === "assistant");
+  // While the assistant is thinking/speaking, follow the *spoken* caption (it
+  // lags the model's much faster token stream) so the hero stays in sync with the
+  // voice instead of racing to the end of the sentence. The prior reply stays up
+  // during the thinking gap (spokenCaption isn't cleared until the first new
+  // spoken chunk). Once settled, show the full last reply.
+  const tracking = status === "thinking" || status === "speaking";
   const hero =
     isInterim
       ? liveCaption
-      : lastAssistant
-        ? heroDisplay(lastAssistant.content)
-        : `Good to see you${name ? `, this is ${name}` : ""}. Say “${wakeWord}” or type below to begin.`;
+      : tracking
+        ? cleanText(spokenCaption || lastAssistant?.content || "")
+        : lastAssistant
+          ? cleanText(lastAssistant.content)
+          : `Good to see you${name ? `, this is ${name}` : ""}. Say “${wakeWord}” or type below to begin.`;
 
-  // The latest reply already lives in the hero above; the Recent card is the
-  // history *behind* it, so drop that turn here to avoid showing it twice.
-  const recent = transcript.filter((t) => t.id !== lastAssistant?.id).slice(-4);
+  // The card is the running transcript — show every turn in order, including the
+  // assistant's in-progress reply (it streams in live here). Don't drop the
+  // latest assistant turn: doing so made the reply appear only after the *next*
+  // turn, and left two user turns adjacent during the thinking gap.
+  const recent = transcript.slice(-6);
 
-  // Keep the Recent card pinned to its newest row; otherwise growing content can
-  // leave it scrolled to the oldest turn at the top.
+  // Keep the Recent card pinned to its newest row. Depend on the rendered content
+  // (ids + lengths), not just the count — a new turn that doesn't change the
+  // capped length (slice(-4)) would otherwise leave the latest turn scrolled out
+  // of view at the bottom.
   const recentRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (recentRef.current) recentRef.current.scrollTop = recentRef.current.scrollHeight;
-  }, [recent.length, lastAssistant?.content]);
+  const recentKey = recent.map((t) => `${t.id}:${t.content.length}`).join("|");
+  useLayoutEffect(() => {
+    const el = recentRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [recentKey]);
 
   const mark = (
     <span className="flex items-center gap-3">
@@ -129,41 +132,52 @@ export function EditorialTheme(props: DexThemeProps) {
         )}
       </div>
 
-      {/* Hero: the latest reply (or live caption) set large. */}
+      {/* Hero: the latest reply (or live caption) set large. The frame is fixed
+          at three lines and bottom-anchored with the overflow clipped, so as text
+          streams in the newest words stay visible and older lines scroll off the
+          top — no truncating ellipsis. (leading × 3 = the em height.) */}
       <section className="z-0 flex flex-1 flex-col justify-center pt-16">
-        <p
+        <div
           className={cn(
-            "line-clamp-2 max-w-2xl text-balance text-3xl font-light leading-snug tracking-tight sm:text-4xl",
+            "flex max-w-2xl flex-col justify-end overflow-hidden text-3xl font-light leading-[1.2] tracking-tight sm:text-4xl",
             isInterim ? "text-muted-foreground" : "text-foreground",
           )}
+          style={{ height: "3.6em" }}
         >
-          {hero}
-        </p>
+          <p>{hero}</p>
+        </div>
         <div className="mt-5 flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
           <span className="h-1 w-1 rounded-full bg-primary" />
           {unsupported ? "Voice unavailable — type below" : STATUS_LABELS[status]}
         </div>
       </section>
 
-      {/* Recent turns — a light card, like a page of activity (hidden when compact). */}
+      {/* Running transcript — a light card spanning the available width, turns as
+          divided rows with the role above the text. The assistant's in-progress
+          reply streams in here too. */}
       {recent.length > 0 && (
         <Card
           ref={recentRef}
-          className="z-10 mb-24 hidden max-h-[28vh] w-full max-w-2xl overflow-y-auto bg-card/95 p-4 sm:block"
+          className="z-10 mb-24 hidden max-h-[32vh] w-full flex-col divide-y divide-card-foreground/10 overflow-y-auto bg-card/95 px-6 sm:flex"
         >
-          <div className="mb-2 text-[10px] uppercase tracking-[0.3em] text-card-foreground/40">
-            Recent
-          </div>
-          <div className="flex flex-col gap-2 text-sm leading-relaxed">
-            {recent.map((t) => (
-              <div key={t.id} className="flex gap-3">
-                <span className="w-12 shrink-0 pt-0.5 text-[10px] uppercase tracking-[0.2em] text-card-foreground/40">
-                  {t.role === "user" ? "You" : name || "Dex"}
+          {recent.map((t) => {
+            const isUser = t.role === "user";
+            return (
+              <div key={t.id} className="flex flex-col gap-1.5 py-3.5">
+                <span
+                  className={cn(
+                    "text-[10px] font-medium uppercase tracking-[0.25em]",
+                    isUser ? "text-primary/80" : "text-card-foreground/40",
+                  )}
+                >
+                  {isUser ? "You" : name || "Dex"}
                 </span>
-                <span className="text-card-foreground/90">{t.content || "…"}</span>
+                <p className="text-sm leading-relaxed text-card-foreground/90">
+                  {cleanText(t.content) || "…"}
+                </p>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </Card>
       )}
 

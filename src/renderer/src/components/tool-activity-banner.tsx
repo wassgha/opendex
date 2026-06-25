@@ -10,12 +10,16 @@ const STOP_HINT = IS_MAC ? "⌘⎋" : "Ctrl+Esc";
 // the visible reminder + a fallback for when OpenDex is in front.
 export function StopControl({ onStop }: { onStop: () => void }) {
   return (
-    <div className="fixed inset-x-0 top-4 z-40 flex justify-center px-4">
+    // Container is click-through (pointer-events-none) so the band it spans
+    // doesn't block the settings gear / mute behind it; only the button itself
+    // is interactive. titlebar-no-drag keeps the macOS drag region (which this
+    // overlaps) from swallowing the click into a window-drag.
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-center px-4">
       <button
         type="button"
         onClick={onStop}
         title="Stop the assistant"
-        className="pointer-events-auto flex items-center gap-2 rounded-full border border-destructive/40 bg-destructive/15 px-4 py-1.5 text-sm font-medium text-destructive-foreground shadow-lg backdrop-blur transition hover:bg-destructive/25"
+        className="titlebar-no-drag pointer-events-auto flex items-center gap-2 rounded-full border border-destructive/40 bg-destructive/15 px-4 py-1.5 text-sm font-medium text-destructive-foreground shadow-lg backdrop-blur transition hover:bg-destructive/25"
       >
         <span className="h-2.5 w-2.5 rounded-[2px] bg-destructive" aria-hidden />
         Stop
