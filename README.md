@@ -40,7 +40,7 @@ It's a **harness**, not a single bot: the model, the voice, the wake/transcripti
 - 🎙️ **Voice-first loop** — wake word → listen → think (with tools) → speak, plus natural follow-ups and opt-in barge-in (interrupt mid-reply).
 - 🧠 **Bring any model** — pick your provider in setup: **Apple Intelligence** (on-device, free, no key — macOS), your own **OpenAI** or **Anthropic** key, or the **Vercel AI Gateway** (one key → Claude, GPT, Gemini, and more). _(An OpenDex hosted subscription — sign in, no keys, cloud-synced — is coming soon.)_
 - 🆓 **Free & offline option** — Vosk wake word + local Whisper transcription (WASM, no signup) and your OS's built-in voice. No data leaves the machine except the LLM call.
-- 🔌 **Pluggable voice I/O** — wake via push-to-talk, Vosk, Porcupine, or Web Speech; transcribe via local Whisper/Vosk, OpenAI, or Web Speech; speak via ElevenLabs or system TTS.
+- 🔌 **Pluggable voice I/O** — wake via push-to-talk, Vosk, or Web Speech; transcribe via local Whisper/Vosk, OpenAI, or Web Speech; speak via ElevenLabs or system TTS.
 - 🎨 **Full-interface themes** — the theme *is* the whole UI: a cinematic **Jarvis HUD** with an animated arc reactor, a minimal **Talking Dot**, or a **Typing Cursor** terminal. All react to your voice.
 - 🛠️ **Agentic skills with a permission gate** — the agent can take real actions (e.g. open apps & URLs); sensitive actions pop an **Allow once / Always / Deny** prompt that's remembered per skill.
 - 🖥️ **Computer-use (opt-in)** — let it *see the screen and drive the mouse & keyboard* to operate apps for you. Works with any vision model (screenshots stream back as images), and stays behind the permission gate.
@@ -76,7 +76,7 @@ Pick where the thinking happens — every part of the loop can be free/offline:
 - **Model:** **Apple Intelligence** (on-device, free, no key — macOS only), your own **OpenAI**/**Anthropic** key, or the **Vercel AI Gateway** (one key, any provider).
 - **Voice out:** "System voice" (free) or ElevenLabs (key).
 - **Voice in:** local **Whisper**/**Vosk** (free, offline, one-time model download) or OpenAI Whisper (key).
-- **Wake:** push-to-talk / Vosk (free) or Porcupine (free Picovoice key).
+- **Wake:** push-to-talk / Vosk (free, offline) or Web Speech (browser).
 
 On a Mac with Apple Intelligence enabled, the whole loop (model + speech + voice) runs locally with **no keys at all**.
 
@@ -94,7 +94,6 @@ cp .env.local.example .env
 | `OPENAI_API_KEY` | chat via OpenAI directly, **and/or** OpenAI Whisper transcription |
 | `ANTHROPIC_API_KEY` | chat via Anthropic (Claude) directly |
 | `ELEVENLABS_API_KEY` | ElevenLabs TTS (skip if using the system voice) |
-| `PICOVOICE_ACCESS_KEY` | Porcupine wake word (optional, free) |
 | `TAVILY_API_KEY` | web-search tool (optional) |
 
 > The chat provider needs **one** of `AI_GATEWAY_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — matching the provider you select. Apple Intelligence needs none.
@@ -131,7 +130,7 @@ The agent's capabilities are **skills** — declarative tool bundles. Sensitive 
 
 ## Tech Stack
 
-Electron · electron-vite · React 19 · Tailwind CSS 4 · Vercel AI SDK v6 · ElevenLabs · Picovoice Porcupine · Vosk · transformers.js (Whisper) — all local speech engines are WASM. The only native module is **nut.js** (computer-use input control); it ships prebuilt N-API binaries per platform.
+Electron · electron-vite · React 19 · Tailwind CSS 4 · Vercel AI SDK v6 · ElevenLabs · Vosk · transformers.js (Whisper) — all local speech engines are WASM. The only native module is **nut.js** (computer-use input control); it ships prebuilt N-API binaries per platform.
 
 ## License
 

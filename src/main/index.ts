@@ -17,7 +17,6 @@ import { transcribe } from "./stt";
 import {
   completeOnboarding,
   getConfig,
-  getPicovoiceKey,
   getPublicConfig,
   initConfig,
   resetConfig,
@@ -238,10 +237,6 @@ function registerIpc() {
       return transcribe(provider, Buffer.from(wav));
     },
   );
-
-  // The one secret the renderer may read — Porcupine's WASM SDK needs it
-  // client-side. Billing keys (OpenAI, etc.) never leave main.
-  ipcMain.handle(IPC.getPicovoiceKey, () => getPicovoiceKey());
 
   // Probe whether the Apple on-device model can run (gates the provider picker).
   ipcMain.handle(IPC.llmAppleAvailability, () => checkAppleAvailability());

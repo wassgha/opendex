@@ -109,8 +109,6 @@ export interface UseDexOptions {
   wakeWord: string;
   /** How active listening is triggered. */
   wakeMode: WakeMode;
-  /** Built-in Porcupine keyword id (porcupine wake mode). */
-  porcupineKeyword: string;
   /** Which engine transcribes captured commands. */
   sttProvider: SttProvider;
   /** transformers.js Whisper model id (local STT). */
@@ -646,8 +644,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
       clearTimers();
 
       // Hard standby guard. A wake event that fired just before mute (vosk match,
-      // a queued Web Speech onresult, an awaiting porcupine start) runs its
-      // callback *after* mute tore everything down and re-enters startMode. While
+      // a queued Web Speech onresult) runs its callback *after* mute tore
+      // everything down and re-enters startMode. While
       // muted, refuse to (re)engage anything and pin the UI to "muted". Unmute
       // clears mutedRef before calling startMode, so it's unaffected.
       if (mutedRef.current && mode !== "off") {
@@ -699,25 +697,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
             hasBriefedRef.current = true;
             void runCommand("Give me my briefing.", { mode: "briefing" });
           }
-          return;
-        }
-
-        if (opts.wakeMode === "porcupine") {
-          void (async () => {
-            // Code-split: the Porcupine WASM (~4MB) loads only in this mode.
-            const { PorcupineWakeEngine } = await import("./engines/porcupine-wake");
-            const key = await window.opendex.getPicovoiceKey();
-            if (modeRef.current !== "wake") return; // mode changed while loading
-            const engine = new PorcupineWakeEngine(
-              key,
-              opts.porcupineKeyword,
-              (s) => {
-                if (s !== "ok") setStatus("unsupported");
-              },
-            );
-            wakeEngineRef.current = engine;
-            await engine.start(onWake);
-          })();
           return;
         }
 
@@ -1120,9 +1099,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
     }
   }, [options.sttProvider, options.whisperModel, abortStt]);
 
-  // Wake: Vosk/Porcupine capture their keyword at construction. If we're sitting
-  // in passive wake, restart so the new wake engine takes over. Don't interrupt
-  // an in-flight command or reply.
+  // Wake: Vosk captures its keyword at construction. If we're sitting in passive
+  // wake, restart so the new wake engine takes over. Don't interrupt an in-flight
+  // command or reply.
   useEffect(() => {
     if (!startedRef.current) return;
     const s = statusRef.current;
@@ -1133,7 +1112,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     ) {
       startModeRef.current?.("wake");
     }
-  }, [options.wakeMode, options.wakeWord, options.porcupineKeyword]);
+  }, [options.wakeMode, options.wakeWord]);
 
   const engage = useCallback(async () => {
     if (!isSpeechRecognitionSupported()) {

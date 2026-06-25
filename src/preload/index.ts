@@ -139,12 +139,6 @@ const opendex = {
     return ipcRenderer.invoke(IPC.transcribe, provider, wav);
   },
 
-  /** Read the Picovoice AccessKey (the one secret the renderer may read — the
-   *  Porcupine WASM SDK requires it client-side). */
-  getPicovoiceKey(): Promise<string> {
-    return ipcRenderer.invoke(IPC.getPicovoiceKey);
-  },
-
   /** Probe whether the Apple on-device model can run (provider picker gate). */
   appleAvailability(): Promise<{ available: boolean; reason?: string }> {
     return ipcRenderer.invoke(IPC.llmAppleAvailability);

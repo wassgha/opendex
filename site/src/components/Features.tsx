@@ -13,7 +13,7 @@ const FEATURES = [
   },
   {
     title: "Pluggable voice I/O",
-    body: "Wake via push-to-talk, Vosk, Porcupine, or Web Speech; transcribe locally or in the cloud; speak via ElevenLabs or system TTS.",
+    body: "Wake via push-to-talk, Vosk, or Web Speech; transcribe locally or in the cloud; speak via ElevenLabs or system TTS.",
   },
   {
     title: "Full-interface themes",

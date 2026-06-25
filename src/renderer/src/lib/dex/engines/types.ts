@@ -1,6 +1,6 @@
 // Wake/STT engine contracts. Web Speech and the keyless "manual" path stay
-// inline in use-dex (they're tightly coupled to the state machine); Porcupine
-// wake and cloud STT are encapsulated here behind these interfaces.
+// inline in use-dex (they're tightly coupled to the state machine); Vosk wake
+// and cloud STT are encapsulated here behind these interfaces.
 
 export type EngineStatus = "ok" | "needs-key" | "unsupported" | "error";
 

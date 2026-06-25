@@ -111,37 +111,10 @@ function VoiceInputSection({ data, setConfig, setSecret }: SectionProps) {
         options={[
           { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
           { value: "vosk", label: "Wake word (Vosk — free, offline)" },
-          { value: "porcupine", label: "Wake word (Porcupine, hands-free)" },
           { value: "webspeech", label: "Wake word (Web Speech — browser)" },
         ]}
         onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, wakeMode: v } })}
       />
-      {config.voiceInput.wakeMode === "porcupine" && (
-        <>
-          <SelectField
-            label="Wake keyword"
-            value={config.voiceInput.porcupineKeyword}
-            options={[
-              { value: "jarvis", label: "Jarvis" },
-              { value: "computer", label: "Computer" },
-              { value: "bumblebee", label: "Bumblebee" },
-              { value: "porcupine", label: "Porcupine" },
-              { value: "picovoice", label: "Picovoice" },
-              { value: "alexa", label: "Alexa" },
-              { value: "terminator", label: "Terminator" },
-            ]}
-            onChange={(v) =>
-              setConfig({ voiceInput: { ...config.voiceInput, porcupineKeyword: v } })
-            }
-          />
-          <SecretField
-            label="Picovoice AccessKey"
-            hint="Free at console.picovoice.ai. Required for hands-free wake word."
-            present={secrets.PICOVOICE_ACCESS_KEY}
-            onSave={(v) => setSecret("PICOVOICE_ACCESS_KEY", v)}
-          />
-        </>
-      )}
       <SelectField
         label="Transcription (speech-to-text)"
         hint="Whisper-local and Vosk-local are free and offline (one-time model download)."

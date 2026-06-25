@@ -26,9 +26,6 @@ importers:
       '@nut-tree-fork/nut-js':
         specifier: ^4.2.6
         version: 4.2.6
-      '@picovoice/porcupine-web':
-        specifier: ^4.0.0
-        version: 4.0.0
       '@picovoice/web-voice-processor':
         specifier: ^4.0.10
         version: 4.0.10
@@ -1136,7 +1133,6 @@ packages:
   '@meridius-labs/apple-on-device-ai@1.6.2':
     resolution: {integrity: sha512-t8xhFp6prAcxtiinMJGUVW+2G7TL0B0DVRTiP28soE4Xl0NtbxX16fbUVuOZU+rd0Tgm8UmVtzdH4b8xha41Ng==}
     engines: {node: '>=18.0.0'}
-    cpu: [arm64]
     os: [darwin]
     peerDependencies:
       ai: ''
@@ -1188,17 +1184,8 @@ packages:
     resolution: {integrity: sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q==}
     engines: {node: '>=8.0.0'}
 
-  '@picovoice/porcupine-web@4.0.0':
-    resolution: {integrity: sha512-YqXBp6R9od6NTgcm80UyyB71c4eBArxD3BtX1SKQC4/xAvThM2VgwtPj4J7gvjl9yqqlcr+0Mg3T4lbKIOziTw==}
-    engines: {node: '>=18'}
-
   '@picovoice/web-utils@1.3.1':
     resolution: {integrity: sha512-jcDqdULtTm+yJrnHDjg64hARup+Z4wNkYuXHNx6EM8+qZkweBq9UA6XJrHAlUkPnlkso4JWjaIKhz3x8vZcd3g==}
-    hasBin: true
-
-  '@picovoice/web-utils@1.4.3':
-    resolution: {integrity: sha512-7JN3YYsSD9Gtce6YKG3XqpX49dkeu7jTdbox7rHQA/X/Q3zxopXA9zlCKSq6EIjFbiX2iuzDKUx1XrFa3d8c0w==}
-    engines: {node: '>=14'}
     hasBin: true
 
   '@picovoice/web-voice-processor@4.0.10':
@@ -2041,10 +2028,6 @@ packages:
 
   command-exists@1.2.9:
     resolution: {integrity: sha512-LTQ/SGc+s0Xc0Fu5WaKnR0YiygZkm9eKFvyS+fRsU7/ZWFF8ykFM6Pc9aCVf1+xasOOZpO3BAVgVrKvsqKHV7w==}
-
-  commander@10.0.1:
-    resolution: {integrity: sha512-y4Mg2tXshplEbSGzx7amzPwKKOCGuoSRP/CjEdwwk0FOGlUbq6lKuoyDZTNZkmxHdJtp54hdfY/JUrdL7Xfdug==}
-    engines: {node: '>=14'}
 
   commander@5.1.0:
     resolution: {integrity: sha512-P0CysNDQ7rtVw4QIQtm+MRxV66vKFSvlsQvGYXZWR3qFU0jlMKHZZZgw8e+8DSah4UDKMqnknRDQz+xuQXQ/Zg==}
@@ -4468,17 +4451,9 @@ snapshots:
 
   '@opentelemetry/api@1.9.1': {}
 
-  '@picovoice/porcupine-web@4.0.0':
-    dependencies:
-      '@picovoice/web-utils': 1.4.3
-
   '@picovoice/web-utils@1.3.1':
     dependencies:
       commander: 9.5.0
-
-  '@picovoice/web-utils@1.4.3':
-    dependencies:
-      commander: 10.0.1
 
   '@picovoice/web-voice-processor@4.0.10':
     dependencies:
@@ -5270,8 +5245,6 @@ snapshots:
       delayed-stream: 1.0.0
 
   command-exists@1.2.9: {}
-
-  commander@10.0.1: {}
 
   commander@5.1.0: {}
 

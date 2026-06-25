@@ -32,7 +32,6 @@
     "@huggingface/transformers": "^4.2.0",
     "@meridius-labs/apple-on-device-ai": "^1.6.2",
     "@nut-tree-fork/nut-js": "^4.2.6",
-    "@picovoice/porcupine-web": "^4.0.0",
     "@picovoice/web-voice-processor": "^4.0.10",
     "ai": "^6.0.193",
     "dotenv": "^17.4.2",

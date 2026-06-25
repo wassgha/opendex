@@ -54,7 +54,6 @@ function MainExperience({ data }: { data: PublicConfig }) {
     () => ({
       wakeWord: cfg.assistant.wakeWord,
       wakeMode: cfg.voiceInput.wakeMode,
-      porcupineKeyword: cfg.voiceInput.porcupineKeyword,
       sttProvider: cfg.voiceInput.sttProvider,
       whisperModel: cfg.voiceInput.whisperModel,
       greetingEnabled: greetingEnabled(cfg),
@@ -64,7 +63,6 @@ function MainExperience({ data }: { data: PublicConfig }) {
     [
       cfg.assistant.wakeWord,
       cfg.voiceInput.wakeMode,
-      cfg.voiceInput.porcupineKeyword,
       cfg.voiceInput.sttProvider,
       cfg.voiceInput.whisperModel,
       cfg.greeting.mode,

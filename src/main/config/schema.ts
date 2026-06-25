@@ -6,7 +6,7 @@ export type GreetingMode = "example" | "custom" | "none";
 /** How the assistant addresses the user. Drives honorifics ("sir"/"ma'am") and
  *  is "unspecified" by default so we never presume a gender. */
 export type UserGender = "male" | "female" | "unspecified";
-export type WakeMode = "webspeech" | "manual" | "porcupine" | "vosk";
+export type WakeMode = "webspeech" | "manual" | "vosk";
 export type SttProvider = "webspeech" | "openai" | "whisper-local" | "vosk-local";
 /** Which provider routes chat completions. `apple` is free + on-device (macOS);
  *  `openai`/`anthropic` are bring-your-own-key; `gateway` is the Vercel AI
@@ -20,7 +20,6 @@ export type SecretName =
   | "AI_GATEWAY_API_KEY"
   | "ELEVENLABS_API_KEY"
   | "TAVILY_API_KEY"
-  | "PICOVOICE_ACCESS_KEY"
   | "OPENAI_API_KEY"
   | "ANTHROPIC_API_KEY";
 
@@ -58,8 +57,6 @@ export interface OpenDexConfig {
   voiceInput: {
     /** How active listening is triggered. */
     wakeMode: WakeMode;
-    /** Built-in Porcupine keyword id (e.g. "jarvis", "computer", "bumblebee"). */
-    porcupineKeyword: string;
     /** Which engine transcribes the captured command. */
     sttProvider: SttProvider;
     /** transformers.js Whisper model id (local STT). */
@@ -94,7 +91,6 @@ export interface SecretsPresence {
   AI_GATEWAY_API_KEY: boolean;
   ELEVENLABS_API_KEY: boolean;
   TAVILY_API_KEY: boolean;
-  PICOVOICE_ACCESS_KEY: boolean;
   OPENAI_API_KEY: boolean;
   ANTHROPIC_API_KEY: boolean;
 }
@@ -123,7 +119,6 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
   voiceInput: {
     // Free, offline defaults: Vosk wake word + local Whisper transcription.
     wakeMode: "vosk",
-    porcupineKeyword: "dex",
     sttProvider: "whisper-local",
     whisperModel: "Xenova/whisper-base.en",
   },
@@ -143,7 +138,6 @@ export const SECRET_NAMES: SecretName[] = [
   "AI_GATEWAY_API_KEY",
   "ELEVENLABS_API_KEY",
   "TAVILY_API_KEY",
-  "PICOVOICE_ACCESS_KEY",
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
 ];

@@ -173,19 +173,10 @@ export function OnboardingWizard({
             options={[
               { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
               { value: "vosk", label: "Wake word (Vosk — free, offline)" },
-              { value: "porcupine", label: "Wake word (Porcupine)" },
               { value: "webspeech", label: "Wake word (Web Speech)" },
             ]}
             onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, wakeMode: v } })}
           />
-          {config.voiceInput.wakeMode === "porcupine" && (
-            <SecretField
-              label="Picovoice AccessKey"
-              hint="Free at console.picovoice.ai."
-              present={secrets.PICOVOICE_ACCESS_KEY}
-              onSave={(v) => setSecret("PICOVOICE_ACCESS_KEY", v)}
-            />
-          )}
           <SelectField
             label="Transcription"
             hint="Local options are free + offline (one-time model download)."
