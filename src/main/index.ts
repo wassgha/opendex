@@ -3,6 +3,7 @@ import { config as loadEnv } from "dotenv";
 import { app, BrowserWindow, globalShortcut, ipcMain, shell } from "electron";
 import { IPC, type ChatStartPayload } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
+import { resolveModel, checkAppleAvailability } from "./agent/llm/resolve-model";
 import { buildSystemPrompt } from "./agent/system-prompt";
 import { buildToolSet, isSkillEnabled } from "./agent/skills/registry";
 import { computerSkill } from "./agent/skills/computer";
@@ -140,10 +141,14 @@ function registerIpc() {
       requestPermission: makePermissionRequester(sender),
     });
     try {
+      // Resolve the configured provider to a model (may throw for an unset key,
+      // an unavailable Apple model, or the not-yet-built subscription). The
+      // catch below turns it into a spoken apology.
+      const model = await resolveModel(config);
       const responseMessages = await streamChat({
         messages,
         system,
-        model: config.llm.model,
+        model,
         tools,
         briefing,
         // Computer-use sessions need many screenshot→act→screenshot steps.
@@ -237,6 +242,9 @@ function registerIpc() {
   // The one secret the renderer may read — Porcupine's WASM SDK needs it
   // client-side. Billing keys (OpenAI, etc.) never leave main.
   ipcMain.handle(IPC.getPicovoiceKey, () => getPicovoiceKey());
+
+  // Probe whether the Apple on-device model can run (gates the provider picker).
+  ipcMain.handle(IPC.llmAppleAvailability, () => checkAppleAvailability());
 
   // Permission gate: the renderer answers a sensitive-tool prompt.
   ipcMain.on(

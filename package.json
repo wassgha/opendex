@@ -26,8 +26,11 @@
     "cut:major": "pnpm version major -m \"Release v%s\" && git push --follow-tags"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.86",
+    "@ai-sdk/openai": "^3.0.74",
     "@elevenlabs/elevenlabs-js": "^2.49.1",
     "@huggingface/transformers": "^4.2.0",
+    "@meridius-labs/apple-on-device-ai": "^1.6.2",
     "@nut-tree-fork/nut-js": "^4.2.6",
     "@picovoice/porcupine-web": "^4.0.0",
     "@picovoice/web-voice-processor": "^4.0.10",

@@ -145,6 +145,11 @@ const opendex = {
     return ipcRenderer.invoke(IPC.getPicovoiceKey);
   },
 
+  /** Probe whether the Apple on-device model can run (provider picker gate). */
+  appleAvailability(): Promise<{ available: boolean; reason?: string }> {
+    return ipcRenderer.invoke(IPC.llmAppleAvailability);
+  },
+
   /** Subscribe to the global push-to-talk hotkey. Returns an unsubscribe fn. */
   onPushToTalk(handler: () => void): () => void {
     const listener = () => handler();

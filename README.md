@@ -33,12 +33,12 @@ The app **auto-updates**: it checks GitHub Releases on launch (and hourly), down
 
 OpenDex is a desktop app that turns any LLM into a hands-free, **Iron-Man-style voice assistant**. Say the wake word (or push to talk), speak naturally, and the agent thinks, uses tools, and replies out loud — streaming its answer into a live visualization.
 
-It's a **harness**, not a single bot: the model, the voice, the wake/transcription engines, the on-screen theme, the greeting, and the agent's skills are all configurable, and it can run **fully offline and free** (local speech in, local speech recognition, system voice out) — you only need a model key.
+It's a **harness**, not a single bot: the model, the voice, the wake/transcription engines, the on-screen theme, the greeting, and the agent's skills are all configurable, and it can run **fully offline and free** (local speech in, local speech recognition, system voice out) — and on a Mac with Apple Intelligence, even the model runs on-device, so the whole loop is free with no key.
 
 ## Features
 
 - 🎙️ **Voice-first loop** — wake word → listen → think (with tools) → speak, plus natural follow-ups and opt-in barge-in (interrupt mid-reply).
-- 🧠 **Any model** — routes through the Vercel AI Gateway, so one key gets you Claude, GPT, Gemini, and more (`anthropic/claude-sonnet-4-6` by default).
+- 🧠 **Bring any model** — pick your provider in setup: **Apple Intelligence** (on-device, free, no key — macOS), your own **OpenAI** or **Anthropic** key, or the **Vercel AI Gateway** (one key → Claude, GPT, Gemini, and more). _(An OpenDex hosted subscription — sign in, no keys, cloud-synced — is coming soon.)_
 - 🆓 **Free & offline option** — Vosk wake word + local Whisper transcription (WASM, no signup) and your OS's built-in voice. No data leaves the machine except the LLM call.
 - 🔌 **Pluggable voice I/O** — wake via push-to-talk, Vosk, Porcupine, or Web Speech; transcribe via local Whisper/Vosk, OpenAI, or Web Speech; speak via ElevenLabs or system TTS.
 - 🎨 **Full-interface themes** — the theme *is* the whole UI: a cinematic **Jarvis HUD** with an animated arc reactor, a minimal **Talking Dot**, or a **Typing Cursor** terminal. All react to your voice.
@@ -69,13 +69,16 @@ pnpm install
 pnpm dev            # launches the OpenDex desktop window
 ```
 
-On first launch a short **onboarding wizard** walks you through the model key, voice, wake/transcription engine, theme, and greeting. Everything is changeable later from the **Settings** gear (⚙).
+On first launch a short **onboarding wizard** walks you through choosing a model provider, voice, wake/transcription engine, theme, and greeting. Everything is changeable later from the **Settings** gear (⚙).
 
-The only thing you must provide is an LLM key (an **AI Gateway key**, or any provider key it proxies). Everything else can be free/offline:
+Pick where the thinking happens — every part of the loop can be free/offline:
 
+- **Model:** **Apple Intelligence** (on-device, free, no key — macOS only), your own **OpenAI**/**Anthropic** key, or the **Vercel AI Gateway** (one key, any provider).
 - **Voice out:** "System voice" (free) or ElevenLabs (key).
 - **Voice in:** local **Whisper**/**Vosk** (free, offline, one-time model download) or OpenAI Whisper (key).
 - **Wake:** push-to-talk / Vosk (free) or Porcupine (free Picovoice key).
+
+On a Mac with Apple Intelligence enabled, the whole loop (model + speech + voice) runs locally with **no keys at all**.
 
 ### Optional `.env` (dev convenience)
 
@@ -87,11 +90,14 @@ cp .env.local.example .env
 
 | Variable | Purpose |
 | --- | --- |
-| `AI_GATEWAY_API_KEY` | required — lets the agent think/reply |
+| `AI_GATEWAY_API_KEY` | chat via the Vercel AI Gateway |
+| `OPENAI_API_KEY` | chat via OpenAI directly, **and/or** OpenAI Whisper transcription |
+| `ANTHROPIC_API_KEY` | chat via Anthropic (Claude) directly |
 | `ELEVENLABS_API_KEY` | ElevenLabs TTS (skip if using the system voice) |
-| `OPENAI_API_KEY` | OpenAI Whisper transcription (optional) |
 | `PICOVOICE_ACCESS_KEY` | Porcupine wake word (optional, free) |
 | `TAVILY_API_KEY` | web-search tool (optional) |
+
+> The chat provider needs **one** of `AI_GATEWAY_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — matching the provider you select. Apple Intelligence needs none.
 
 ## Skills & permissions
 
@@ -107,6 +113,8 @@ The agent's capabilities are **skills** — declarative tool bundles. Sensitive 
 - [x] Pluggable wake-word + speech-to-text (incl. free offline Whisper & Vosk)
 - [x] Skills + permission gate *(Open apps & URLs)*
 - [x] Computer-use — screen capture + mouse/keyboard control, gated & opt-in
+- [x] Pluggable model providers — Apple on-device, OpenAI/Anthropic keys, AI Gateway
+- [ ] OpenDex hosted subscription — sign in, no keys, cloud-synced settings & history
 - [ ] MCP servers + more built-in skills (shell, filesystem, …)
 - [ ] Signed GitHub releases + auto-update
 

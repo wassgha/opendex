@@ -8,12 +8,21 @@ export type GreetingMode = "example" | "custom" | "none";
 export type UserGender = "male" | "female" | "unspecified";
 export type WakeMode = "webspeech" | "manual" | "porcupine" | "vosk";
 export type SttProvider = "webspeech" | "openai" | "whisper-local" | "vosk-local";
+/** Which provider routes chat completions. `apple` is free + on-device (macOS);
+ *  `openai`/`anthropic` are bring-your-own-key; `gateway` is the Vercel AI
+ *  Gateway (one key, any provider); `opendex` is our hosted subscription
+ *  (reserved — not implemented yet). */
+export type LlmProvider = "apple" | "openai" | "anthropic" | "gateway" | "opendex";
+/** How a provider authenticates: `none` (local), `key` (user-pasted secret), or
+ *  `account` (a session we manage — reserved for the OpenDex subscription). */
+export type ProviderAuth = "none" | "key" | "account";
 export type SecretName =
   | "AI_GATEWAY_API_KEY"
   | "ELEVENLABS_API_KEY"
   | "TAVILY_API_KEY"
   | "PICOVOICE_ACCESS_KEY"
-  | "OPENAI_API_KEY";
+  | "OPENAI_API_KEY"
+  | "ANTHROPIC_API_KEY";
 
 export interface OpenDexConfig {
   version: 1;
@@ -29,7 +38,11 @@ export interface OpenDexConfig {
     persona: string;
   };
   llm: {
-    /** AI Gateway model id, e.g. "anthropic/claude-sonnet-4-6". */
+    /** Which provider routes chat completions. */
+    provider: LlmProvider;
+    /** Model id, interpreted per-provider: slash form for the gateway
+     *  ("anthropic/claude-sonnet-4-6"), bare id for direct providers
+     *  ("gpt-5"), ignored for apple (single on-device model). */
     model: string;
   };
   tts: {
@@ -83,6 +96,7 @@ export interface SecretsPresence {
   TAVILY_API_KEY: boolean;
   PICOVOICE_ACCESS_KEY: boolean;
   OPENAI_API_KEY: boolean;
+  ANTHROPIC_API_KEY: boolean;
 }
 
 /** What the renderer receives — config plus which secrets are set (never the values). */
@@ -96,7 +110,10 @@ export interface PublicConfig {
 export const DEFAULT_CONFIG: OpenDexConfig = {
   version: 1,
   assistant: { name: "Dex", wakeWord: "dex", userGender: "unspecified", persona: "" },
-  llm: { model: "anthropic/claude-sonnet-4-6" },
+  // Defaults to the gateway so configs written before the provider field
+  // (which only had `llm.model`) keep working after upgrade. First-run
+  // onboarding forces an explicit choice regardless.
+  llm: { provider: "gateway", model: "anthropic/claude-sonnet-4-6" },
   tts: {
     engine: "elevenlabs",
     elevenLabs: { voiceId: "JBFqnCBsd6RMkjVDRZzb", modelId: "eleven_turbo_v2_5" },
@@ -128,6 +145,7 @@ export const SECRET_NAMES: SecretName[] = [
   "TAVILY_API_KEY",
   "PICOVOICE_ACCESS_KEY",
   "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
 ];
 
 /** Deep-merge a partial patch into a config (one level of nesting is enough here). */

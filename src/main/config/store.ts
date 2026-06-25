@@ -135,6 +135,7 @@ function secretsPresence(): SecretsPresence {
     TAVILY_API_KEY: hasSecret("TAVILY_API_KEY"),
     PICOVOICE_ACCESS_KEY: hasSecret("PICOVOICE_ACCESS_KEY"),
     OPENAI_API_KEY: hasSecret("OPENAI_API_KEY"),
+    ANTHROPIC_API_KEY: hasSecret("ANTHROPIC_API_KEY"),
   };
 }
 

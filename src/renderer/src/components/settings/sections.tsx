@@ -28,6 +28,11 @@ import {
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
 import { SKILLS_META } from "@/lib/skills-meta";
+import {
+  ProviderPicker,
+  defaultModelFor,
+  useAppleAvailability,
+} from "@/components/llm/provider-picker";
 
 export interface SectionProps {
   data: PublicConfig;
@@ -274,18 +279,22 @@ function SkillsSection({ data, setConfig }: SectionProps) {
 
 function ModelSection({ data, setConfig, setSecret }: SectionProps) {
   const { config, secrets } = data;
+  const apple = useAppleAvailability();
   return (
     <>
-      <TextField
-        label="Model"
-        hint="AI Gateway model id, e.g. anthropic/claude-sonnet-4-6 or openai/gpt-5."
-        value={config.llm.model}
-        onChange={(v) => setConfig({ llm: { model: v } })}
-      />
-      <SecretField
-        label="AI Gateway API key"
-        present={secrets.AI_GATEWAY_API_KEY}
-        onSave={(v) => setSecret("AI_GATEWAY_API_KEY", v)}
+      <ProviderPicker
+        data={data}
+        selected={config.llm.provider}
+        onSelect={(id) =>
+          // Keep the current model only if switching back to the same provider;
+          // otherwise reset to that provider's default id.
+          setConfig({
+            llm: id === config.llm.provider ? { provider: id } : { provider: id, model: defaultModelFor(id) },
+          })
+        }
+        setConfig={setConfig}
+        setSecret={setSecret}
+        apple={apple}
       />
       <SecretField
         label="Tavily API key (web search)"

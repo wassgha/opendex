@@ -1,4 +1,4 @@
-import { stepCountIs, streamText, type ModelMessage, type ToolSet } from "ai";
+import { stepCountIs, streamText, type LanguageModel, type ModelMessage, type ToolSet } from "ai";
 
 // Conversation messages are full ModelMessages so tool calls + tool results are
 // carried across turns (otherwise the model forgets actions it already took and
@@ -9,8 +9,9 @@ export interface StreamChatOptions {
   messages: ChatMessage[];
   /** Resolved system prompt (persona, plus greeting when this is a briefing). */
   system: string;
-  /** AI Gateway model id. */
-  model: string;
+  /** Resolved model: an AI SDK `LanguageModel` (direct providers / apple) or a
+   *  bare model-id string (the gateway path). See agent/llm/resolve-model.ts. */
+  model: LanguageModel;
   /** Tool set for this turn (base tools + enabled, permission-gated skills). */
   tools?: ToolSet;
   /** Briefing turns are self-contained narration — tools are disabled. */

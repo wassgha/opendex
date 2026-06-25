@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type {
   DeepPartial,
+  LlmProvider,
   OpenDexConfig,
   PublicConfig,
   SecretName,
@@ -12,6 +13,12 @@ import {
   TextArea,
   TextField,
 } from "../ui/fields";
+import {
+  ProviderPicker,
+  defaultModelFor,
+  isProviderReady,
+  useAppleAvailability,
+} from "@/components/llm/provider-picker";
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
 import { Dot } from "lucide-react";
@@ -35,6 +42,10 @@ export function OnboardingWizard({
   onComplete: () => void;
 }) {
   const [stepIndex, setStepIndex] = useState(0);
+  // No default provider: start with none chosen so the user makes a deliberate
+  // pick before continuing past the model step.
+  const [chosenProvider, setChosenProvider] = useState<LlmProvider | null>(null);
+  const apple = useAppleAvailability();
   const { config, secrets } = data;
   const voices = useSystemVoices();
 
@@ -57,22 +68,19 @@ export function OnboardingWizard({
     {
       key: "llm",
       title: "Language model",
-      subtitle: "OpenDex routes through the Vercel AI Gateway, so you can use any provider with one key.",
+      subtitle: "Pick where the thinking happens — free on-device, your own API key, or the Vercel gateway.",
       render: () => (
-        <>
-          <TextField
-            label="Model"
-            hint="e.g. anthropic/claude-sonnet-4-6 or openai/gpt-5"
-            value={config.llm.model}
-            onChange={(v) => setConfig({ llm: { model: v } })}
-          />
-          <SecretField
-            label="AI Gateway API key"
-            hint="Required to think and reply."
-            present={secrets.AI_GATEWAY_API_KEY}
-            onSave={(v) => setSecret("AI_GATEWAY_API_KEY", v)}
-          />
-        </>
+        <ProviderPicker
+          data={data}
+          selected={chosenProvider}
+          onSelect={(id) => {
+            setChosenProvider(id);
+            setConfig({ llm: { provider: id, model: defaultModelFor(id) } });
+          }}
+          setConfig={setConfig}
+          setSecret={setSecret}
+          apple={apple}
+        />
       ),
     },
     {
@@ -239,10 +247,12 @@ export function OnboardingWizard({
 
   const step = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
+  // Block advancing past the model step until a provider is chosen and usable.
+  const blocked = step.key === "llm" && !isProviderReady(data, chosenProvider, apple);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a] p-6">
-      <div className="flex w-full h-full md:h-auto md:max-w-md flex-1 flex-col gap-5 md:rounded-2xl md:border md:border-white/10 md:bg-[#0e0e0e] md:p-7 md:shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a] p-0 md:p-6">
+      <div className="flex w-full h-full md:h-auto md:max-h-[85vh] md:max-w-md flex-1 flex-col gap-5 overflow-hidden px-6 pt-6 md:rounded-2xl md:border md:border-white/10 md:bg-[#0e0e0e] md:p-7 md:shadow-2xl">
         <div className="flex gap-1.5 mt-8 md:mt-0">
           {steps.map((s, i) => (
             <div
@@ -258,24 +268,34 @@ export function OnboardingWizard({
           <p className="mt-1 text-sm text-white/50">{step.subtitle}</p>
         </div>
 
-        <div className="flex flex-1 flex-col gap-4">{step.render()}</div>
+        {/* Scrollable body with an overlaid, blurred bottom bar: content scrolls
+            *under* the bar, which stays pinned to the bottom of the card. */}
+        <div className="relative -mx-6 min-h-0 flex-1 md:-mx-7">
+          <div className="h-full overflow-y-auto px-6 pb-20 md:px-7">
+            <div className="flex flex-col gap-4">{step.render()}</div>
+          </div>
 
-        <div className="mt-2 flex items-center justify-between">
-          <button
-            type="button"
-            disabled={stepIndex === 0}
-            onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-            className="rounded-full px-4 py-2 text-sm text-white/50 transition enabled:hover:text-white disabled:opacity-0"
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={() => (isLast ? onComplete() : setStepIndex((i) => i + 1))}
-            className="rounded-full bg-white px-6 py-2 text-sm font-medium text-black transition hover:bg-white/90"
-          >
-            {isLast ? "Start using OpenDex" : "Continue"}
-          </button>
+          {/* Fade so scrolling content dissolves into the bar instead of clipping. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-[64px] h-10 bg-gradient-to-t from-[#0a0a0a] to-transparent md:from-[#0e0e0e]" />
+
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-white/10 bg-[#0a0a0a]/80 px-6 py-4 backdrop-blur-md md:bg-[#0e0e0e]/80 md:px-7">
+            <button
+              type="button"
+              disabled={stepIndex === 0}
+              onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+              className="rounded-full px-4 py-2 text-sm text-white/50 transition enabled:hover:text-white disabled:opacity-0"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={blocked}
+              onClick={() => (isLast ? onComplete() : setStepIndex((i) => i + 1))}
+              className="rounded-full bg-white px-6 py-2 text-sm font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isLast ? "Start using OpenDex" : "Continue"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -26,6 +26,8 @@ export const IPC = {
   // STT
   transcribe: "stt:transcribe",
   getPicovoiceKey: "stt:picovoice-key",
+  // LLM: probe Apple on-device model availability (for the provider picker)
+  llmAppleAvailability: "llm:apple-availability",
   // main → renderer event: global push-to-talk hotkey pressed
   pushToTalk: "push-to-talk",
   // main → renderer event: global emergency-stop hotkey pressed
