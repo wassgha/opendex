@@ -15,6 +15,7 @@ import {
   IPC,
   type ChatStartPayload,
   type SessionState,
+  type ViewCommand,
   type WindowMode,
 } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
@@ -57,19 +58,23 @@ const isDev = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let permissionWindow: BrowserWindow | null = null;
+// The notch bar is its OWN transparent window (not the reshaped main window) so
+// CSS controls its shape — a flat top edge flush to the screen, rounded bottom,
+// "part of the notch" — which an opaque, OS-corner-rounded window can't do.
+let notchWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
-// Window layout state. `savedFullBounds` remembers the full-mode geometry so we
-// can restore it when leaving notch mode.
+// Current layout. In `notch`, the main window is hidden and the notch window
+// shown; in `full`, vice-versa. The voice session always lives in the (possibly
+// hidden) main window — the notch is a view that relays actions back to it.
 let windowMode: WindowMode = "full";
-let savedFullBounds: Electron.Rectangle | null = null;
 
-// Last session snapshot, replayed to view surfaces (overlay) as they load so a
-// freshly-created window paints immediately instead of waiting for the next change.
+// Last session snapshot, replayed to view surfaces (overlay/notch) as they load
+// so a freshly-created window paints immediately instead of waiting for a change.
 let latestSessionState: SessionState | null = null;
 
-const NOTCH_SIZE = { width: 520, height: 40 };
+const NOTCH_SIZE = { width: 540, height: 44 };
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -252,76 +257,48 @@ function showPermissionWindow() {
   win.focus();
 }
 
-// ── Notch / full window transform ────────────────────────────────────────────
-// Notch mode reshapes the main window into a slim, top-pinned, always-on-top
-// bar; full mode restores the prior geometry + normal stacking. The renderer
-// swaps its layout in response to the `windowMode` event (App.tsx). Notch is
-// engaged automatically when OpenDex loses focus / the agent drives another app
-// (see attachAutoModeListeners); leaving it is explicit (expand button), so
-// focusing the bar to type doesn't blow it back up. Not a user setting.
-function applyWindowMode(mode: WindowMode) {
-  const win = mainWindow;
-  if (!win || win.isDestroyed()) return;
-  if (mode === windowMode) return;
-
-  if (mode === "notch") {
-    // Only capture full bounds from a real full-size window (not mid-resize).
-    if (win.isNormal()) savedFullBounds = win.getBounds();
-    win.setResizable(false);
-    // The full-mode minimum size (420 tall) would otherwise clamp the slim bar
-    // straight back up — drop the floor before resizing, restore it for full.
-    win.setMinimumSize(NOTCH_SIZE.width, NOTCH_SIZE.height);
-    applyNotchPlacement(win);
-    win.setAlwaysOnTop(true, "screen-saver");
-    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    // No drop shadow in notch mode — it reads as a flush top bar, not a floating
-    // pill. Hide the macOS traffic lights too (they'd overlap the slim content).
-    win.setHasShadow(false);
-    if (process.platform === "darwin") win.setWindowButtonVisibility(false);
-  } else {
-    win.setAlwaysOnTop(false);
-    win.setVisibleOnAllWorkspaces(false);
-    win.setMinimumSize(360, 420);
-    win.setResizable(true);
-    win.setHasShadow(true);
-    if (process.platform === "darwin") win.setWindowButtonVisibility(true);
-    if (savedFullBounds) win.setBounds(savedFullBounds);
-  }
-
-  windowMode = mode;
-  win.webContents.send(IPC.windowMode, mode);
-}
-
-// Auto-engage notch when OpenDex loses focus — i.e. the user clicked away or the
-// agent is driving another app during computer-use (which steals focus). Only
-// after onboarding, so the wizard always runs full. Returning to full is
-// explicit, so focusing the bar to type into it doesn't expand it.
-function attachAutoModeListeners(win: BrowserWindow) {
-  win.on("blur", () => {
-    if (getConfig().onboarding.completed) applyWindowMode("notch");
+// ── Notch window ──────────────────────────────────────────────────────────────
+// A transparent, frameless, always-on-top bar pinned to the very top-center of
+// the screen. Transparency lets CSS draw a flat top edge flush to the screen
+// (rounded bottom only) — the "part of the notch" look an opaque, OS-rounded
+// window can't achieve. It's a view: it reads the session snapshot and relays
+// actions (type / mute / expand) to the main window via `view:command`.
+function createNotchWindow() {
+  const win = new BrowserWindow({
+    ...NOTCH_SIZE,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    roundedCorners: false, // we draw our own (square top, rounded bottom)
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      backgroundThrottling: false,
+    },
   });
+  notchWindow = win;
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.setAlwaysOnTop(true, "screen-saver");
+  win.on("closed", () => {
+    if (notchWindow === win) notchWindow = null;
+  });
+  win.webContents.on("did-finish-load", () => {
+    if (latestSessionState) win.webContents.send(IPC.sessionChanged, latestSessionState);
+  });
+  loadRenderer(win, "notch");
+  return win;
 }
 
-// Bring the main window forward (Spotlight-style). Toggles when already focused.
-function summonWindow({ toggle = true }: { toggle?: boolean } = {}) {
-  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
-  const win = mainWindow;
-  if (!win) return;
-  if (toggle && win.isVisible() && win.isFocused()) {
-    win.hide();
-    return;
-  }
-  if (process.platform === "darwin") app.dock?.show();
-  if (windowMode === "notch") applyNotchPlacement(win);
-  win.show();
-  win.focus();
-  win.webContents.send(IPC.windowSummoned);
-}
-
-// Pin the bar flush to the very top-center of the display under the cursor —
-// using full display bounds (not workArea), so it sits at the physical top edge
-// and floats over the menu bar via the screen-saver always-on-top level.
-function applyNotchPlacement(win: BrowserWindow) {
+// Pin the notch flush to the very top-center of the display under the cursor,
+// using full display bounds (not workArea) so it sits at the physical top edge.
+function placeNotch(win: BrowserWindow) {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const { x, y, width } = display.bounds;
   win.setBounds({
@@ -330,6 +307,77 @@ function applyNotchPlacement(win: BrowserWindow) {
     width: NOTCH_SIZE.width,
     height: NOTCH_SIZE.height,
   });
+}
+
+// ── Layout: full (main window) ↔ notch (notch window) ─────────────────────────
+// Switching mode hides one window and shows the other; the session keeps running
+// in the main window regardless of its visibility. Notch is engaged automatically
+// when OpenDex loses focus / the agent drives another app (attachAutoModeListeners);
+// returning to full is explicit (the notch's expand button), so focusing the bar
+// to type into it doesn't expand it. Not a user setting.
+function applyWindowMode(mode: WindowMode) {
+  if (mode === windowMode) return;
+  windowMode = mode;
+
+  if (mode === "notch") {
+    const notch =
+      notchWindow && !notchWindow.isDestroyed() ? notchWindow : createNotchWindow();
+    placeNotch(notch);
+    notch.showInactive(); // don't steal focus (esp. mid computer-use)
+    mainWindow?.hide();
+  } else {
+    notchWindow?.hide();
+    if (process.platform === "darwin") app.dock?.show();
+    mainWindow?.show();
+    mainWindow?.focus();
+  }
+  mainWindow?.webContents.send(IPC.windowMode, mode);
+}
+
+// Auto-engage notch when the full window loses focus — clicked away, or the agent
+// is driving another app during computer-use (which steals focus). Only after
+// onboarding so the wizard always runs full.
+function attachAutoModeListeners(win: BrowserWindow) {
+  win.on("blur", () => {
+    // Don't collapse to notch when the blur is the permission popup taking focus
+    // — answering a prompt shouldn't change the main window's layout.
+    if (
+      getConfig().onboarding.completed &&
+      win.isVisible() &&
+      pendingPermissions() === 0
+    ) {
+      applyWindowMode("notch");
+    }
+  });
+}
+
+// Spotlight-style summon: toggle whichever surface the current mode uses. In
+// notch mode this shows + focuses the bar so you can type immediately.
+function summonWindow({ toggle = true }: { toggle?: boolean } = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (windowMode === "notch") {
+    const notch =
+      notchWindow && !notchWindow.isDestroyed() ? notchWindow : createNotchWindow();
+    if (toggle && notch.isVisible() && notch.isFocused()) {
+      notch.hide();
+      return;
+    }
+    placeNotch(notch);
+    notch.show();
+    notch.focus();
+    notch.webContents.send(IPC.windowSummoned);
+    return;
+  }
+  const win = mainWindow;
+  if (!win) return;
+  if (toggle && win.isVisible() && win.isFocused()) {
+    win.hide();
+    return;
+  }
+  if (process.platform === "darwin") app.dock?.show();
+  win.show();
+  win.focus();
+  win.webContents.send(IPC.windowSummoned);
 }
 
 let settingsWindow: BrowserWindow | null = null;
@@ -396,6 +444,10 @@ function broadcastSessionState(state: SessionState) {
     } else if (!busy && overlay.isVisible()) {
       overlay.hide();
     }
+  }
+  // The notch bar reflects status/caption live whenever it's on screen.
+  if (notchWindow && !notchWindow.isDestroyed()) {
+    notchWindow.webContents.send(IPC.sessionChanged, state);
   }
 }
 
@@ -538,6 +590,16 @@ function registerIpc() {
     applyWindowMode(mode);
   });
 
+  // The notch (a view-only window) relays session actions: `expand` switches
+  // back to the full window; the rest run against `useDex` in the main window.
+  ipcMain.on(IPC.viewCommand, (_event, cmd: ViewCommand) => {
+    if (cmd.type === "expand") {
+      applyWindowMode("full");
+    } else {
+      mainWindow?.webContents.send(IPC.remoteCommand, cmd);
+    }
+  });
+
   // Overlay HUD: toggle click-through, and relay its Stop button to the main
   // window's interrupt path (the same channel the global hotkey uses).
   ipcMain.on(IPC.overlaySetInteractive, (_event, interactive: boolean) => {
@@ -640,6 +702,7 @@ app.whenReady().then(() => {
   registerIpc();
   createWindow();
   createOverlayWindow();
+  createNotchWindow();
   createPermissionWindow();
   createTray();
 

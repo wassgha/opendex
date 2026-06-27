@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { UpdateBanner } from "@/components/update-banner";
-import { CompactBar } from "@/components/compact-bar";
 import { getDexTheme } from "@/components/themes/registry";
 import { useConfig } from "@/lib/use-config";
 import { useDex, type UseDexOptions } from "@/lib/dex/use-dex";
-import type { PublicConfig, WindowMode } from "../../main/config/schema";
+import type { PublicConfig } from "../../main/config/schema";
 import type { OpenDexConfig } from "../../main/config/schema";
 
 export function App() {
@@ -74,11 +73,6 @@ function MainExperience({ data }: { data: PublicConfig }) {
   const dex = useDex(dexOptions);
   const ThemeComponent = getDexTheme(cfg.appearance.theme).Component;
 
-  // Window layout (full ↔ notch). Driven entirely by the main process (focus →
-  // full, blur / computer-use → notch); we just mirror its events. Starts full.
-  const [mode, setMode] = useState<WindowMode>("full");
-  useEffect(() => window.opendex.onWindowMode(setMode), []);
-
   // Summon hotkey → re-broadcast as a window-level signal the active text input
   // picks up (TextComposer focuses itself). Decoupled so it works in any theme.
   useEffect(
@@ -89,44 +83,44 @@ function MainExperience({ data }: { data: PublicConfig }) {
     [],
   );
 
+  // Session actions relayed from the notch window (which can't reach `useDex`).
+  const { submitText, toggleMute } = dex;
+  useEffect(
+    () =>
+      window.opendex.onRemoteCommand((cmd) => {
+        if (cmd.type === "submitText") submitText(cmd.text);
+        else if (cmd.type === "toggleMute") toggleMute();
+      }),
+    [submitText, toggleMute],
+  );
+
   return (
     <div className="relative flex flex-1 flex-col">
-      {mode === "notch" ? (
-        <CompactBar
-          dex={dex}
-          name={cfg.assistant.name}
-          onExpand={() => window.opendex.setWindowMode("full")}
-          onOpenSettings={() => window.opendex.openSettings()}
-        />
-      ) : (
-        <>
-          {/* Frameless title bar: a draggable strip across the top, inset from
-              the corner controls (brand mark, settings gear). */}
-          {window.opendex.platform === "darwin" && (
-            <div className="titlebar-drag fixed inset-x-[72px] top-0 z-30 h-9" />
-          )}
-
-          <ThemeComponent
-            name={cfg.assistant.name}
-            wakeWord={cfg.assistant.wakeWord}
-            status={dex.status}
-            transcript={dex.transcript}
-            liveCaption={dex.liveCaption}
-            spokenCaption={dex.spokenCaption}
-            getAmplitude={dex.getAmplitude}
-            isMuted={dex.isMuted}
-            briefingActive={dex.briefingActive}
-            unsupported={dex.status === "unsupported"}
-            canPushToTalk={dex.canPushToTalk}
-            onPushToTalk={dex.pushToTalk}
-            onSubmitText={dex.submitText}
-            toggleMute={dex.toggleMute}
-            onOpenSettings={() => window.opendex.openSettings()}
-          />
-        </>
+      {/* Frameless title bar: a draggable strip across the top, inset from the
+          corner controls (brand mark, settings gear). */}
+      {window.opendex.platform === "darwin" && (
+        <div className="titlebar-drag fixed inset-x-[72px] top-0 z-30 h-9" />
       )}
 
-      {/* Global chrome shown in both layouts. Tool-activity hints + the Stop
+      <ThemeComponent
+        name={cfg.assistant.name}
+        wakeWord={cfg.assistant.wakeWord}
+        status={dex.status}
+        transcript={dex.transcript}
+        liveCaption={dex.liveCaption}
+        spokenCaption={dex.spokenCaption}
+        getAmplitude={dex.getAmplitude}
+        isMuted={dex.isMuted}
+        briefingActive={dex.briefingActive}
+        unsupported={dex.status === "unsupported"}
+        canPushToTalk={dex.canPushToTalk}
+        onPushToTalk={dex.pushToTalk}
+        onSubmitText={dex.submitText}
+        toggleMute={dex.toggleMute}
+        onOpenSettings={() => window.opendex.openSettings()}
+      />
+
+      {/* Global chrome. Tool-activity hints + the Stop
           control now live in the always-on-top overlay HUD window (a separate
           renderer), so they stay visible even when this window is hidden or
           behind another app — they're intentionally not rendered here. */}

@@ -41,6 +41,11 @@ export const IPC = {
   // renderer → main: request a window mode; main → renderer: mode applied
   windowSetMode: "window:set-mode",
   windowMode: "window:mode",
+  // A view-only surface (the notch window) asks main to run a session action;
+  // main relays it to the main window which owns the voice session.
+  viewCommand: "view:command",
+  // main → main window: a relayed command to execute against `useDex`.
+  remoteCommand: "remote:command",
   // main → renderer event: the summon hotkey brought the window forward
   windowSummoned: "window:summoned",
   // Overlay HUD: renderer → main, toggle click-through so the Stop button is
@@ -103,11 +108,24 @@ export interface SessionState {
   status: string;
   muted: boolean;
   activity: SessionActivity[];
+  /** The user's in-progress transcription (while listening). */
   liveCaption: string;
+  /** Assistant text spoken so far this turn (TTS-synced; lags the stream). */
   spokenCaption: string;
+  /** The assistant's full streamed reply for the current turn (what the main
+   *  window shows live) — so view surfaces stay in sync with it, not the
+   *  speech-lagged caption. */
+  reply: string;
 }
 
 export type { WindowMode };
+
+/** A session action requested by a view-only surface (notch) and relayed to the
+ *  main window (which owns `useDex`). */
+export type ViewCommand =
+  | { type: "submitText"; text: string }
+  | { type: "toggleMute" }
+  | { type: "expand" };
 
 export interface PermissionRequestPayload {
   id: string;

@@ -1369,6 +1369,16 @@ export function useDex(options: UseDexOptions): UseDexResult {
   // voice loop runs solely in this window). Cheap; fires only on real changes.
   const showToolActivity = options.showToolActivity ?? true;
   useEffect(() => {
+    // The current turn's streamed reply (the last assistant turn) — what the
+    // main window renders live, so the notch shows the same text, not the
+    // speech-lagged spokenCaption.
+    let reply = "";
+    for (let i = transcript.length - 1; i >= 0; i--) {
+      if (transcript[i].role === "assistant") {
+        reply = transcript[i].content;
+        break;
+      }
+    }
     window.opendex.publishSessionState({
       status,
       muted: isMuted,
@@ -1379,8 +1389,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
         : [],
       liveCaption,
       spokenCaption,
+      reply,
     });
-  }, [status, isMuted, toolActivity, liveCaption, spokenCaption, showToolActivity]);
+  }, [status, isMuted, toolActivity, liveCaption, spokenCaption, transcript, showToolActivity]);
 
   const canPushToTalk =
     options.wakeMode === "manual" &&

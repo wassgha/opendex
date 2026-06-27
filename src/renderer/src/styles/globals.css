@@ -207,7 +207,8 @@ body {
    fully transparent (no background/gradient) so only the banners + Stop pill
    paint over the desktop. */
 [data-window="overlay"] body,
-[data-window="permission"] body {
+[data-window="permission"] body,
+[data-window="notch"] body {
   background: transparent;
 }
 

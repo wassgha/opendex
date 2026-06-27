@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { NotchApp } from "./NotchApp";
 import { OverlayApp } from "./OverlayApp";
 import { PermissionApp } from "./PermissionApp";
 import { SettingsApp } from "./components/settings/settings-view";
@@ -8,31 +9,24 @@ import "./styles/globals.css";
 
 // All windows load this same bundle; the URL hash selects which experience
 // mounts: `#settings` → settings, `#overlay` → the always-on-top action HUD,
-// `#permission` → the sensitive-tool prompt popup, otherwise the main voice
-// experience.
+// `#permission` → the sensitive-tool prompt popup, `#notch` → the compact top
+// bar, otherwise the main voice experience.
 const route = window.location.hash.replace(/^#\/?/, "");
-const isSettings = route === "settings";
-const isOverlay = route === "overlay";
-const isPermission = route === "permission";
+const ROUTES = {
+  settings: SettingsApp,
+  overlay: OverlayApp,
+  permission: PermissionApp,
+  notch: NotchApp,
+} as const;
+const isRoute = (r: string): r is keyof typeof ROUTES => r in ROUTES;
 
 // Expose host platform + which window this is so CSS can adapt the chrome (the
-// frameless main window's traffic lights; the transparent overlay/popup bodies).
+// frameless main window's traffic lights; the transparent overlay/popup/notch
+// bodies).
 document.documentElement.dataset.platform = window.opendex.platform;
-document.documentElement.dataset.window = isSettings
-  ? "settings"
-  : isOverlay
-    ? "overlay"
-    : isPermission
-      ? "permission"
-      : "main";
+document.documentElement.dataset.window = isRoute(route) ? route : "main";
 
-const Root = isSettings
-  ? SettingsApp
-  : isOverlay
-    ? OverlayApp
-    : isPermission
-      ? PermissionApp
-      : App;
+const Root = isRoute(route) ? ROUTES[route] : App;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

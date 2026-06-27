@@ -7,6 +7,7 @@ import {
   type SessionState,
   type ToolCallEvent,
   type UpdateStatusPayload,
+  type ViewCommand,
   type WindowMode,
 } from "../main/ipc/channels";
 import type { PermissionDecision } from "../main/agent/permissions";
@@ -187,6 +188,18 @@ const opendex = {
     const listener = (_e: IpcRendererEvent, mode: WindowMode) => handler(mode);
     ipcRenderer.on(IPC.windowMode, listener);
     return () => ipcRenderer.removeListener(IPC.windowMode, listener);
+  },
+
+  /** View-only surface (notch) → run a session action on the main window. */
+  sendViewCommand(cmd: ViewCommand): void {
+    ipcRenderer.send(IPC.viewCommand, cmd);
+  },
+
+  /** Main window: receive a relayed session action (submitText / toggleMute). */
+  onRemoteCommand(handler: (cmd: ViewCommand) => void): () => void {
+    const listener = (_e: IpcRendererEvent, cmd: ViewCommand) => handler(cmd);
+    ipcRenderer.on(IPC.remoteCommand, listener);
+    return () => ipcRenderer.removeListener(IPC.remoteCommand, listener);
   },
 
   /** Subscribe to the summon hotkey bringing the window forward (focus input). */
