@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="build/icon.png" alt="OpenDex" width="128" height="128">
+<a href="https://getopendex.com/"><img src="build/icon.png" alt="OpenDex" width="128" height="128"></a>
 
 # OpenDex
 
@@ -14,7 +14,7 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 [![Stars](https://img.shields.io/github/stars/wassgha/notjarvis?style=flat-square&color=111)](https://github.com/wassgha/notjarvis/stargazers)
 [![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square&color=111)](https://github.com/wassgha/opendex/releases/latest)
 
-<img alt="OpenDex — Control your computer with voice" src="screenshots/open-music.png" style="max-width: 90%;" />
+<a href="https://getopendex.com/"><img alt="OpenDex — Control your computer with voice" src="screenshots/open-music.png" style="max-width: 90%;" /></a>
 
 </div>
 
@@ -50,13 +50,13 @@ It's a **harness**, not a single bot: the model, the voice, the wake/transcripti
 
 OpenDex is fully theamable, you can change anything about the user interface and make it yours.
 
-![OpenDex — Jarvis HUD theme](screenshots/jarvis.png)
+[![OpenDex — Jarvis HUD theme](screenshots/jarvis.png)](https://getopendex.com/)
 
 ## Screenshots
 
 | First-run setup | Minimal "typing cursor" theme |
 | --- | --- |
-| ![Onboarding theme picker](screenshots/hud-selection.png) | ![Typing cursor theme](screenshots/typing-cursor.png) |
+| [![Onboarding theme picker](screenshots/hud-selection.png)](https://getopendex.com/) | [![Typing cursor theme](screenshots/typing-cursor.png)](https://getopendex.com/) |
 
 ## Build from source
 
