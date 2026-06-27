@@ -183,6 +183,11 @@ const opendex = {
     ipcRenderer.send(IPC.windowSetMode, mode);
   },
 
+  /** Notch only: grow/shrink the notch window when it's hovered. */
+  setNotchExpanded(expanded: boolean): void {
+    ipcRenderer.send(IPC.notchSetExpanded, expanded);
+  },
+
   /** Subscribe to window-mode changes applied by main. Returns an unsubscribe fn. */
   onWindowMode(handler: (mode: WindowMode) => void): () => void {
     const listener = (_e: IpcRendererEvent, mode: WindowMode) => handler(mode);

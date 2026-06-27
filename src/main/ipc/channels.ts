@@ -48,6 +48,9 @@ export const IPC = {
   remoteCommand: "remote:command",
   // main → renderer event: the summon hotkey brought the window forward
   windowSummoned: "window:summoned",
+  // notch renderer → main: grow/shrink the notch window on hover (so the
+  // hover-revealed controls + type field have room to appear).
+  notchSetExpanded: "notch:set-expanded",
   // Overlay HUD: renderer → main, toggle click-through so the Stop button is
   // clickable while the rest of the overlay stays pass-through.
   overlaySetInteractive: "overlay:set-interactive",

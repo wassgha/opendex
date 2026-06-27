@@ -9,8 +9,18 @@ import type { SessionState } from "../../main/ipc/channels";
 // type, mute, expand — back to the main window's session via `view:command`.
 export function NotchApp() {
   const [state, setState] = useState<SessionState | null>(null);
+  const [agentName, setAgentName] = useState("");
 
   useEffect(() => window.opendex.onSessionState(setState), []);
+
+  // The notch owns no config; read the assistant name (for the type-field
+  // prompt) once and keep it live as settings change.
+  useEffect(() => {
+    window.opendex.getConfig().then((c) => setAgentName(c.config.assistant.name));
+    return window.opendex.onConfigChanged((c) =>
+      setAgentName(c.config.assistant.name),
+    );
+  }, []);
 
   // The summon hotkey focuses this window; surface + focus the type field too.
   useEffect(
@@ -35,6 +45,7 @@ export function NotchApp() {
     <CompactBar
       status={status}
       caption={caption}
+      agentName={agentName}
       isMuted={state?.muted ?? false}
       onSubmitText={(text) => window.opendex.sendViewCommand({ type: "submitText", text })}
       onToggleMute={() => window.opendex.sendViewCommand({ type: "toggleMute" })}

@@ -19,7 +19,7 @@ export function StopControl({ onStop }: { onStop: () => void }) {
         type="button"
         onClick={onStop}
         title="Stop the assistant"
-        className="titlebar-no-drag pointer-events-auto flex items-center gap-2 rounded-full border border-destructive/40 bg-destructive/15 px-4 py-1.5 text-sm font-medium text-destructive-foreground shadow-lg backdrop-blur transition hover:bg-destructive/25"
+        className="titlebar-no-drag pointer-events-auto flex items-center gap-2 rounded-full border border-destructive/40 bg-destructive/30 px-4 py-1.5 text-sm font-medium text-destructive-foreground shadow-lg backdrop-blur transition hover:bg-destructive/25"
       >
         <span className="h-2.5 w-2.5 rounded-[2px] bg-destructive" aria-hidden />
         Stop

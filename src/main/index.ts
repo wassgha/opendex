@@ -74,7 +74,11 @@ let windowMode: WindowMode = "full";
 // so a freshly-created window paints immediately instead of waiting for a change.
 let latestSessionState: SessionState | null = null;
 
-const NOTCH_SIZE = { width: 680, height: 44 };
+const NOTCH_SIZE = { width: 480, height: 44 };
+// Height when the notch is hovered — enough for the revealed controls plus the
+// type field that slides up from the bottom. The window grows downward (y stays
+// pinned at the top edge), so the cursor stays over the bar and hover holds.
+const NOTCH_EXPANDED_HEIGHT = 96;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -311,6 +315,20 @@ function placeNotch(win: BrowserWindow) {
     width: NOTCH_SIZE.width,
     height: NOTCH_SIZE.height,
   });
+}
+
+// Grow/shrink the notch on hover, pinned to the top edge so the cursor stays
+// over the bar (otherwise the window would slide out from under the pointer and
+// hover would flicker). Only meaningful while the notch is the active surface.
+function setNotchExpanded(expanded: boolean) {
+  if (windowMode !== "notch") return;
+  if (!notchWindow || notchWindow.isDestroyed()) return;
+  const b = notchWindow.getBounds();
+  const height = expanded ? NOTCH_EXPANDED_HEIGHT : NOTCH_SIZE.height;
+  if (b.height === height) return;
+  // animate: true → Cocoa tweens the resize on macOS (ignored elsewhere) so the
+  // type field eases into view instead of snapping.
+  notchWindow.setBounds({ x: b.x, y: b.y, width: b.width, height }, true);
 }
 
 // ── Layout: full (main window) ↔ notch (notch window) ─────────────────────────
@@ -592,6 +610,11 @@ function registerIpc() {
   // Window mode (full ↔ notch), requested from the renderer.
   ipcMain.on(IPC.windowSetMode, (_event, mode: WindowMode) => {
     applyWindowMode(mode);
+  });
+
+  // Notch hover → grow/shrink the notch window.
+  ipcMain.on(IPC.notchSetExpanded, (_event, expanded: boolean) => {
+    setNotchExpanded(!!expanded);
   });
 
   // The notch (a view-only window) relays session actions: `expand` switches
