@@ -140,11 +140,13 @@ function createWindow() {
 // Both windows share one renderer bundle; `hash` selects which experience mounts
 // (the settings window passes "settings"; see src/renderer/src/main.tsx).
 function loadRenderer(win: BrowserWindow, hash?: string) {
+  const onLoadError = (err: unknown) =>
+    console.error("[opendex] failed to load renderer", { hash }, err);
   if (isDev && process.env.ELECTRON_RENDERER_URL) {
     const base = process.env.ELECTRON_RENDERER_URL;
-    void win.loadURL(hash ? `${base}#${hash}` : base);
+    win.loadURL(hash ? `${base}#${hash}` : base).catch(onLoadError);
   } else {
-    void win.loadFile(join(__dirname, "../renderer/index.html"), { hash });
+    win.loadFile(join(__dirname, "../renderer/index.html"), { hash }).catch(onLoadError);
   }
 }
 

@@ -1,6 +1,7 @@
-// FIFO TTS playback queue. Each enqueued sentence is fetched from /api/tts in
-// parallel, then audio elements are played strictly in order so the speech is
-// gapless even if later requests resolve before earlier ones.
+// FIFO TTS playback queue. Each enqueued sentence is synthesized in the main
+// process (via window.opendex.synthesize) in parallel, then audio elements are
+// played strictly in order so the speech is gapless even if later requests
+// resolve before earlier ones.
 //
 // If the browser blocks playback (autoplay policy — no user gesture yet), the
 // player parks the queue and notifies the orchestrator via `onAudioBlocked`.

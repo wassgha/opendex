@@ -915,12 +915,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
           chars: cleaned.length,
         });
         if (cleaned.length === 0) {
-          // Nothing heard. Follow-up rolls back to wake; command does the same.
-          if (fromTimeout && mode === "follow_up") {
-            startModeRef.current?.("wake");
-          } else {
-            startModeRef.current?.("wake");
-          }
+          // Nothing heard — both command and follow-up roll back to passive wake.
+          startModeRef.current?.("wake");
         } else {
           void runCommand(cleaned);
         }

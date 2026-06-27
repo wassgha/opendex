@@ -82,7 +82,12 @@ export function makePermissionRequester(sender: WebContents): PermissionRequeste
 
       pending.set(id, settle);
       sender.once("destroyed", onDestroyed);
-      timer = setTimeout(() => settle("deny"), PERMISSION_TIMEOUT_MS);
+      timer = setTimeout(() => {
+        console.warn(
+          `[opendex] permission prompt for "${skillId}" auto-denied after ${PERMISSION_TIMEOUT_MS}ms with no answer`,
+        );
+        settle("deny");
+      }, PERMISSION_TIMEOUT_MS);
       // Surface the prompt in the dedicated always-on-top popup so it can't be
       // missed (the main window may be hidden, in notch, or behind the app the
       // agent is driving) — without disturbing the main window's layout.
