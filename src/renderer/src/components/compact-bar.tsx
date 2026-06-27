@@ -26,16 +26,24 @@ export function CompactBar({
   onOpenSettings: () => void;
 }) {
   return (
-    <div className="titlebar-drag flex h-screen w-screen items-center gap-2 rounded-b-2xl bg-black pl-3.5 pr-2">
-      <StatusDot status={status} />
-
-      <div className="min-w-0 flex-1 truncate text-[13px] text-foreground/80">
-        {caption || (
-          <span className="text-muted-foreground">{STATUS_LABELS[status]}</span>
-        )}
+    <div className="titlebar-drag flex h-screen w-screen items-center rounded-b-2xl bg-black pl-3.5 pr-2">
+      {/* Left + right groups each take an equal share (flex-1), with a fixed
+          empty gap between them. Because the notch window is screen-centered, an
+          equally-balanced gap lands directly under the physical laptop notch —
+          so neither the caption nor the controls ever sit behind it. */}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <StatusDot status={status} />
+        <div className="min-w-0 flex-1 truncate text-[13px] text-foreground/80">
+          {caption || (
+            <span className="text-muted-foreground">{STATUS_LABELS[status]}</span>
+          )}
+        </div>
       </div>
 
-      <div className="titlebar-no-drag flex shrink-0 items-center gap-1">
+      {/* Reserved center gap sized to roughly the physical notch width. */}
+      <div className="w-[200px] shrink-0" aria-hidden />
+
+      <div className="titlebar-no-drag flex flex-1 items-center justify-end gap-1">
         <TextComposer onSubmit={onSubmitText} className="max-w-[200px]" />
         {status !== "unsupported" && (
           <Button

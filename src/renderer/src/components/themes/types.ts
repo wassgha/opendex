@@ -26,6 +26,8 @@ export interface DexThemeProps {
   toggleMute: () => void;
   /** Open the settings panel — rendered by the theme's shared top bar. */
   onOpenSettings: () => void;
+  /** Collapse the main window into the slim notch bar. */
+  onMinimize: () => void;
 }
 
 export interface DexThemeDef {

@@ -74,7 +74,7 @@ let windowMode: WindowMode = "full";
 // so a freshly-created window paints immediately instead of waiting for a change.
 let latestSessionState: SessionState | null = null;
 
-const NOTCH_SIZE = { width: 540, height: 44 };
+const NOTCH_SIZE = { width: 680, height: 44 };
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -106,13 +106,17 @@ function createWindow() {
 
   win.once("ready-to-show", () => win.show());
 
-  // Closing the window (red traffic light / Ctrl+W) hides it instead of tearing
-  // down the renderer — that would kill the live voice session. A real quit goes
-  // through the tray or ⌘Q (isQuitting), and only then do we let it close.
+  // Closing the window (red traffic light / Ctrl+W) collapses to the notch
+  // instead of tearing down the renderer — that would kill the live voice
+  // session. The session keeps running in the (now hidden) main window behind
+  // the notch. Before onboarding finishes we just hide, since the wizard always
+  // runs full. A real quit goes through the tray or ⌘Q (isQuitting), and only
+  // then do we let it close.
   win.on("close", (event) => {
     if (isQuitting) return;
     event.preventDefault();
-    win.hide();
+    if (getConfig().onboarding.completed) applyWindowMode("notch");
+    else win.hide();
   });
 
   win.on("closed", () => {

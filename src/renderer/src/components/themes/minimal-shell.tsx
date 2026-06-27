@@ -48,6 +48,7 @@ export function MinimalShell({
         name={name}
         status={status}
         onOpenSettings={props.onOpenSettings}
+        onMinimize={props.onMinimize}
         isMuted={isMuted}
         onToggleMute={unsupported || status === "error" ? undefined : toggleMute}
       />

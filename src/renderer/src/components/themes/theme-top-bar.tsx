@@ -1,4 +1,4 @@
-import { Mic, MicOff, Settings, WavesHorizontal } from "lucide-react";
+import { Minimize2, Mic, MicOff, Settings, WavesHorizontal } from "lucide-react";
 import { StatusPill } from "@/components/status-bar";
 import { Button } from "@/components/ui/button";
 import type { DexStatus } from "@/lib/dex/state";
@@ -17,6 +17,7 @@ export function ThemeTopBar({
   showStatus = true,
   isMuted,
   onToggleMute,
+  onMinimize,
 }: {
   name?: string;
   status: DexStatus;
@@ -27,6 +28,8 @@ export function ThemeTopBar({
   isMuted?: boolean;
   /** Toggle standby (pause/resume listening). Hidden when omitted. */
   onToggleMute?: () => void;
+  /** Collapse into the slim notch bar. Hidden when omitted. */
+  onMinimize?: () => void;
 }) {
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 px-5 py-4 sm:px-6 sm:py-5">
@@ -61,6 +64,18 @@ export function ThemeTopBar({
             className="rounded-full bg-dex-surface/70 text-muted-foreground backdrop-blur hover:text-foreground"
           >
             {isMuted ? <MicOff /> : <Mic />}
+          </Button>
+        )}
+        {onMinimize && (
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={onMinimize}
+            aria-label="Minimize to notch"
+            title="Minimize to notch"
+            className="rounded-full bg-dex-surface/70 text-muted-foreground backdrop-blur hover:text-foreground"
+          >
+            <Minimize2 />
           </Button>
         )}
         <Button

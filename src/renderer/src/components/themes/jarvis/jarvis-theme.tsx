@@ -129,6 +129,7 @@ export function JarvisTheme(props: DexThemeProps) {
         name={name}
         status={status}
         onOpenSettings={props.onOpenSettings}
+        onMinimize={props.onMinimize}
         showBrand={false}
         isMuted={isMuted}
         onToggleMute={showControls ? toggleMute : undefined}

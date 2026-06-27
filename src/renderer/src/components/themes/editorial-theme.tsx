@@ -110,6 +110,7 @@ export function EditorialTheme(props: DexThemeProps) {
         name={name}
         status={status}
         onOpenSettings={props.onOpenSettings}
+        onMinimize={props.onMinimize}
         showBrand={false}
         showStatus={false}
         isMuted={props.isMuted}

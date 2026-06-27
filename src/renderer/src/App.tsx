@@ -118,6 +118,7 @@ function MainExperience({ data }: { data: PublicConfig }) {
         onSubmitText={dex.submitText}
         toggleMute={dex.toggleMute}
         onOpenSettings={() => window.opendex.openSettings()}
+        onMinimize={() => window.opendex.setWindowMode("notch")}
       />
 
       {/* Global chrome. Tool-activity hints + the Stop
