@@ -16,8 +16,6 @@ export interface StreamChatOptions {
   tools?: ToolSet;
   /** Briefing turns are self-contained narration — tools are disabled. */
   briefing?: boolean;
-  /** Max tool/generation steps before the loop stops. Defaults to 8. */
-  maxSteps?: number;
   signal?: AbortSignal;
   /** Called with each text delta as it streams. */
   onDelta: (text: string) => void;
@@ -37,6 +35,10 @@ export interface StreamChatOptions {
 // most recent frame(s) to decide the next action, so before each step we keep
 // the last `KEEP_SCREENSHOTS` images and replace older ones with a text stub.
 const KEEP_SCREENSHOTS = 2;
+
+// Tool/generation steps before the loop stops. Generous so multi-step tasks
+// (e.g. a computer-use screenshot→act→screenshot loop) can run to completion.
+const MAX_STEPS = 40;
 
 function hasImage(output: unknown): boolean {
   return (
@@ -82,6 +84,18 @@ function pruneOldScreenshots(messages: ModelMessage[]): ModelMessage[] {
   });
 }
 
+// Deep-clone a value for logging with long strings truncated, so dumping the
+// conversation doesn't spew base64 screenshots / huge tool outputs to the console.
+function loggable(value: unknown): unknown {
+  return JSON.parse(
+    JSON.stringify(value, (_key, v) =>
+      typeof v === "string" && v.length > 600
+        ? `${v.slice(0, 600)}…[${v.length} chars]`
+        : v,
+    ),
+  );
+}
+
 // Strip ANSI colour codes and noisy trailers from gateway errors before they
 // are read aloud.
 function sanitiseError(raw: string): string {
@@ -102,19 +116,28 @@ export async function streamChat({
   model,
   tools,
   briefing,
-  maxSteps,
   signal,
   onDelta,
   onToolCall,
   onToolResult,
 }: StreamChatOptions): Promise<ModelMessage[]> {
   let capturedError: unknown = null;
+
+  // Debug: exactly what we send to the LLM this turn (system prompt, full
+  // conversation, and available tool names). Long strings are truncated.
+  console.log("[opendex chat] → request", {
+    briefing: !!briefing,
+    tools: briefing ? [] : Object.keys(tools ?? {}),
+    system,
+    messages: loggable(messages),
+  });
+
   const result = streamText({
     model,
     system,
     messages,
     tools: briefing ? undefined : tools,
-    stopWhen: stepCountIs(maxSteps ?? 8),
+    stopWhen: stepCountIs(MAX_STEPS),
     // Trim stale screenshots from the context before each step (no-op when
     // there are none, e.g. ordinary turns).
     prepareStep: ({ messages: stepMessages }) => ({
@@ -128,6 +151,9 @@ export async function streamChat({
   });
 
   let emittedAny = false;
+  // Debug: accumulate what the model produces so we can log the full reply.
+  let fullText = "";
+  const toolCallsLog: Array<{ toolName: string; input: unknown }> = [];
   try {
     // Iterate the full stream (not just textStream) so we can forward tool-call
     // events for the activity UI alongside the text deltas.
@@ -135,8 +161,10 @@ export async function streamChat({
       if (part.type === "text-delta") {
         if (part.text.length === 0) continue;
         emittedAny = true;
+        fullText += part.text;
         onDelta(part.text);
       } else if (part.type === "tool-call") {
+        toolCallsLog.push({ toolName: part.toolName, input: part.input });
         onToolCall?.({
           toolCallId: part.toolCallId,
           toolName: part.toolName,
@@ -154,6 +182,14 @@ export async function streamChat({
     if ((err as Error)?.name === "AbortError") return [];
     capturedError = err;
   }
+
+  // Debug: what the model actually returned this turn.
+  console.log("[opendex chat] ← response", {
+    finishReason: await Promise.resolve(result.finishReason).catch(() => "unknown"),
+    text: fullText,
+    toolCalls: loggable(toolCallsLog),
+    error: capturedError ? String(capturedError) : undefined,
+  });
 
   if (signal?.aborted) return [];
 

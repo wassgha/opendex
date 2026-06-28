@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useAmplitudeFrame, ACTIVE_STATES } from "../use-amplitude";
+import { useAmplitudeFrame, ACTIVE_STATES } from "../shared/use-amplitude";
 import type { DexStatus } from "@/lib/dex/state";
 
 // Decorative satellite ring cluster — concentric spinning circles, tick marks,

@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import type { DexStatus, TranscriptTurn } from "@/lib/dex/state";
-import type { ToolInvocation } from "@/lib/dex/use-dex";
+import type { ToolInvocation } from "@skills/tool-view";
 
 // A theme renders the ENTIRE main experience (visualization + status +
 // transcript + controls). Only the global settings button and the audio-unlock
@@ -35,9 +35,18 @@ export interface DexThemeProps {
   onNewConversation: () => void;
 }
 
+// A theme is fully self-contained: its folder (src/.../themes/<id>/index.tsx)
+// default-exports this definition — identity, the full-experience Component, and
+// a small static Preview glyph for the picker. Drop a new folder with an
+// index.tsx that default-exports a DexThemeDef and it's auto-registered.
 export interface DexThemeDef {
   id: string;
   label: string;
   description: string;
+  /** Sort order in the picker (lower first). Defaults to alphabetical by label. */
+  order?: number;
+  /** The whole main experience. */
   Component: ComponentType<DexThemeProps>;
+  /** A small, audio-free glyph shown in the theme picker. */
+  Preview: ComponentType;
 }

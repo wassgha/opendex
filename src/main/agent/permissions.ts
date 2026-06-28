@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { WebContents } from "electron";
 import type { PermissionRequestPayload } from "../ipc/channels";
 import { getConfig, updateConfig } from "../config/store";
-import type { PermissionRequester } from "./skills/types";
+import type { PermissionRequester } from "../../skills/types";
 
 export type PermissionDecision = "allow_once" | "always" | "deny" | "never";
 

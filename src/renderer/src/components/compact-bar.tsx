@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Maximize2, Mic, MicOff, Settings, X } from "lucide-react";
 import { StatusDot } from "@/components/status-bar";
 import { Button } from "@/components/ui/button";
-import { ToolCardLayer } from "@/lib/tools/tool-card-layer";
+import { ToolCardLayer } from "@skills/tool-card-layer";
 import { STATUS_LABELS, type DexStatus } from "@/lib/dex/state";
 import { cn } from "@/lib/utils";
 import type { SessionToolInvocation } from "../../../main/ipc/channels";

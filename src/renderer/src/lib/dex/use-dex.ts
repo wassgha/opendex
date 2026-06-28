@@ -19,6 +19,7 @@ import { CloudSttEngine } from "./engines/cloud-stt";
 import type { SttEngine, WakeEngine } from "./engines/types";
 import type { DexStatus, TranscriptTurn } from "./state";
 import { formatToolCall } from "../format-tool-call";
+import type { ToolInvocation } from "@skills/tool-view";
 import type { ToolCallEvent, ToolResultEvent } from "../../../../main/ipc/channels";
 import type { ChatMessage } from "../../../../main/agent/chat";
 import type { SttProvider, WakeMode } from "../../../../main/config/schema";
@@ -34,17 +35,9 @@ export interface ToolActivity {
   label: string;
 }
 
-/** A tool call paired with its result, accumulated for the current session so
- *  themes can render result cards (weather, clock, …). Distinct from the
- *  transient `ToolActivity` banner: invocations persist (no TTL) and carry the
- *  full input/output. Keyed by the tool-call id so the result updates in place. */
-export interface ToolInvocation {
-  id: string;
-  name: string;
-  input: unknown;
-  result: unknown | null;
-  status: "running" | "done" | "error";
-}
+// Re-exported so themes/components can keep importing the tool-invocation shape
+// from the voice hook; the canonical definition lives with the skills module.
+export type { ToolInvocation };
 
 /** A tool result is an error if it carries a top-level string `error` field
  *  (the shape our skills return on failure). */
@@ -59,20 +52,6 @@ function isErrorResult(output: unknown): boolean {
 // How long a tool-activity banner lingers before fading out.
 const TOOL_ACTIVITY_TTL_MS = 4000;
 
-// Computer-use tools. When the agent starts driving the screen, we stop voicing
-// its per-action narration (the user can watch the screen + the activity
-// banners) and speak only the opening line and the final summary — otherwise
-// TTS lags far behind the fast on-screen actions.
-const COMPUTER_TOOL_NAMES = new Set([
-  "captureScreen",
-  "click",
-  "moveMouse",
-  "drag",
-  "typeText",
-  "pressKeys",
-  "scroll",
-  "wait",
-]);
 
 // A smooth, organic synthetic loudness envelope (0..1) used for speaking/
 // thinking states where we don't meter the actual audio. Layered sines give it
@@ -520,13 +499,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
       const buffer = createSentenceBuffer();
       const abortController = new AbortController();
       let assistantText = "";
-      // Computer-use "quiet mode": once the agent acts on the screen, the model
-      // can emit narration faster than it can be spoken. Rather than mute it or
-      // let it pile up (lagging behind the actions), we voice a note only when
-      // TTS has caught up, always keeping the *freshest* unspoken sentence as
-      // `pending` and dropping stale ones — so spoken updates stay current.
-      let quiet = false;
-      let pending: string | null = null;
       runningCommandRef.current = {
         abortController,
         getPartialReply: () => assistantText,
@@ -574,11 +546,6 @@ export function useDex(options: UseDexOptions): UseDexResult {
             }
             addToolActivity(call);
             recordToolCall(call);
-            // First on-screen action: flush the opener to TTS, then go quiet.
-            if (COMPUTER_TOOL_NAMES.has(call.toolName) && !quiet) {
-              for (const tail of buffer.flush()) speak(tail);
-              quiet = true;
-            }
           },
           onToolResult: recordToolResult,
           onDelta: (value) => {
@@ -593,18 +560,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
             for (const w of value.toLowerCase().split(/\s+/)) {
               if (w.length > 3) assistantWordsRef.current.add(w);
             }
-            for (const chunk of buffer.push(value)) {
-              if (!quiet) {
-                speak(chunk);
-              } else if (!tts.isSpeaking) {
-                // Caught up — voice this note now and forget any stale one.
-                speak(chunk);
-                pending = null;
-              } else {
-                // Still speaking — hold only the freshest note, drop older.
-                pending = chunk;
-              }
-            }
+            for (const chunk of buffer.push(value)) speak(chunk);
           },
         });
 
@@ -626,14 +582,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
           // Cancelled by barge-in or stop — skip the drain/follow-up transition.
           bargedIn = true;
         } else {
-          if (quiet) {
-            // Voice the freshest unspoken note plus any trailing summary, so the
-            // wrap-up always lands even if TTS was busy through the last action.
-            const tail = [pending, ...buffer.flush()].filter(Boolean).join(" ").trim();
-            if (tail) speak(tail);
-          } else {
-            for (const tail of buffer.flush()) speak(tail);
-          }
+          // Flush any trailing partial sentence to TTS.
+          for (const tail of buffer.flush()) speak(tail);
           // Record the real assistant + tool messages so the model remembers
           // what it already did (and won't re-trigger gated actions next turn).
           if (respMessages.length) messagesRef.current.push(...respMessages);

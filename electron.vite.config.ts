@@ -16,6 +16,10 @@ export default defineConfig({
     resolve: {
       alias: {
         "@": resolve(__dirname, "src/renderer/src"),
+        // Skills live outside the renderer tree (src/skills) because each one is
+        // a self-contained folder spanning the process boundary — the renderer
+        // imports only the UI half (view.tsx / metas / tool-card-layer).
+        "@skills": resolve(__dirname, "src/skills"),
       },
     },
     // Pin the dev origin. The local STT models (transformers.js / Vosk) cache in
