@@ -40,6 +40,7 @@ export function DotTheme(props: DexThemeProps) {
         <OverlayTranscript
           turns={props.transcript}
           liveCaption={props.liveCaption}
+          toolInvocations={props.toolInvocations}
           variant="bubble"
         />
       }

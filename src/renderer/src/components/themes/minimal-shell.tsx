@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { ThemeTopBar } from "./theme-top-bar";
 import { TextComposer } from "./text-composer";
-import { ToolCardLayer } from "@/lib/tools/tool-card-layer";
 import type { DexThemeProps } from "./types";
 
 // Shared chrome for the minimalist themes (dot, cursor): a solid background, a
@@ -36,7 +35,9 @@ export function MinimalShell({
   } = props;
   const hasTranscript =
     !hideTranscript &&
-    (props.transcript.length > 0 || props.liveCaption.length > 0);
+    (props.transcript.length > 0 ||
+      props.liveCaption.length > 0 ||
+      props.toolInvocations.length > 0);
 
   return (
     <div
@@ -77,8 +78,6 @@ export function MinimalShell({
             Pulling up your dashboards…
           </div>
         )}
-
-        <ToolCardLayer invocations={props.toolInvocations} surface="main" />
 
         {unsupported && (
           <p className="max-w-sm text-center text-sm text-muted-foreground">

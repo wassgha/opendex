@@ -1,15 +1,21 @@
 import type { TranscriptTurn } from "@/lib/dex/state";
+import type { ToolInvocation } from "@/lib/dex/use-dex";
+import { ToolCardLayer } from "@/lib/tools/tool-card-layer";
 
 // Bottom-anchored, boxless transcript for the minimal themes' overlay. Newest
 // lines sit at the bottom; older ones rise and are clipped + faded by the
-// shell's mask. No scrollbar — we just render the most recent turns.
+// shell's mask. No scrollbar — we just render the most recent turns. A tool
+// result renders inline as the trailing item (a card in the thread), so it
+// scrolls with the conversation rather than floating over it.
 export function OverlayTranscript({
   turns,
   liveCaption,
+  toolInvocations = [],
   variant,
 }: {
   turns: TranscriptTurn[];
   liveCaption: string;
+  toolInvocations?: ToolInvocation[];
   variant: "bubble" | "line";
 }) {
   const recent = turns.slice(-8);
@@ -39,6 +45,12 @@ export function OverlayTranscript({
           </div>
         ),
       )}
+      {/* Tool result — inline in the thread, after the latest reply. */}
+      <ToolCardLayer
+        invocations={toolInvocations}
+        surface="main"
+        className="max-w-[85%] self-start"
+      />
       {liveCaption &&
         (variant === "bubble" ? (
           <div className="max-w-[80%] self-end px-4 py-2 italic text-foreground/45">

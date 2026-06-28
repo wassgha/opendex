@@ -73,6 +73,7 @@ export function JarvisTheme(props: DexThemeProps) {
     status,
     transcript,
     liveCaption,
+    toolInvocations,
     getAmplitude,
     isMuted,
     briefingActive,
@@ -207,7 +208,12 @@ export function JarvisTheme(props: DexThemeProps) {
                 "linear-gradient(to top, black 0%, black 55%, transparent 100%)",
             }}
           >
-            <OverlayTranscript turns={transcript} liveCaption={liveCaption} variant="line" />
+            <OverlayTranscript
+              turns={transcript}
+              liveCaption={liveCaption}
+              toolInvocations={toolInvocations}
+              variant="line"
+            />
           </div>
         </div>
       )}

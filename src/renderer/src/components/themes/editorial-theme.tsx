@@ -153,11 +153,6 @@ export function EditorialTheme(props: DexThemeProps) {
           <span className="h-1 w-1 rounded-full bg-primary" />
           {unsupported ? "Voice unavailable — type below" : STATUS_LABELS[status]}
         </div>
-
-        {/* Tool result cards (weather, clock, …) appear under the reply. */}
-        <div className="mt-6 max-w-sm">
-          <ToolCardLayer invocations={props.toolInvocations} surface="main" />
-        </div>
       </section>
 
       {/* Running transcript — a light card spanning the available width, turns as
@@ -186,6 +181,12 @@ export function EditorialTheme(props: DexThemeProps) {
               </div>
             );
           })}
+          {/* Tool result — the latest card, inline as the trailing thread row. */}
+          <ToolCardLayer
+            invocations={props.toolInvocations}
+            surface="main"
+            className="py-3.5"
+          />
         </Card>
       )}
 
