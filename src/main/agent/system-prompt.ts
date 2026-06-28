@@ -73,46 +73,30 @@ Here are the metrics you are working from. Use them for accuracy but speak them 
 ${BRIEFING_FACTS}`;
 }
 
-// Operating manual injected when the computer-control skill is active, so the
-// model drives the screenshot → act → screenshot loop correctly.
-function computerUseGuidance(gender: UserGender): string {
-  const v = vocative(gender);
-  const platform =
-    process.platform === "darwin"
-      ? "macOS (use the Cmd key for shortcuts, not Ctrl)"
-      : process.platform === "win32"
-        ? "Windows (use the Ctrl key for shortcuts)"
-        : "Linux (use the Ctrl key for shortcuts)";
-  return `You can see and control this computer. The operating system is ${platform}.
-
-To operate it: first call captureScreen to see the screen, then act with click, moveMouse, drag, typeText, pressKeys, scroll, and wait. Coordinates are in the pixel space of the most recent screenshot, with (0,0) at the top-left.
-
-To read or precisely click something small, call captureScreen with a region to zoom into that area rather than guessing on the full frame — the zoomed image is sharper and the coordinates you get back refer to it. Use drag for sliders, drag-and-drop, selecting, or moving windows. To scroll a specific pane, pass x and y to scroll. Long text you pass to typeText is pasted instantly via the clipboard; short text is typed key-by-key. If something is still loading, use wait rather than screenshotting repeatedly.
-
-Don't take a screenshot after every action — it's slow. typeText and pressKeys return no screenshot by default, so chain related keystrokes (e.g. type a field, press Tab, type the next, press Enter) without looking in between. click, drag, and scroll do return a screenshot since they change what's on screen. When you want to verify the result of a keystroke sequence, either pass screenshot:true on the last action or call captureScreen. Screenshots are settled before you see them, so you won't catch a half-loaded frame. If an action reports "no visible change on screen", your click probably missed — re-aim (zoom in to be sure) instead of repeating the same click.
-
-Keep spoken narration light — the user is watching the screen and sees a live list of every action, so don't give a play-by-play of each click or keystroke. Say a short sentence when you begin (e.g. "On it${v}."), then offer a brief progress note every few actions as you move between phases of the task (a quick "Opening the browser now", "Filling in the details") so it's clear you're still working, and finish with one short summary of the outcome.
-
-Work in small, deliberate steps and stop once the task is done or if something looks wrong. If a screenshot is empty or a click has no effect, the operator may need to grant Screen Recording and Accessibility permissions in their system settings — say so rather than retrying blindly.`;
-}
-
 export interface PromptInputs {
   config: OpenDexConfig;
   briefing: boolean;
-  /** Whether the computer-control skill is active this turn. */
-  computerUse?: boolean;
+  /** Operating-instruction addenda from enabled skills (non-briefing turns).
+   *  Each skill declares its own via `Skill.systemPrompt` — see src/skills. */
+  skillPrompts?: string[];
 }
 
 /** Resolve the system prompt for a turn, honouring the configured persona and
- *  greeting mode. */
-export function buildSystemPrompt({ config, briefing, computerUse }: PromptInputs): string {
+ *  greeting mode, plus any enabled-skill operating instructions. */
+export function buildSystemPrompt({
+  config,
+  briefing,
+  skillPrompts = [],
+}: PromptInputs): string {
   const persona = buildPersona(config);
   const gender = config.assistant.userGender;
-  const base =
-    computerUse && !briefing
-      ? `${persona}\n\n---\n\n${computerUseGuidance(gender)}`
-      : persona;
-  if (!briefing || config.greeting.mode === "none") return base;
+
+  if (!briefing) {
+    // Append each enabled skill's operating manual (e.g. computer-use).
+    return [persona, ...skillPrompts].join("\n\n---\n\n");
+  }
+
+  if (config.greeting.mode === "none") return persona;
 
   if (config.greeting.mode === "custom") {
     const custom = config.greeting.customPrompt.trim();

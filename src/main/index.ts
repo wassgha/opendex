@@ -21,8 +21,7 @@ import {
 import { streamChat } from "./agent/chat";
 import { resolveModel, checkAppleAvailability } from "./agent/llm/resolve-model";
 import { buildSystemPrompt } from "./agent/system-prompt";
-import { buildToolSet, isSkillEnabled } from "./agent/skills/registry";
-import { computerSkill } from "./agent/skills/computer";
+import { buildToolSet, skillSystemPrompts } from "../skills/registry";
 import {
   makePermissionRequester,
   pendingPermissions,
@@ -512,8 +511,11 @@ function registerIpc() {
     const config = getConfig();
     const briefing = mode === "briefing";
     track("command_run", { mode: briefing ? "briefing" : "command" });
-    const computerUse = !briefing && isSkillEnabled(computerSkill, config);
-    const system = buildSystemPrompt({ config, briefing, computerUse });
+    const system = buildSystemPrompt({
+      config,
+      briefing,
+      skillPrompts: briefing ? [] : skillSystemPrompts(config),
+    });
     const tools = buildToolSet({
       config,
       requestPermission: makePermissionRequester(sender),
@@ -529,8 +531,6 @@ function registerIpc() {
         model,
         tools,
         briefing,
-        // Computer-use sessions need many screenshot→act→screenshot steps.
-        maxSteps: computerUse ? 40 : 8,
         signal: ac.signal,
         onDelta: (delta) => {
           if (!ac.signal.aborted && !sender.isDestroyed()) {

@@ -27,7 +27,7 @@ import {
 } from "../ui/fields";
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
-import { SKILLS_META } from "@/lib/skills-meta";
+import { SKILL_METAS } from "@skills/metas";
 import {
   ProviderPicker,
   defaultModelFor,
@@ -243,7 +243,7 @@ function SkillsSection({ data, setConfig }: SectionProps) {
   const { config } = data;
   return (
     <>
-      {SKILLS_META.map((skill) => {
+      {SKILL_METAS.map((skill) => {
         const enabled = skill.optIn
           ? config.skills.enabled[skill.id] === true
           : config.skills.enabled[skill.id] !== false;

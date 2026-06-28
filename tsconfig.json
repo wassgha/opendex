@@ -14,7 +14,8 @@
     "types": ["node", "electron-vite/node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/renderer/src/*"]
+      "@/*": ["src/renderer/src/*"],
+      "@skills/*": ["src/skills/*"]
     }
   },
   "include": [
