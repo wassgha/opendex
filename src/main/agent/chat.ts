@@ -23,6 +23,12 @@ export interface StreamChatOptions {
   onDelta: (text: string) => void;
   /** Called when the model invokes a tool, so the UI can surface activity. */
   onToolCall?: (call: { toolCallId: string; toolName: string; input: unknown }) => void;
+  /** Called when a tool returns, so the UI can render a result card. */
+  onToolResult?: (result: {
+    toolCallId: string;
+    toolName: string;
+    output: unknown;
+  }) => void;
 }
 
 // Computer-use returns a screenshot from every action, so the visual history
@@ -100,6 +106,7 @@ export async function streamChat({
   signal,
   onDelta,
   onToolCall,
+  onToolResult,
 }: StreamChatOptions): Promise<ModelMessage[]> {
   let capturedError: unknown = null;
   const result = streamText({
@@ -134,6 +141,12 @@ export async function streamChat({
           toolCallId: part.toolCallId,
           toolName: part.toolName,
           input: part.input,
+        });
+      } else if (part.type === "tool-result") {
+        onToolResult?.({
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          output: part.output,
         });
       }
     }

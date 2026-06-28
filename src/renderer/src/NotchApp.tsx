@@ -41,14 +41,20 @@ export function NotchApp() {
         ? state?.liveCaption || ""
         : "";
 
+  // Completed tool results — the notch shows the latest as a compact card
+  // (running ones stay as the caption/status until they resolve).
+  const cards = (state?.toolInvocations ?? []).filter((t) => t.status === "done");
+
   return (
     <CompactBar
       status={status}
       caption={caption}
+      toolInvocations={cards}
       agentName={agentName}
       isMuted={state?.muted ?? false}
       onSubmitText={(text) => window.opendex.sendViewCommand({ type: "submitText", text })}
       onToggleMute={() => window.opendex.sendViewCommand({ type: "toggleMute" })}
+      onNewConversation={() => window.opendex.sendViewCommand({ type: "newConversation" })}
       onExpand={() => window.opendex.sendViewCommand({ type: "expand" })}
       onOpenSettings={() => window.opendex.openSettings()}
     />

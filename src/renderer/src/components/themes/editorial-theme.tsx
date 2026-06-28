@@ -5,6 +5,7 @@ import { TextComposer } from "./text-composer";
 import { useAmplitudeFrame, ACTIVE_STATES } from "./use-amplitude";
 import { STATUS_LABELS } from "@/lib/dex/state";
 import { Card } from "@/components/ui/card";
+import { ToolCardLayer } from "@/lib/tools/tool-card-layer";
 import { cn } from "@/lib/utils";
 import type { DexThemeProps } from "./types";
 
@@ -111,6 +112,7 @@ export function EditorialTheme(props: DexThemeProps) {
         status={status}
         onOpenSettings={props.onOpenSettings}
         onMinimize={props.onMinimize}
+        onNewConversation={props.onNewConversation}
         showBrand={false}
         showStatus={false}
         isMuted={props.isMuted}
@@ -150,6 +152,11 @@ export function EditorialTheme(props: DexThemeProps) {
         <div className="mt-5 flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
           <span className="h-1 w-1 rounded-full bg-primary" />
           {unsupported ? "Voice unavailable — type below" : STATUS_LABELS[status]}
+        </div>
+
+        {/* Tool result cards (weather, clock, …) appear under the reply. */}
+        <div className="mt-6 max-w-sm">
+          <ToolCardLayer invocations={props.toolInvocations} surface="main" />
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import type { DexStatus, TranscriptTurn } from "@/lib/dex/state";
+import type { ToolInvocation } from "@/lib/dex/use-dex";
 
 // A theme renders the ENTIRE main experience (visualization + status +
 // transcript + controls). Only the global settings button and the audio-unlock
@@ -15,6 +16,8 @@ export interface DexThemeProps {
   spokenCaption: string;
   /** 0..1 voice loudness, sampled via requestAnimationFrame. */
   getAmplitude: () => number;
+  /** Tool calls + results this session — render result cards via <ToolCardLayer>. */
+  toolInvocations: ToolInvocation[];
   isMuted: boolean;
   briefingActive: boolean;
   unsupported: boolean;
@@ -28,6 +31,8 @@ export interface DexThemeProps {
   onOpenSettings: () => void;
   /** Collapse the main window into the slim notch bar. */
   onMinimize: () => void;
+  /** Dismiss the current turn and start a fresh conversation. */
+  onNewConversation: () => void;
 }
 
 export interface DexThemeDef {

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ThemeTopBar } from "./theme-top-bar";
 import { TextComposer } from "./text-composer";
+import { ToolCardLayer } from "@/lib/tools/tool-card-layer";
 import type { DexThemeProps } from "./types";
 
 // Shared chrome for the minimalist themes (dot, cursor): a solid background, a
@@ -49,6 +50,7 @@ export function MinimalShell({
         status={status}
         onOpenSettings={props.onOpenSettings}
         onMinimize={props.onMinimize}
+        onNewConversation={props.onNewConversation}
         isMuted={isMuted}
         onToggleMute={unsupported || status === "error" ? undefined : toggleMute}
       />
@@ -75,6 +77,8 @@ export function MinimalShell({
             Pulling up your dashboards…
           </div>
         )}
+
+        <ToolCardLayer invocations={props.toolInvocations} surface="main" />
 
         {unsupported && (
           <p className="max-w-sm text-center text-sm text-muted-foreground">

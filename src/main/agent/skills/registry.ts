@@ -1,12 +1,21 @@
 import { tool, type ToolSet } from "ai";
-import { tools as baseTools } from "../tools";
+import { clockSkill } from "./clock";
+import { weatherSkill } from "./weather";
+import { webSearchSkill } from "./web-search";
 import { openSkill } from "./open";
 import { computerSkill } from "./computer";
 import type { OpenDexConfig } from "../../config/schema";
 import type { PermissionRequester, Skill } from "./types";
 
-// Built-in skills available to the agent.
-export const BUILTIN_SKILLS: Skill[] = [openSkill, computerSkill];
+// Built-in skills available to the agent. The read-only ones (clock/weather/
+// web-search) are always on by default; open/computer are sensitive (gated).
+export const BUILTIN_SKILLS: Skill[] = [
+  clockSkill,
+  weatherSkill,
+  webSearchSkill,
+  openSkill,
+  computerSkill,
+];
 
 /** Whether a skill is active for this config (opt-in skills default OFF). */
 export function isSkillEnabled(skill: Skill, config: OpenDexConfig): boolean {
@@ -32,9 +41,8 @@ export const SKILL_META: SkillMeta[] = BUILTIN_SKILLS.map((s) => ({
 }));
 
 /**
- * Assemble the tool set for a chat turn: the always-on base read-only tools
- * plus every enabled skill's tools. Sensitive skills' tools are wrapped so each
- * call passes through the permission gate first.
+ * Assemble the tool set for a chat turn: every enabled skill's tools. Sensitive
+ * skills' tools are wrapped so each call passes through the permission gate first.
  */
 export function buildToolSet({
   config,
@@ -43,7 +51,7 @@ export function buildToolSet({
   config: OpenDexConfig;
   requestPermission: PermissionRequester;
 }): ToolSet {
-  const set: ToolSet = { ...baseTools };
+  const set: ToolSet = {};
 
   for (const skill of BUILTIN_SKILLS) {
     if (!isSkillEnabled(skill, config)) continue;

@@ -1,35 +1,48 @@
 import { useEffect, useRef, useState } from "react";
-import { Maximize2, Mic, MicOff, Settings } from "lucide-react";
+import { Maximize2, Mic, MicOff, Settings, X } from "lucide-react";
 import { StatusDot } from "@/components/status-bar";
 import { Button } from "@/components/ui/button";
+import { ToolCardLayer } from "@/lib/tools/tool-card-layer";
 import { STATUS_LABELS, type DexStatus } from "@/lib/dex/state";
 import { cn } from "@/lib/utils";
+import type { SessionToolInvocation } from "../../../main/ipc/channels";
+
+// Notch height regions (px), summed by CompactBar to drive the window height.
+const BAR_H = 44; // the always-visible bar (matches NOTCH_SIZE.height in main)
+const CARD_H = 96; // body region for a tool-result card
+const TYPE_H = 52; // the type field, revealed on hover/focus
 
 // The notch bar's presentation. It fills its transparent host window (the notch
 // window — see createNotchWindow), drawing a flat top edge flush to the screen
 // and rounded bottom so it reads as hanging from the top "notch".
 //
 // At rest it shows only the status + a standby (mic) toggle. Hovering it (or
-// focusing the type field, or the summon hotkey) "expands" it: the host window
-// grows downward (setNotchExpanded) to reveal the expand + settings buttons and
-// a minimalist type field that slides up from the bottom. State + callbacks are
-// wired by NotchApp from the session relay.
+// focusing the type field, or the summon hotkey) reveals the expand + settings
+// buttons and a minimalist type field. When a tool result is available it also
+// shows that result as a card in the body, below the bar (under the physical
+// notch), Dynamic-Island style. The host window grows downward to fit whatever
+// is shown — the renderer sums the region heights and drives the window via
+// setNotchHeight. State + callbacks are wired by NotchApp from the session relay.
 export function CompactBar({
   status,
   caption,
+  toolInvocations,
   agentName,
   isMuted,
   onSubmitText,
   onToggleMute,
+  onNewConversation,
   onExpand,
   onOpenSettings,
 }: {
   status: DexStatus;
   caption: string;
+  toolInvocations: SessionToolInvocation[];
   agentName: string;
   isMuted: boolean;
   onSubmitText: (text: string) => void;
   onToggleMute: () => void;
+  onNewConversation: () => void;
   onExpand: () => void;
   onOpenSettings: () => void;
 }) {
@@ -53,10 +66,15 @@ export function CompactBar({
     return () => clearTimeout(timer);
   }, [rawExpanded]);
 
-  // Drive the host window's height to match the expanded state.
+  // When a tool result is available, the notch grows to show it as a card in the
+  // body below the bar (Dynamic-Island style) — separate from the hover/type
+  // expansion. Drive the host window's height from what's actually shown: the
+  // bar, plus the card body, plus the type field when expanded.
+  const hasCard = toolInvocations.length > 0;
+  const targetHeight = BAR_H + (hasCard ? CARD_H : 0) + (expanded ? TYPE_H : 0);
   useEffect(() => {
-    window.opendex.setNotchExpanded(expanded);
-  }, [expanded]);
+    window.opendex.setNotchHeight(targetHeight);
+  }, [targetHeight]);
 
   // The summon hotkey (⌥Space) focuses this window — reveal + focus the field so
   // the user can type immediately, Spotlight-style.
@@ -159,6 +177,25 @@ export function CompactBar({
         </div>
       </div>
 
+      {/* Tool-result card — shown in the body, centred under the physical notch
+          (which only covers the top bar), like the Dynamic Island. */}
+      {hasCard && (
+        <div className="flex shrink-0 justify-center px-3 pb-2">
+          <div className="relative w-full max-w-[360px]">
+            <ToolCardLayer invocations={toolInvocations} surface="notch" />
+            <button
+              type="button"
+              onClick={onNewConversation}
+              aria-label="Dismiss"
+              title="Dismiss"
+              className="absolute -right-1.5 -top-1.5 grid size-5 cursor-pointer place-items-center rounded-full bg-black/40 text-white/80 backdrop-blur hover:bg-black/60 hover:text-white"
+            >
+              <X className="size-3" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Type field — slides up from the bottom when expanded. Minimalist: a
           blinking caret + "Type to {name}" prompt while empty, native text once
           you start typing. */}
@@ -169,8 +206,8 @@ export function CompactBar({
             submit();
           }}
           className={cn(
-            "flex-1 px-3.5 transition-opacity duration-200 ease-out",
-            expanded ? "opacity-100" : "pointer-events-none opacity-0",
+            "shrink-0 px-3.5 transition-all duration-200 ease-out",
+            expanded ? "opacity-100" : "pointer-events-none h-0 overflow-hidden opacity-0",
           )}
         >
           <div

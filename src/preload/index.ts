@@ -6,6 +6,7 @@ import {
   type PermissionRequestPayload,
   type SessionState,
   type ToolCallEvent,
+  type ToolResultEvent,
   type UpdateStatusPayload,
   type ViewCommand,
   type WindowMode,
@@ -25,6 +26,8 @@ export interface ChatRequest {
   onDelta: (text: string) => void;
   /** Fired when the agent invokes a tool (for the activity UI). */
   onToolCall?: (call: ToolCallEvent) => void;
+  /** Fired when a tool returns (for result cards). */
+  onToolResult?: (result: ToolResultEvent) => void;
 }
 
 export interface ChatHandle {
@@ -43,10 +46,11 @@ const opendex = {
    * resolves with the generated messages (or rejects on error). `cancel()`
    * aborts the main-process stream (used for barge-in / stop).
    */
-  chat({ messages, mode, onDelta, onToolCall }: ChatRequest): ChatHandle {
+  chat({ messages, mode, onDelta, onToolCall, onToolResult }: ChatRequest): ChatHandle {
     const requestId = randomUUID();
     const deltaCh = IPC.chatDelta(requestId);
     const toolCh = IPC.chatTool(requestId);
+    const toolResultCh = IPC.chatToolResult(requestId);
     const doneCh = IPC.chatDone(requestId);
     const errorCh = IPC.chatError(requestId);
 
@@ -61,6 +65,8 @@ const opendex = {
     const onDeltaEvt = (_e: IpcRendererEvent, text: string) => onDelta(text);
     const onToolEvt = (_e: IpcRendererEvent, call: ToolCallEvent) =>
       onToolCall?.(call);
+    const onToolResultEvt = (_e: IpcRendererEvent, result: ToolResultEvent) =>
+      onToolResult?.(result);
     const onDoneEvt = (_e: IpcRendererEvent, msgs: ChatMessage[]) =>
       finish(null, msgs);
     const onErrorEvt = (_e: IpcRendererEvent, message: string) =>
@@ -71,6 +77,7 @@ const opendex = {
       settled = true;
       ipcRenderer.removeListener(deltaCh, onDeltaEvt);
       ipcRenderer.removeListener(toolCh, onToolEvt);
+      ipcRenderer.removeListener(toolResultCh, onToolResultEvt);
       ipcRenderer.removeListener(doneCh, onDoneEvt);
       ipcRenderer.removeListener(errorCh, onErrorEvt);
       if (err) rejectDone(err);
@@ -79,6 +86,7 @@ const opendex = {
 
     ipcRenderer.on(deltaCh, onDeltaEvt);
     ipcRenderer.on(toolCh, onToolEvt);
+    ipcRenderer.on(toolResultCh, onToolResultEvt);
     ipcRenderer.once(doneCh, onDoneEvt);
     ipcRenderer.once(errorCh, onErrorEvt);
     ipcRenderer.send(IPC.chatStart, { requestId, messages, mode });
@@ -183,9 +191,10 @@ const opendex = {
     ipcRenderer.send(IPC.windowSetMode, mode);
   },
 
-  /** Notch only: grow/shrink the notch window when it's hovered. */
-  setNotchExpanded(expanded: boolean): void {
-    ipcRenderer.send(IPC.notchSetExpanded, expanded);
+  /** Notch only: set the notch window height (px) — the renderer drives the
+   *  exact height for the collapsed bar, the type field, or a result card. */
+  setNotchHeight(height: number): void {
+    ipcRenderer.send(IPC.notchSetHeight, height);
   },
 
   /** Subscribe to window-mode changes applied by main. Returns an unsubscribe fn. */

@@ -84,14 +84,15 @@ function MainExperience({ data }: { data: PublicConfig }) {
   );
 
   // Session actions relayed from the notch window (which can't reach `useDex`).
-  const { submitText, toggleMute } = dex;
+  const { submitText, toggleMute, newConversation } = dex;
   useEffect(
     () =>
       window.opendex.onRemoteCommand((cmd) => {
         if (cmd.type === "submitText") submitText(cmd.text);
         else if (cmd.type === "toggleMute") toggleMute();
+        else if (cmd.type === "newConversation") newConversation();
       }),
-    [submitText, toggleMute],
+    [submitText, toggleMute, newConversation],
   );
 
   return (
@@ -110,6 +111,8 @@ function MainExperience({ data }: { data: PublicConfig }) {
         liveCaption={dex.liveCaption}
         spokenCaption={dex.spokenCaption}
         getAmplitude={dex.getAmplitude}
+        toolInvocations={dex.toolInvocations}
+        onNewConversation={dex.newConversation}
         isMuted={dex.isMuted}
         briefingActive={dex.briefingActive}
         unsupported={dex.status === "unsupported"}

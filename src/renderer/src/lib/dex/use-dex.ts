@@ -19,7 +19,7 @@ import { CloudSttEngine } from "./engines/cloud-stt";
 import type { SttEngine, WakeEngine } from "./engines/types";
 import type { DexStatus, TranscriptTurn } from "./state";
 import { formatToolCall } from "../format-tool-call";
-import type { ToolCallEvent } from "../../../../main/ipc/channels";
+import type { ToolCallEvent, ToolResultEvent } from "../../../../main/ipc/channels";
 import type { ChatMessage } from "../../../../main/agent/chat";
 import type { SttProvider, WakeMode } from "../../../../main/config/schema";
 
@@ -32,6 +32,28 @@ export interface ToolActivity {
   id: string;
   icon: string;
   label: string;
+}
+
+/** A tool call paired with its result, accumulated for the current session so
+ *  themes can render result cards (weather, clock, …). Distinct from the
+ *  transient `ToolActivity` banner: invocations persist (no TTL) and carry the
+ *  full input/output. Keyed by the tool-call id so the result updates in place. */
+export interface ToolInvocation {
+  id: string;
+  name: string;
+  input: unknown;
+  result: unknown | null;
+  status: "running" | "done" | "error";
+}
+
+/** A tool result is an error if it carries a top-level string `error` field
+ *  (the shape our skills return on failure). */
+function isErrorResult(output: unknown): boolean {
+  return (
+    !!output &&
+    typeof output === "object" &&
+    typeof (output as { error?: unknown }).error === "string"
+  );
 }
 
 // How long a tool-activity banner lingers before fading out.
@@ -143,8 +165,13 @@ export interface UseDexResult {
   submitText: (text: string) => void;
   /** Abort whatever the agent is currently doing (mid-reply or mid tool loop). */
   interrupt: () => void;
+  /** Dismiss the current turn and start a fresh conversation (clears transcript,
+   *  history, and result cards; stays listening). */
+  newConversation: () => void;
   /** Recent tool calls the agent made (transient; for the activity banners). */
   toolActivity: ToolActivity[];
+  /** Tool calls + results for the current session (persistent; for result cards). */
+  toolInvocations: ToolInvocation[];
   /** Current voice loudness, 0..1 — real mic level while listening, a synthetic
    *  envelope while speaking/thinking. Sampled by the visualization via rAF. */
   getAmplitude: () => number;
@@ -179,6 +206,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
   });
   const [toolActivity, setToolActivity] = useState<ToolActivity[]>([]);
   const toolTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  // Persistent call+result records for result-card rendering (no TTL).
+  const [toolInvocations, setToolInvocations] = useState<ToolInvocation[]>([]);
 
   const addToolActivity = useCallback((call: ToolCallEvent) => {
     const { icon, label } = formatToolCall(call);
@@ -191,10 +220,41 @@ export function useDex(options: UseDexOptions): UseDexResult {
     toolTimersRef.current.add(timer);
   }, []);
 
+  // Record a tool call as a running invocation (replacing any prior record with
+  // the same id, e.g. on a retried step).
+  const recordToolCall = useCallback((call: ToolCallEvent) => {
+    setToolInvocations((prev) => [
+      ...prev.filter((t) => t.id !== call.toolCallId),
+      {
+        id: call.toolCallId,
+        name: call.toolName,
+        input: call.input,
+        result: null,
+        status: "running",
+      },
+    ]);
+  }, []);
+
+  // Fill in a running invocation's result when the tool returns.
+  const recordToolResult = useCallback((result: ToolResultEvent) => {
+    setToolInvocations((prev) =>
+      prev.map((t) =>
+        t.id === result.toolCallId
+          ? {
+              ...t,
+              result: result.output,
+              status: isErrorResult(result.output) ? "error" : "done",
+            }
+          : t,
+      ),
+    );
+  }, []);
+
   const clearToolActivity = useCallback(() => {
     toolTimersRef.current.forEach(clearTimeout);
     toolTimersRef.current.clear();
     setToolActivity([]);
+    setToolInvocations([]);
   }, []);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -474,6 +534,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
 
       // Reset the assistant-word filter for the new reply.
       assistantWordsRef.current = new Set();
+      // Fresh result cards per turn (so a prior turn's weather/clock card doesn't
+      // linger next to an unrelated reply).
+      setToolInvocations([]);
 
       // Wake-word barge-in: when the user says the wake word mid-reply, stop the
       // assistant, keep the partial reply for context, and drop straight into
@@ -510,12 +573,14 @@ export function useDex(options: UseDexOptions): UseDexResult {
               vlog("tool:first", { tool: call.toolName });
             }
             addToolActivity(call);
+            recordToolCall(call);
             // First on-screen action: flush the opener to TTS, then go quiet.
             if (COMPUTER_TOOL_NAMES.has(call.toolName) && !quiet) {
               for (const tail of buffer.flush()) speak(tail);
               quiet = true;
             }
           },
+          onToolResult: recordToolResult,
           onDelta: (value) => {
             if (!value) return;
             if (!loggedFirstToken) {
@@ -635,6 +700,8 @@ export function useDex(options: UseDexOptions): UseDexResult {
     },
     [
       addToolActivity,
+      recordToolCall,
+      recordToolResult,
       appendTurn,
       startBargeMonitor,
       stopBargeMonitor,
@@ -1251,6 +1318,26 @@ export function useDex(options: UseDexOptions): UseDexResult {
     else startModeRef.current?.("wake");
   }, [clearToolActivity, stopBargeMonitor]);
 
+  // Start a fresh conversation: abort anything in flight, wipe the transcript +
+  // model history + result cards + captions, and return to passive listening
+  // (without tearing down the mic/engines). This is how the user dismisses the
+  // current turn — e.g. clearing a lingering result card once they've read it.
+  const newConversation = useCallback(() => {
+    ttsRef.current?.stop();
+    stopBargeMonitor();
+    bargeOnSpeakingRef.current = null;
+    runningCommandRef.current?.abortController.abort();
+    runningCommandRef.current = null;
+    messagesRef.current = [];
+    setTranscript([]);
+    setLiveCaption("");
+    setSpokenCaption("");
+    spokenFreshRef.current = true;
+    clearToolActivity(); // clears the activity banners + the result cards
+    if (mutedRef.current) setStatus("muted");
+    else startModeRef.current?.("wake");
+  }, [clearToolActivity, stopBargeMonitor]);
+
   const stop = useCallback(() => {
     restartGuardRef.current = true;
     clearTimers();
@@ -1365,16 +1452,12 @@ export function useDex(options: UseDexOptions): UseDexResult {
   // voice loop runs solely in this window). Cheap; fires only on real changes.
   const showToolActivity = options.showToolActivity ?? true;
   useEffect(() => {
-    // The current turn's streamed reply (the last assistant turn) — what the
-    // main window renders live, so the notch shows the same text, not the
-    // speech-lagged spokenCaption.
-    let reply = "";
-    for (let i = transcript.length - 1; i >= 0; i--) {
-      if (transcript[i].role === "assistant") {
-        reply = transcript[i].content;
-        break;
-      }
-    }
+    // The current turn's streamed reply — only when the *last* turn is the
+    // assistant's. While a new turn is starting (the user turn was just appended
+    // but no reply has streamed yet), this is "" so view surfaces don't show the
+    // previous turn's stale answer during the thinking gap.
+    const lastTurn = transcript[transcript.length - 1];
+    const reply = lastTurn?.role === "assistant" ? lastTurn.content : "";
     window.opendex.publishSessionState({
       status,
       muted: isMuted,
@@ -1383,11 +1466,23 @@ export function useDex(options: UseDexOptions): UseDexResult {
       activity: showToolActivity
         ? toolActivity.map((t) => ({ id: t.id, icon: t.icon, label: t.label }))
         : [],
+      // Result cards are content (not action-hint noise), so they're relayed
+      // regardless of the showToolActivity toggle.
+      toolInvocations,
       liveCaption,
       spokenCaption,
       reply,
     });
-  }, [status, isMuted, toolActivity, liveCaption, spokenCaption, transcript, showToolActivity]);
+  }, [
+    status,
+    isMuted,
+    toolActivity,
+    toolInvocations,
+    liveCaption,
+    spokenCaption,
+    transcript,
+    showToolActivity,
+  ]);
 
   const canPushToTalk =
     options.wakeMode === "manual" &&
@@ -1411,5 +1506,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     unlockAudio,
     stop,
     toggleMute,
+    toolInvocations,
+    newConversation,
   };
 }

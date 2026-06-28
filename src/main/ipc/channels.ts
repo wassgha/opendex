@@ -8,9 +8,10 @@ export const IPC = {
   chatStart: "chat:start",
   chatCancel: "chat:cancel",
   // Per-request reply channels are suffixed with the requestId:
-  //   chat:delta:<id> · chat:done:<id> · chat:error:<id>
+  //   chat:delta:<id> · chat:tool:<id> · chat:tool-result:<id> · chat:done:<id> · chat:error:<id>
   chatDelta: (id: string) => `chat:delta:${id}`,
   chatTool: (id: string) => `chat:tool:${id}`,
+  chatToolResult: (id: string) => `chat:tool-result:${id}`,
   chatDone: (id: string) => `chat:done:${id}`,
   chatError: (id: string) => `chat:error:${id}`,
   ttsSynthesize: "tts:synthesize",
@@ -48,9 +49,10 @@ export const IPC = {
   remoteCommand: "remote:command",
   // main → renderer event: the summon hotkey brought the window forward
   windowSummoned: "window:summoned",
-  // notch renderer → main: grow/shrink the notch window on hover (so the
-  // hover-revealed controls + type field have room to appear).
-  notchSetExpanded: "notch:set-expanded",
+  // notch renderer → main: set the notch window height (px). The renderer drives
+  // the exact height it needs — collapsed bar, expanded for the type field, or
+  // taller still to show a tool-result card in the body (Dynamic-Island style).
+  notchSetHeight: "notch:set-height",
   // Overlay HUD: renderer → main, toggle click-through so the Stop button is
   // clickable while the rest of the overlay stays pass-through.
   overlaySetInteractive: "overlay:set-interactive",
@@ -94,11 +96,30 @@ export interface ToolCallEvent {
   input: unknown;
 }
 
+/** A tool's result, streamed to the renderer so it can render a result card.
+ *  Image-bearing outputs (computer-use screenshots) are stripped to a small
+ *  placeholder before they reach this channel — see the chatStart handler. */
+export interface ToolResultEvent {
+  toolCallId: string;
+  toolName: string;
+  output: unknown;
+}
+
 /** One transient action hint (mirrors the renderer's `ToolActivity`). */
 export interface SessionActivity {
   id: string;
   icon: string;
   label: string;
+}
+
+/** A tool call + result, relayed so view-only surfaces (notch) can render the
+ *  result card. Structurally matches the renderer's `ToolInvocation`. */
+export interface SessionToolInvocation {
+  id: string;
+  name: string;
+  input: unknown;
+  result: unknown;
+  status: "running" | "done" | "error";
 }
 
 /**
@@ -111,6 +132,8 @@ export interface SessionState {
   status: string;
   muted: boolean;
   activity: SessionActivity[];
+  /** Tool calls + results this turn — view surfaces render the latest as a card. */
+  toolInvocations: SessionToolInvocation[];
   /** The user's in-progress transcription (while listening). */
   liveCaption: string;
   /** Assistant text spoken so far this turn (TTS-synced; lags the stream). */
@@ -128,6 +151,7 @@ export type { WindowMode };
 export type ViewCommand =
   | { type: "submitText"; text: string }
   | { type: "toggleMute" }
+  | { type: "newConversation" }
   | { type: "expand" };
 
 export interface PermissionRequestPayload {

@@ -1,4 +1,4 @@
-import { Minimize2, Mic, MicOff, Settings, WavesHorizontal } from "lucide-react";
+import { Minimize2, Mic, MicOff, Settings, SquarePen, WavesHorizontal } from "lucide-react";
 import { StatusPill } from "@/components/status-bar";
 import { Button } from "@/components/ui/button";
 import type { DexStatus } from "@/lib/dex/state";
@@ -18,6 +18,7 @@ export function ThemeTopBar({
   isMuted,
   onToggleMute,
   onMinimize,
+  onNewConversation,
 }: {
   name?: string;
   status: DexStatus;
@@ -30,6 +31,8 @@ export function ThemeTopBar({
   onToggleMute?: () => void;
   /** Collapse into the slim notch bar. Hidden when omitted. */
   onMinimize?: () => void;
+  /** Start a fresh conversation (dismiss the current turn). Hidden when omitted. */
+  onNewConversation?: () => void;
 }) {
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 px-5 py-4 sm:px-6 sm:py-5">
@@ -64,6 +67,18 @@ export function ThemeTopBar({
             className="rounded-full bg-dex-surface/70 text-muted-foreground backdrop-blur hover:text-foreground"
           >
             {isMuted ? <MicOff /> : <Mic />}
+          </Button>
+        )}
+        {onNewConversation && (
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={onNewConversation}
+            aria-label="New conversation"
+            title="New conversation"
+            className="rounded-full bg-dex-surface/70 text-muted-foreground backdrop-blur hover:text-foreground"
+          >
+            <SquarePen />
           </Button>
         )}
         {onMinimize && (

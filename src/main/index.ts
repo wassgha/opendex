@@ -75,10 +75,11 @@ let windowMode: WindowMode = "full";
 let latestSessionState: SessionState | null = null;
 
 const NOTCH_SIZE = { width: 480, height: 44 };
-// Height when the notch is hovered — enough for the revealed controls plus the
-// type field that slides up from the bottom. The window grows downward (y stays
-// pinned at the top edge), so the cursor stays over the bar and hover holds.
-const NOTCH_EXPANDED_HEIGHT = 96;
+// The renderer drives the notch height (collapsed bar, expanded for the type
+// field, or taller to show a tool-result card). The window grows downward (y
+// stays pinned at the top edge), so the cursor stays over the bar and hover
+// holds. Clamp to a sane max so a renderer bug can't take over the screen.
+const NOTCH_MAX_HEIGHT = 260;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -315,22 +316,29 @@ function placeNotch(win: BrowserWindow) {
     x: Math.round(x + (width - NOTCH_SIZE.width) / 2),
     y,
     width: NOTCH_SIZE.width,
-    height: NOTCH_SIZE.height,
+    // Preserve the renderer-driven height (it owns it via setNotchHeight) so a
+    // card visible on entering notch mode isn't clipped back to the bare bar.
+    height: win.getBounds().height,
   });
 }
 
-// Grow/shrink the notch on hover, pinned to the top edge so the cursor stays
-// over the bar (otherwise the window would slide out from under the pointer and
-// hover would flicker). Only meaningful while the notch is the active surface.
-function setNotchExpanded(expanded: boolean) {
-  if (windowMode !== "notch") return;
+// Set the notch height, pinned to the top edge so the cursor stays over the bar
+// (otherwise the window would slide out from under the pointer and hover would
+// flicker). Only meaningful while the notch is the active surface.
+function setNotchHeight(height: number) {
+  // No windowMode guard: the notch renderer keeps its (possibly hidden) window
+  // sized correctly even while full mode is active, so re-showing it is instant
+  // and never stale. Resizing a hidden window is harmless.
   if (!notchWindow || notchWindow.isDestroyed()) return;
   const b = notchWindow.getBounds();
-  const height = expanded ? NOTCH_EXPANDED_HEIGHT : NOTCH_SIZE.height;
-  if (b.height === height) return;
+  const clamped = Math.max(
+    NOTCH_SIZE.height,
+    Math.min(Math.round(height), NOTCH_MAX_HEIGHT),
+  );
+  if (b.height === clamped) return;
   // animate: true → Cocoa tweens the resize on macOS (ignored elsewhere) so the
-  // type field eases into view instead of snapping.
-  notchWindow.setBounds({ x: b.x, y: b.y, width: b.width, height }, true);
+  // body eases into view instead of snapping.
+  notchWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: clamped }, true);
 }
 
 // ── Layout: full (main window) ↔ notch (notch window) ─────────────────────────
@@ -475,6 +483,24 @@ function broadcastSessionState(state: SessionState) {
   }
 }
 
+// Tool results stream to the renderer for result cards, but computer-use tools
+// return `{ type: "content", value: [...media...] }` screenshots — replace those
+// with a tiny placeholder so the IPC payload (and the renderer) stay light.
+function stripImageOutput(output: unknown): unknown {
+  if (
+    output &&
+    typeof output === "object" &&
+    (output as { type?: string }).type === "content" &&
+    Array.isArray((output as { value?: unknown[] }).value) &&
+    (output as { value: Array<{ type?: string }> }).value.some(
+      (c) => c.type === "media" || c.type === "file-data",
+    )
+  ) {
+    return { type: "content", value: [{ type: "text", value: "[screenshot]" }] };
+  }
+  return output;
+}
+
 function registerIpc() {
   const inFlight = new Map<string, AbortController>();
 
@@ -516,6 +542,16 @@ function registerIpc() {
           track("tool_used", { tool_name: call.toolName });
           if (!ac.signal.aborted && !sender.isDestroyed()) {
             sender.send(IPC.chatTool(requestId), call);
+          }
+        },
+        onToolResult: (result) => {
+          if (!ac.signal.aborted && !sender.isDestroyed()) {
+            sender.send(IPC.chatToolResult(requestId), {
+              ...result,
+              // Computer-use returns full screenshots; don't ship megabytes of
+              // base64 to the activity UI (which never renders them as cards).
+              output: stripImageOutput(result.output),
+            });
           }
         },
       });
@@ -615,8 +651,8 @@ function registerIpc() {
   });
 
   // Notch hover → grow/shrink the notch window.
-  ipcMain.on(IPC.notchSetExpanded, (_event, expanded: boolean) => {
-    setNotchExpanded(!!expanded);
+  ipcMain.on(IPC.notchSetHeight, (_event, height: number) => {
+    setNotchHeight(typeof height === "number" ? height : NOTCH_SIZE.height);
   });
 
   // The notch (a view-only window) relays session actions: `expand` switches
