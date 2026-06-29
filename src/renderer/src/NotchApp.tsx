@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CompactBar } from "@/components/compact-bar";
 import { StatusDot } from "@/components/status-bar";
 import { getDexTheme } from "@/components/themes/registry";
+import { getToolView } from "@skills/tool-views";
 import type { DexStatus } from "@/lib/dex/state";
 import type { SessionState } from "../../main/ipc/channels";
 
@@ -59,9 +60,12 @@ export function NotchApp() {
         ? state?.liveCaption || ""
         : "";
 
-  // Completed tool results — the notch shows the latest as a compact card
-  // (running ones stay as the caption/status until they resolve).
-  const cards = (state?.toolInvocations ?? []).filter((t) => t.status === "done");
+  // Completed tool results that actually have a card (weather/clock/web-search).
+  // Label-only tools (e.g. computer/open) are excluded so the notch doesn't open
+  // an empty card body for them. The notch shows the latest as a compact card.
+  const cards = (state?.toolInvocations ?? []).filter(
+    (t) => t.status === "done" && getToolView(t.name).Card,
+  );
 
   // The active theme may supply its own status indicator; otherwise the dot.
   const StatusIndicator = getDexTheme(themeId).StatusIndicator ?? StatusDot;
