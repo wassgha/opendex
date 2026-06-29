@@ -14,7 +14,7 @@ export function StopControl({ onStop }: { onStop: () => void }) {
     // doesn't block the settings gear / mute behind it; only the button itself
     // is interactive. titlebar-no-drag keeps the macOS drag region (which this
     // overlaps) from swallowing the click into a window-drag.
-    <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
       <button
         type="button"
         onClick={onStop}
@@ -32,15 +32,15 @@ export function StopControl({ onStop }: { onStop: () => void }) {
 }
 
 // A stack of transient banners showing what the agent is doing (tool calls),
-// rendered as global chrome over whichever theme is active. Newest at the
-// bottom; each entry self-expires from the hook's state.
+// rendered as global chrome over whichever theme is active. Stacked just above
+// the Stop control at the bottom, newest nearest it; each entry self-expires.
 export function ToolActivityBanner({ activity }: { activity: ToolActivity[] }) {
   if (activity.length === 0) return null;
   // Show only the most recent few so a long computer-use run doesn't fill the screen.
   const visible = activity.slice(-4);
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-16 z-30 flex flex-col items-center gap-2 px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-16 z-30 flex flex-col items-center gap-2 px-4">
       {visible.map((t) => (
         <div
           key={t.id}

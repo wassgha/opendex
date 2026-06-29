@@ -200,7 +200,7 @@ function JarvisTheme(props: DexThemeProps) {
       {(transcript.length > 0 || liveCaption.length > 0) && (
         <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex justify-center xl:hidden">
           <div
-            className="max-h-[36vh] w-full max-w-xl overflow-hidden px-6 pb-4 font-mono"
+            className="flex max-h-[36vh] w-full max-w-xl flex-col justify-end overflow-hidden px-6 pb-4 font-mono"
             style={{
               maskImage:
                 "linear-gradient(to top, black 0%, black 55%, transparent 100%)",

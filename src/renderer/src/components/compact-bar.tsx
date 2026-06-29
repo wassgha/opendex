@@ -10,8 +10,8 @@ import type { SessionToolInvocation } from "../../../main/ipc/channels";
 // always lands under the physical laptop notch and the two wings (flex-1, equal
 // share) keep it centered at any width.
 const NOTCH_GAP = 200; // reserved center gap ≈ physical notch width
-const COMPACT_WIDTH = 360; // at rest: status indicator + mic, no text
-const WIDE_WIDTH = 540; // expanded for a caption / controls / type field
+const COMPACT_WIDTH = 300; // at rest: status indicator + mic, no text
+const WIDE_WIDTH = 460; // expanded for a caption / controls / type field
 const BAR_H = 44; // the always-visible bar
 const CARD_H = 96; // body region for a tool-result card
 const TYPE_H = 52; // the type field, revealed on hover/focus

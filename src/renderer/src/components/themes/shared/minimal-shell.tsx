@@ -91,7 +91,7 @@ export function MinimalShell({
       {hasTranscript && (
         <div className="pointer-events-none absolute inset-x-0 bottom-20 z-10 flex justify-center">
           <div
-            className="max-h-[42vh] w-full max-w-2xl overflow-hidden px-6 pb-4"
+            className="flex max-h-[42vh] w-full max-w-2xl flex-col justify-end overflow-hidden px-6 pb-4"
             style={{
               maskImage:
                 "linear-gradient(to top, black 0%, black 55%, transparent 100%)",

@@ -212,10 +212,13 @@ function createOverlayWindow() {
 // it tracks whichever monitor is being controlled during computer-use).
 function positionOverlay(overlay: BrowserWindow) {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  const { x, y, width } = display.workArea;
-  // Start below where the notch bar sits so the HUD's banners never collide with
-  // it when both are on screen during a command.
-  overlay.setBounds({ x, y: y + NOTCH_SIZE.height + 8, width, height: 160 });
+  const { x, y, width, height } = display.workArea;
+  // Float the hints at the BOTTOM of the work area (above the Dock) so they sit
+  // out of the way of the notch bar at the top. The HUD content is bottom-anchored
+  // (Stop at bottom-4, banners stacking up from bottom-16); tall enough for the
+  // Stop control + the few activity banners above it.
+  const h = 260;
+  overlay.setBounds({ x, y: y + height - h, width, height: h });
 }
 
 // ── Permission popup ──────────────────────────────────────────────────────────
