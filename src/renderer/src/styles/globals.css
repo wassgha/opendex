@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Skills live outside the renderer's Vite root (src/skills), so Tailwind's
+   automatic content detection misses their view.tsx files — utility classes
+   used only there (e.g. the weather card's gradient) wouldn't be generated.
+   Scan that tree explicitly. */
+@source "../../../skills";
+
 :root {
   color-scheme: dark;
 

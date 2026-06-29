@@ -192,6 +192,8 @@ function createOverlayWindow() {
   // the user across Spaces — essential while driving a fullscreen app.
   overlay.setAlwaysOnTop(true, "screen-saver");
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Keep the HUD out of Mission Control / the Spaces bar (it's chrome, not a window).
+  if (process.platform === "darwin") overlay.setHiddenInMissionControl(true);
 
   positionOverlay(overlay);
   overlay.on("closed", () => {
@@ -244,6 +246,7 @@ function createPermissionWindow() {
   });
   permissionWindow = win;
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (process.platform === "darwin") win.setHiddenInMissionControl(true);
   win.on("closed", () => {
     if (permissionWindow === win) permissionWindow = null;
   });
@@ -299,6 +302,7 @@ function createNotchWindow() {
   notchWindow = win;
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   win.setAlwaysOnTop(true, "screen-saver");
+  if (process.platform === "darwin") win.setHiddenInMissionControl(true);
   win.on("closed", () => {
     if (notchWindow === win) notchWindow = null;
   });
