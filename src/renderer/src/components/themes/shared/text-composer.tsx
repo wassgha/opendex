@@ -16,19 +16,17 @@ export function TextComposer({
   onSubmit: (text: string) => void;
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+    inputRef.current?.focus();
+  }, []);
 
   // The summon hotkey (⌥Space) fires this window-level signal; reveal + focus
   // the input so the user can type immediately, Spotlight-style.
   useEffect(() => {
     const reveal = () => {
-      setOpen(true);
       inputRef.current?.focus();
     };
     window.addEventListener("opendex:summon", reveal);
@@ -41,30 +39,6 @@ export function TextComposer({
     onSubmit(text);
     setValue(""); // keep open for quick follow-ups
   };
-
-  const close = () => {
-    setValue("");
-    setOpen(false);
-  };
-
-  if (!open) {
-    return (
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        title="Type a message instead"
-        className={cn(
-          "rounded-full bg-dex-surface/60 text-[10px] uppercase tracking-[0.25em] text-muted-foreground backdrop-blur hover:text-foreground",
-          className,
-        )}
-      >
-        <Keyboard />
-        Type
-      </Button>
-    );
-  }
 
   return (
     <form
@@ -96,16 +70,6 @@ export function TextComposer({
         className="shrink-0 rounded-full"
       >
         <Send />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={close}
-        aria-label="Close typing"
-        className="shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-      >
-        <X />
       </Button>
     </form>
   );

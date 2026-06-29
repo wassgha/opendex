@@ -183,6 +183,13 @@ body {
   50.01%, 100% { opacity: 0.15; }
 }
 
+/* Dot-matrix status indicator: each dot fades in/out; per-dot delay + duration
+   (set inline per status) turn it into a wave / sweep / pulse. */
+@keyframes dex-matrix {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
 @keyframes dex-breath {
   0%, 100% { transform: scale(1); opacity: 0.92; }
   50% { transform: scale(1.04); opacity: 1; }

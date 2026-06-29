@@ -191,10 +191,17 @@ const opendex = {
     ipcRenderer.send(IPC.windowSetMode, mode);
   },
 
-  /** Notch only: set the notch window height (px) — the renderer drives the
-   *  exact height for the collapsed bar, the type field, or a result card. */
-  setNotchHeight(height: number): void {
-    ipcRenderer.send(IPC.notchSetHeight, height);
+  /** Notch only: set the notch window size (px) — the renderer measures its own
+   *  content and drives width + height (compact at rest, wider/taller for a
+   *  caption, type field, or result card). */
+  setNotchSize(width: number, height: number): void {
+    ipcRenderer.send(IPC.notchSetSize, { width, height });
+  },
+
+  /** Notch only: give the notch window OS keyboard focus so its type field can
+   *  receive keystrokes (it's shown unfocused via showInactive). */
+  focusNotch(): void {
+    ipcRenderer.send(IPC.notchFocus);
   },
 
   /** Subscribe to window-mode changes applied by main. Returns an unsubscribe fn. */

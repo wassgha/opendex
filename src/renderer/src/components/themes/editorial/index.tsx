@@ -3,7 +3,7 @@ import { WavesHorizontal } from "lucide-react";
 import { ThemeTopBar } from "../shared/theme-top-bar";
 import { TextComposer } from "../shared/text-composer";
 import { useAmplitudeFrame, ACTIVE_STATES } from "../shared/use-amplitude";
-import { STATUS_LABELS } from "@/lib/dex/state";
+import { STATUS_LABELS, type DexStatus } from "@/lib/dex/state";
 import { Card } from "@/components/ui/card";
 import { ToolCardLayer } from "@skills/tool-card-layer";
 import { cn } from "@/lib/utils";
@@ -207,6 +207,64 @@ function EditorialPreview() {
   );
 }
 
+// Editorial's status indicator: a small LED dot-matrix whose motion reflects
+// what the assistant is doing. Standby/idle → gray, static. Listening → a slow
+// left-to-right wave; thinking → a faster sweep; speaking → a vertical pulse.
+// (Pure CSS — the notch has no amplitude — using the dex-matrix keyframe with a
+// per-dot delay/duration. Editorial accent hardcoded since the notch has no
+// theme-scoped CSS vars.)
+const MATRIX_COLS = 4;
+const MATRIX_ROWS = 3;
+const ACCENT = "#da7756";
+const GRAY = "rgb(120 120 120)";
+
+function matrixMode(status: DexStatus): "idle" | "listen" | "think" | "speak" {
+  if (status === "thinking") return "think";
+  if (status === "speaking") return "speak";
+  // Only active capture animates. Passive standby (listening_wake), muted, idle,
+  // and errors stay calm/gray so the notch doesn't distract at rest.
+  if (status === "active_listening" || status === "follow_up_listening") {
+    return "listen";
+  }
+  return "idle";
+}
+
+function DotMatrixStatus({ status }: { status: DexStatus }) {
+  const mode = matrixMode(status);
+  const idle = mode === "idle";
+  // listen: gentle horizontal wave · think: faster sweep · speak: vertical pulse.
+  const duration = mode === "think" ? 720 : mode === "speak" ? 460 : 1100;
+
+  return (
+    <span
+      className="grid gap-[1.5px]"
+      style={{ gridTemplateColumns: `repeat(${MATRIX_COLS}, 2px)` }}
+      aria-hidden
+      title={status}
+    >
+      {Array.from({ length: MATRIX_COLS * MATRIX_ROWS }).map((_, i) => {
+        const col = i % MATRIX_COLS;
+        const row = Math.floor(i / MATRIX_COLS);
+        const delay = (mode === "speak" ? row : col) * 110;
+        return (
+          <span
+            key={i}
+            className="size-[2px] rounded-full"
+            style={
+              idle
+                ? { background: GRAY, opacity: 0.4 }
+                : {
+                    background: ACCENT,
+                    animation: `dex-matrix ${duration}ms ease-in-out ${delay}ms infinite`,
+                  }
+            }
+          />
+        );
+      })}
+    </span>
+  );
+}
+
 const theme: DexThemeDef = {
   id: "editorial",
   label: "Editorial",
@@ -215,6 +273,7 @@ const theme: DexThemeDef = {
   order: 1,
   Component: EditorialTheme,
   Preview: EditorialPreview,
+  StatusIndicator: DotMatrixStatus,
 };
 
 export default theme;

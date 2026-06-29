@@ -73,11 +73,14 @@ let windowMode: WindowMode = "full";
 // so a freshly-created window paints immediately instead of waiting for a change.
 let latestSessionState: SessionState | null = null;
 
-const NOTCH_SIZE = { width: 480, height: 44 };
-// The renderer drives the notch height (collapsed bar, expanded for the type
-// field, or taller to show a tool-result card). The window grows downward (y
-// stays pinned at the top edge), so the cursor stays over the bar and hover
-// holds. Clamp to a sane max so a renderer bug can't take over the screen.
+// The renderer drives the notch's size (the CompactBar measures its own content
+// and calls setNotchSize) — compact at rest, wider/taller as a caption, card, or
+// the type field appears. `NOTCH_SIZE` is the initial/min footprint; the window
+// stays centered as it resizes. Clamp to sane bounds so a renderer bug can't take
+// over the screen.
+const NOTCH_SIZE = { width: 320, height: 44 };
+const NOTCH_MIN_WIDTH = 280;
+const NOTCH_MAX_WIDTH = 640;
 const NOTCH_MAX_HEIGHT = 260;
 
 function createWindow() {
@@ -310,34 +313,35 @@ function createNotchWindow() {
 // using full display bounds (not workArea) so it sits at the physical top edge.
 function placeNotch(win: BrowserWindow) {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  const { x, y, width } = display.bounds;
+  const b = win.getBounds();
+  // Preserve the renderer-driven size (it owns width+height via setNotchSize) and
+  // just re-center it on the top edge of the display under the cursor.
   win.setBounds({
-    x: Math.round(x + (width - NOTCH_SIZE.width) / 2),
-    y,
-    width: NOTCH_SIZE.width,
-    // Preserve the renderer-driven height (it owns it via setNotchHeight) so a
-    // card visible on entering notch mode isn't clipped back to the bare bar.
-    height: win.getBounds().height,
+    x: Math.round(display.bounds.x + (display.bounds.width - b.width) / 2),
+    y: display.bounds.y,
+    width: b.width,
+    height: b.height,
   });
 }
 
-// Set the notch height, pinned to the top edge so the cursor stays over the bar
-// (otherwise the window would slide out from under the pointer and hover would
-// flicker). Only meaningful while the notch is the active surface.
-function setNotchHeight(height: number) {
+// Set the notch size, kept centered on the top edge so the cursor stays over the
+// bar as it grows (otherwise the window would slide out from under the pointer
+// and hover would flicker).
+function setNotchSize(width: number, height: number) {
   // No windowMode guard: the notch renderer keeps its (possibly hidden) window
   // sized correctly even while full mode is active, so re-showing it is instant
   // and never stale. Resizing a hidden window is harmless.
   if (!notchWindow || notchWindow.isDestroyed()) return;
   const b = notchWindow.getBounds();
-  const clamped = Math.max(
-    NOTCH_SIZE.height,
-    Math.min(Math.round(height), NOTCH_MAX_HEIGHT),
-  );
-  if (b.height === clamped) return;
+  const w = Math.max(NOTCH_MIN_WIDTH, Math.min(Math.round(width), NOTCH_MAX_WIDTH));
+  const h = Math.max(NOTCH_SIZE.height, Math.min(Math.round(height), NOTCH_MAX_HEIGHT));
+  // Re-center horizontally on the notch's current display; keep it pinned to top.
+  const display = screen.getDisplayNearestPoint({ x: Math.round(b.x + b.width / 2), y: b.y });
+  const x = Math.round(display.bounds.x + (display.bounds.width - w) / 2);
+  if (b.width === w && b.height === h && b.x === x) return;
   // animate: true → Cocoa tweens the resize on macOS (ignored elsewhere) so the
-  // body eases into view instead of snapping.
-  notchWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: clamped }, true);
+  // notch eases between sizes instead of snapping.
+  notchWindow.setBounds({ x, y: display.bounds.y, width: w, height: h }, true);
 }
 
 // ── Layout: full (main window) ↔ notch (notch window) ─────────────────────────
@@ -651,8 +655,14 @@ function registerIpc() {
   });
 
   // Notch hover → grow/shrink the notch window.
-  ipcMain.on(IPC.notchSetHeight, (_event, height: number) => {
-    setNotchHeight(typeof height === "number" ? height : NOTCH_SIZE.height);
+  ipcMain.on(IPC.notchSetSize, (_event, size: { width: number; height: number }) => {
+    setNotchSize(size?.width ?? NOTCH_SIZE.width, size?.height ?? NOTCH_SIZE.height);
+  });
+
+  ipcMain.on(IPC.notchFocus, () => {
+    if (windowMode === "notch" && notchWindow && !notchWindow.isDestroyed()) {
+      notchWindow.focus();
+    }
   });
 
   // The notch (a view-only window) relays session actions: `expand` switches

@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
 import { CompactBar } from "@/components/compact-bar";
+import { StatusDot } from "@/components/status-bar";
+import { getDexTheme } from "@/components/themes/registry";
 import type { DexStatus } from "@/lib/dex/state";
 import type { SessionState } from "../../main/ipc/channels";
+
+// The latest sentence (or in-progress fragment) of `text`, so the one-line notch
+// shows the sentence currently being spoken from its start, advancing as TTS
+// progresses — instead of freezing on the opening or scrolling a long tail.
+function currentSentence(text: string): string {
+  const parts = text.match(/[^.!?]*[.!?]+|[^.!?]+$/g);
+  if (!parts) return text.trim();
+  const last = parts[parts.length - 1].trim();
+  return last || (parts.length > 1 ? parts[parts.length - 2].trim() : "");
+}
 
 // The notch bar runs in its own transparent, always-on-top window (see
 // createNotchWindow). It owns no session state: it reads the live snapshot the
@@ -10,16 +22,19 @@ import type { SessionState } from "../../main/ipc/channels";
 export function NotchApp() {
   const [state, setState] = useState<SessionState | null>(null);
   const [agentName, setAgentName] = useState("");
+  const [themeId, setThemeId] = useState<string>();
 
   useEffect(() => window.opendex.onSessionState(setState), []);
 
   // The notch owns no config; read the assistant name (for the type-field
-  // prompt) once and keep it live as settings change.
+  // prompt) and the active theme (for its status indicator), kept live.
   useEffect(() => {
-    window.opendex.getConfig().then((c) => setAgentName(c.config.assistant.name));
-    return window.opendex.onConfigChanged((c) =>
-      setAgentName(c.config.assistant.name),
-    );
+    const apply = (c: { config: { assistant: { name: string }; appearance: { theme: string } } }) => {
+      setAgentName(c.config.assistant.name);
+      setThemeId(c.config.appearance.theme);
+    };
+    window.opendex.getConfig().then(apply);
+    return window.opendex.onConfigChanged(apply);
   }, []);
 
   // The summon hotkey focuses this window; surface + focus the type field too.
@@ -32,11 +47,14 @@ export function NotchApp() {
   );
 
   const status = (state?.status ?? "idle") as DexStatus;
-  // Mirror the main window: show the streamed reply while the assistant is
-  // thinking/replying, and the user's live transcription while listening.
+  // Show the text *as it's spoken*: the current sentence of `spokenCaption`
+  // (which tracks TTS playback, lagging the faster token stream). It reads from
+  // the start and advances sentence-by-sentence, like live captions — rather
+  // than the full reply racing ahead, or the accumulated text scrolling its tail.
+  // While listening, show the user's live transcription instead.
   const caption =
     status === "thinking" || status === "speaking"
-      ? state?.reply || ""
+      ? currentSentence(state?.spokenCaption || "")
       : status === "active_listening" || status === "follow_up_listening"
         ? state?.liveCaption || ""
         : "";
@@ -45,12 +63,16 @@ export function NotchApp() {
   // (running ones stay as the caption/status until they resolve).
   const cards = (state?.toolInvocations ?? []).filter((t) => t.status === "done");
 
+  // The active theme may supply its own status indicator; otherwise the dot.
+  const StatusIndicator = getDexTheme(themeId).StatusIndicator ?? StatusDot;
+
   return (
     <CompactBar
       status={status}
       caption={caption}
       toolInvocations={cards}
       agentName={agentName}
+      StatusIndicator={StatusIndicator}
       isMuted={state?.muted ?? false}
       onSubmitText={(text) => window.opendex.sendViewCommand({ type: "submitText", text })}
       onToggleMute={() => window.opendex.sendViewCommand({ type: "toggleMute" })}

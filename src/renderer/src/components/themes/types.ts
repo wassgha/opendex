@@ -49,4 +49,7 @@ export interface DexThemeDef {
   Component: ComponentType<DexThemeProps>;
   /** A small, audio-free glyph shown in the theme picker. */
   Preview: ComponentType;
+  /** Optional: the theme's own status indicator, used by the notch in place of
+   *  the default status dot (e.g. editorial's dot-matrix). */
+  StatusIndicator?: ComponentType<{ status: DexStatus }>;
 }

@@ -1,34 +1,37 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Maximize2, Mic, MicOff, Settings, X } from "lucide-react";
-import { StatusDot } from "@/components/status-bar";
 import { Button } from "@/components/ui/button";
 import { ToolCardLayer } from "@skills/tool-card-layer";
-import { STATUS_LABELS, type DexStatus } from "@/lib/dex/state";
+import type { DexStatus } from "@/lib/dex/state";
 import { cn } from "@/lib/utils";
 import type { SessionToolInvocation } from "../../../main/ipc/channels";
 
-// Notch height regions (px), summed by CompactBar to drive the window height.
-const BAR_H = 44; // the always-visible bar (matches NOTCH_SIZE.height in main)
+// Notch sizing (px). The window stays screen-centered, so a fixed center gap
+// always lands under the physical laptop notch and the two wings (flex-1, equal
+// share) keep it centered at any width.
+const NOTCH_GAP = 200; // reserved center gap ≈ physical notch width
+const COMPACT_WIDTH = 360; // at rest: status indicator + mic, no text
+const WIDE_WIDTH = 540; // expanded for a caption / controls / type field
+const BAR_H = 44; // the always-visible bar
 const CARD_H = 96; // body region for a tool-result card
 const TYPE_H = 52; // the type field, revealed on hover/focus
 
-// The notch bar's presentation. It fills its transparent host window (the notch
-// window — see createNotchWindow), drawing a flat top edge flush to the screen
-// and rounded bottom so it reads as hanging from the top "notch".
+// The notch bar's presentation. It fills its transparent, screen-centered host
+// window (createNotchWindow), drawing a flat top edge flush to the screen and a
+// rounded bottom so it reads as hanging from the top "notch".
 //
-// At rest it shows only the status + a standby (mic) toggle. Hovering it (or
-// focusing the type field, or the summon hotkey) reveals the expand + settings
-// buttons and a minimalist type field. When a tool result is available it also
-// shows that result as a card in the body, below the bar (under the physical
-// notch), Dynamic-Island style. The host window grows downward to fit whatever
-// is shown — the renderer sums the region heights and drives the window via
-// setNotchHeight. State + callbacks are wired by NotchApp from the session relay.
+// At rest it's compact — just the theme's status indicator + a standby (mic)
+// toggle, no text. It grows (animated by the window resize, driven via
+// setNotchSize) when there's a caption, a result card, or the hover-revealed
+// type field. The status indicator is supplied by the active theme, so a theme
+// can give the notch its own glyph. State + callbacks are wired by NotchApp.
 export function CompactBar({
   status,
   caption,
   toolInvocations,
   agentName,
   isMuted,
+  StatusIndicator,
   onSubmitText,
   onToggleMute,
   onNewConversation,
@@ -40,6 +43,8 @@ export function CompactBar({
   toolInvocations: SessionToolInvocation[];
   agentName: string;
   isMuted: boolean;
+  /** The active theme's status indicator (defaults to StatusDot in NotchApp). */
+  StatusIndicator: ComponentType<{ status: DexStatus }>;
   onSubmitText: (text: string) => void;
   onToggleMute: () => void;
   onNewConversation: () => void;
@@ -47,14 +52,19 @@ export function CompactBar({
   onOpenSettings: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const [typing, setTyping] = useState(false);
+  // Pinned open by the keyboard summon (no pointer involved); cleared on
+  // submit / Escape / when the window is hidden.
+  const [pinned, setPinned] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Stay expanded while hovered OR while the type field has focus. Expand
-  // immediately; collapse half a second after both drop so a quick blur or
-  // pointer drift doesn't snap the bar shut.
-  const rawExpanded = hovered || typing;
+  // Expand while the pointer is anywhere over the notch (bar OR the revealed
+  // field — it's one window, so moving between them stays "hovered"), or while
+  // pinned by summon. Expansion is NOT tied to input focus: an incidentally
+  // focused field (e.g. on an empty desktop, where nothing blurs it) must not
+  // keep it open. Collapse half a second after hover drops so a quick pointer
+  // drift doesn't snap it shut.
+  const rawExpanded = hovered || pinned;
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -66,47 +76,76 @@ export function CompactBar({
     return () => clearTimeout(timer);
   }, [rawExpanded]);
 
-  // When a tool result is available, the notch grows to show it as a card in the
-  // body below the bar (Dynamic-Island style) — separate from the hover/type
-  // expansion. Drive the host window's height from what's actually shown: the
-  // bar, plus the card body, plus the type field when expanded.
   const hasCard = toolInvocations.length > 0;
-  const targetHeight = BAR_H + (hasCard ? CARD_H : 0) + (expanded ? TYPE_H : 0);
-  useEffect(() => {
-    window.opendex.setNotchHeight(targetHeight);
-  }, [targetHeight]);
+  const hasCaption = caption.length > 0;
 
-  // The summon hotkey (⌥Space) focuses this window — reveal + focus the field so
-  // the user can type immediately, Spotlight-style.
+  // Drive the host window. Width is two-tier (compact at rest, wide when there's
+  // something to show) so the centered gap stays under the physical notch; height
+  // grows downward for the card + type field. The window animates between sizes.
+  const width = hasCaption || hasCard || expanded ? WIDE_WIDTH : COMPACT_WIDTH;
+  const height = BAR_H + (hasCard ? CARD_H : 0) + (expanded ? TYPE_H : 0);
+  useEffect(() => {
+    window.opendex.setNotchSize(width, height);
+  }, [width, height]);
+
+  // The summon hotkey (⌥Space) opens it without a pointer — pin it open + focus
+  // the field so the user can type immediately, Spotlight-style.
   useEffect(() => {
     const reveal = () => {
-      setTyping(true);
+      setPinned(true);
+      window.opendex.focusNotch();
       inputRef.current?.focus();
     };
     window.addEventListener("opendex:summon", reveal);
     return () => window.removeEventListener("opendex:summon", reveal);
   }, []);
 
-  // Collapse when the notch loses focus (e.g. it's hidden on expand-to-full or a
-  // summon toggle) so its expanded state never goes stale against the window
-  // height, which main resets to collapsed whenever it re-shows the notch.
+  // Reset to collapsed whenever the notch window is shown or hidden, or loses
+  // focus. The notch is shown with showInactive (never focused) and can hide
+  // while the cursor is still over it — so onMouseLeave doesn't reliably fire and
+  // `hovered` would get stuck. A real hover re-expands via onMouseEnter.
   useEffect(() => {
     const collapse = () => {
       setHovered(false);
-      setTyping(false);
+      setPinned(false);
     };
+    document.addEventListener("visibilitychange", collapse);
     window.addEventListener("blur", collapse);
-    return () => window.removeEventListener("blur", collapse);
+    return () => {
+      document.removeEventListener("visibilitychange", collapse);
+      window.removeEventListener("blur", collapse);
+    };
   }, []);
+
+  // When it collapses, drop keyboard focus so the now-hidden field can't keep
+  // capturing keystrokes.
+  useEffect(() => {
+    if (!expanded) inputRef.current?.blur();
+  }, [expanded]);
 
   const submit = () => {
     const text = value.trim();
     if (!text) return;
     onSubmitText(text);
-    setValue(""); // keep focus for quick follow-ups
+    setValue("");
+    setPinned(false); // close after sending (stays open if still hovered)
+  };
+
+  // The notch is shown unfocused (showInactive), so keystrokes only reach it once
+  // it has OS keyboard focus. Focus when the pointer reaches the type field (a
+  // deliberate move onto it) — so you can type without a click, but merely
+  // glancing at / hovering the bar never steals focus from the foreground app.
+  const focusField = () => {
+    window.opendex.focusNotch();
+    inputRef.current?.focus();
   };
 
   const canInteract = status !== "unsupported";
+
+  // Icon buttons are mouse-only (tabIndex -1) so the notch never auto-focuses one
+  // when the window is shown — which left the mic with a persistent focus ring.
+  const iconButton =
+    "rounded-full text-muted-foreground hover:text-foreground cursor-pointer";
 
   return (
     <div
@@ -114,47 +153,42 @@ export function CompactBar({
       onMouseLeave={() => setHovered(false)}
       className="flex h-screen w-screen flex-col overflow-hidden rounded-b-2xl bg-black"
     >
-      {/* Top bar. Left + right groups each take an equal share (flex-1) with a
-          fixed empty gap between them; since the notch window is screen-centered,
-          that gap lands under the physical laptop notch so nothing hides behind
-          it. */}
+      {/* Top bar: equal-share wings (so the fixed center gap stays centered under
+          the physical notch) — status indicator + optional caption on the left,
+          controls on the right. */}
       <div className="flex h-11 shrink-0 items-center pl-3.5 pr-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <StatusDot status={status} />
-          <div className="min-w-0 flex-1 truncate text-[13px] text-foreground/80">
-            {caption || (
-              <span className="text-muted-foreground">{STATUS_LABELS[status]}</span>
-            )}
-          </div>
+          <StatusIndicator status={status} />
+          {hasCaption && (
+            <div className="min-w-0 flex-1 truncate text-[13px] text-foreground/80">
+              {caption}
+            </div>
+          )}
         </div>
 
-        {/* Reserved center gap sized to roughly the physical notch width. */}
-        <div className="w-[200px] shrink-0" aria-hidden />
+        <div className="shrink-0" style={{ width: NOTCH_GAP }} aria-hidden />
 
-        {/* Mic stays pinned to the right edge; the expand + settings buttons are
-            revealed to its LEFT so they appear away from the cursor after a mic
-            click (no accidental hit on a button that wasn't there a moment ago). */}
         <div className="flex flex-1 items-center justify-end gap-1">
           {expanded && (
             <>
               <Button
                 variant="ghost"
                 size="icon-sm"
+                tabIndex={-1}
                 onClick={onExpand}
-                autoFocus={false}
                 aria-label="Expand to full window"
                 title="Expand to full window"
-                className="rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+                className={iconButton}
               >
                 <Maximize2 />
               </Button>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                autoFocus={false}
+                tabIndex={-1}
                 onClick={onOpenSettings}
                 aria-label="Settings"
-                className="rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+                className={iconButton}
               >
                 <Settings />
               </Button>
@@ -164,12 +198,12 @@ export function CompactBar({
             <Button
               variant="ghost"
               size="icon-sm"
+              tabIndex={-1}
               onClick={onToggleMute}
               aria-pressed={isMuted}
-              autoFocus={false}
               aria-label={isMuted ? "Resume listening" : "Stand by"}
               title={isMuted ? "On standby — click to resume" : "Listening — click to stand by"}
-              className="rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+              className={iconButton}
             >
               {isMuted ? <MicOff /> : <Mic />}
             </Button>
@@ -177,14 +211,15 @@ export function CompactBar({
         </div>
       </div>
 
-      {/* Tool-result card — shown in the body, centred under the physical notch
-          (which only covers the top bar), like the Dynamic Island. */}
+      {/* Tool-result card — in the body, below the bar (the physical notch only
+          covers the top bar), Dynamic-Island style. */}
       {hasCard && (
         <div className="flex shrink-0 justify-center px-3 pb-2">
           <div className="relative w-full max-w-[360px]">
             <ToolCardLayer invocations={toolInvocations} surface="notch" />
             <button
               type="button"
+              tabIndex={-1}
               onClick={onNewConversation}
               aria-label="Dismiss"
               title="Dismiss"
@@ -196,9 +231,7 @@ export function CompactBar({
         </div>
       )}
 
-      {/* Type field — slides up from the bottom when expanded. Minimalist: a
-          blinking caret + "Type to {name}" prompt while empty, native text once
-          you start typing. */}
+      {/* Type field — revealed when expanded; the window grows to reveal it. */}
       {canInteract && (
         <form
           onSubmit={(e) => {
@@ -211,18 +244,16 @@ export function CompactBar({
           )}
         >
           <div
-            onMouseDown={() => inputRef.current?.focus()}
             className="relative flex h-9 w-full items-center rounded-xl bg-white/[0.06] px-3"
           >
             <input
               ref={inputRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              onFocus={() => setTyping(true)}
-              onBlur={() => setTyping(false)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   setValue("");
+                  setPinned(false);
                   inputRef.current?.blur();
                 }
               }}

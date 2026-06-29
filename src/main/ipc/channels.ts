@@ -49,10 +49,14 @@ export const IPC = {
   remoteCommand: "remote:command",
   // main → renderer event: the summon hotkey brought the window forward
   windowSummoned: "window:summoned",
-  // notch renderer → main: set the notch window height (px). The renderer drives
-  // the exact height it needs — collapsed bar, expanded for the type field, or
-  // taller still to show a tool-result card in the body (Dynamic-Island style).
-  notchSetHeight: "notch:set-height",
+  // notch renderer → main: set the notch window size (px). The renderer measures
+  // its own content and drives both width and height — compact at rest, wider for
+  // a caption, taller for the type field or a tool-result card. Main keeps it
+  // centered on the top edge.
+  notchSetSize: "notch:set-size",
+  // notch renderer → main: give the notch window OS keyboard focus (it's shown
+  // with showInactive, so typing needs an explicit focus first).
+  notchFocus: "notch:focus",
   // Overlay HUD: renderer → main, toggle click-through so the Stop button is
   // clickable while the rest of the overlay stays pass-through.
   overlaySetInteractive: "overlay:set-interactive",
