@@ -48,6 +48,8 @@ function MainExperience({ data }: { data: PublicConfig }) {
 
   const dexOptions = useMemo<UseDexOptions>(
     () => ({
+      voiceMode: cfg.voice.mode,
+      realtimeIdleDisconnectSec: cfg.realtime.idleDisconnectSec,
       wakeWord: cfg.assistant.wakeWord,
       wakeMode: cfg.voiceInput.wakeMode,
       sttProvider: cfg.voiceInput.sttProvider,
@@ -58,6 +60,8 @@ function MainExperience({ data }: { data: PublicConfig }) {
       showToolActivity: cfg.appearance.showToolActivity,
     }),
     [
+      cfg.voice.mode,
+      cfg.realtime.idleDisconnectSec,
       cfg.assistant.wakeWord,
       cfg.voiceInput.wakeMode,
       cfg.voiceInput.sttProvider,

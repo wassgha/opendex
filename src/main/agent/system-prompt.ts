@@ -108,6 +108,50 @@ export function buildSystemPrompt({
   return `${persona}\n\n---\n\n${exampleGreeting(gender)}`;
 }
 
+// Extra rules for realtime speech-to-speech sessions. Latency punishes rambling
+// harder than TTS does, tool calls happen live mid-conversation, and heavy work
+// is delegated to the pipeline agent via run_task with spoken progress updates.
+const REALTIME_ADDENDUM = `You are speaking live over a realtime voice connection.
+
+- Be extra brief. One or two sentences is the norm; only go longer when the user asks for detail.
+- When the user's intent is clear, call tools immediately without asking for confirmation.
+- For anything that involves looking at the screen, operating apps or files, or multi-step desktop work, call run_task with complete, self-contained instructions — do not attempt it yourself.
+- While a delegated task runs you will receive notes prefixed "[task progress]" or "[task action]". When asked to respond mid-task, give ONE short sentence about what concretely changed since your last update — name the specific thing ("Found the invoice, filling in the amounts now."). Never say generic filler like "still working on it", and never read the notes verbatim.
+- When a tool returns a result, summarise the outcome in a sentence or two.
+- If a tool reports the user denied permission, say so and move on — do not retry.`;
+
+export interface RealtimePromptInputs {
+  config: OpenDexConfig;
+  /** Whether this session should open with the proactive greeting (first wake
+   *  of the app lifetime, greeting enabled). */
+  briefing: boolean;
+  /** Operating instructions from the skills exposed DIRECTLY to the session
+   *  (non-image skills). Delegated skills' manuals reach the pipeline
+   *  sub-agent through the normal chat path instead. */
+  skillPrompts?: string[];
+}
+
+/** Session instructions for a realtime speech-to-speech connection: the same
+ *  persona as the pipeline, the direct skills' manuals, realtime-specific
+ *  rules, and — when this session opens with a greeting — the briefing brief. */
+export function buildRealtimeInstructions({
+  config,
+  briefing,
+  skillPrompts = [],
+}: RealtimePromptInputs): string {
+  const parts = [buildPersona(config), ...skillPrompts, REALTIME_ADDENDUM];
+  const gender = config.assistant.userGender;
+
+  if (briefing && config.greeting.mode !== "none") {
+    const custom = config.greeting.customPrompt.trim();
+    parts.push(
+      config.greeting.mode === "custom" && custom ? custom : exampleGreeting(gender),
+    );
+  }
+
+  return parts.join("\n\n---\n\n");
+}
+
 /** Whether a proactive greeting should fire on first wake (drives the renderer). */
 export function greetingEnabled(config: OpenDexConfig): boolean {
   if (config.greeting.mode === "none") return false;

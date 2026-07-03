@@ -19,8 +19,12 @@ export function SettingsApp() {
     );
   }
 
+  // Sections can hide themselves for the current config (e.g. Voice (TTS) when
+  // realtime voice mode is on). If the active one just hid — the user flipped
+  // the mode live — fall back to the first visible section.
+  const visibleSections = SETTINGS_SECTIONS.filter((s) => !s.hidden?.(data));
   const section =
-    SETTINGS_SECTIONS.find((s) => s.id === active) ?? SETTINGS_SECTIONS[0];
+    visibleSections.find((s) => s.id === active) ?? visibleSections[0];
   const Active = section.Component;
 
   return (
@@ -30,8 +34,8 @@ export function SettingsApp() {
         <div className="px-2 py-3 text-sm font-semibold tracking-tight text-foreground">
           Settings
         </div>
-        {SETTINGS_SECTIONS.map((s) => {
-          const selected = s.id === active;
+        {visibleSections.map((s) => {
+          const selected = s.id === section.id;
           return (
             <button
               key={s.id}

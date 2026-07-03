@@ -4,6 +4,9 @@ import {
   IPC,
   type ChatMessage,
   type PermissionRequestPayload,
+  type RealtimeClientMessage,
+  type RealtimeServerNotice,
+  type RealtimeStartResult,
   type SessionState,
   type ToolCallEvent,
   type ToolResultEvent,
@@ -104,6 +107,40 @@ const opendex = {
   /** Synthesise a sentence to MP3 bytes for playback in the renderer. */
   async synthesize(text: string): Promise<ArrayBuffer> {
     return ipcRenderer.invoke(IPC.ttsSynthesize, text);
+  },
+
+  // ── Realtime voice sessions ───────────────────────────────────────────────
+  // The WebSocket lives in main (the gateway key authenticates the upgrade);
+  // the renderer streams mic PCM up and plays the audio notices coming back.
+
+  /** Open a realtime session in main. `briefing` opens it with the proactive
+   *  greeting. Rejects with a user-facing reason (unset key, failed connect). */
+  realtimeStart(opts: { briefing: boolean }): Promise<RealtimeStartResult> {
+    return ipcRenderer.invoke(IPC.realtimeStart, opts);
+  },
+
+  /** Drive an open session: mic audio frames, typed text, task-progress
+   *  context, run_task results, response control. */
+  realtimeSend(sessionId: string, msg: RealtimeClientMessage): void {
+    ipcRenderer.send(IPC.realtimeClient, sessionId, msg);
+  },
+
+  /** Subscribe to a session's notices (audio, transcripts, tool calls,
+   *  disconnect). Returns an unsubscribe fn. */
+  onRealtimeEvent(
+    sessionId: string,
+    handler: (notice: RealtimeServerNotice) => void,
+  ): () => void {
+    const channel = IPC.realtimeEvent(sessionId);
+    const listener = (_e: IpcRendererEvent, notice: RealtimeServerNotice) =>
+      handler(notice);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
+
+  /** Close a session (idle disconnect, mute, mode switch). Safe to call twice. */
+  realtimeEnd(sessionId: string): void {
+    ipcRenderer.send(IPC.realtimeEnd, sessionId);
   },
 
   /** Read the full (non-secret) config plus which secrets are present. */

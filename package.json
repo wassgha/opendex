@@ -19,6 +19,7 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "smoke:chat": "tsx scripts/smoke-chat.ts",
+    "smoke:realtime": "tsx scripts/smoke-realtime.ts",
     "dist": "electron-vite build && electron-builder",
     "release": "electron-vite build && electron-builder --publish always",
     "cut:patch": "pnpm version patch -m \"Release v%s\" && git push --follow-tags",
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.86",
+    "@ai-sdk/gateway": "4.0.0-canary.107",
     "@ai-sdk/openai": "^3.0.74",
     "@elevenlabs/elevenlabs-js": "^2.49.1",
     "@huggingface/transformers": "^4.2.0",

@@ -21,13 +21,50 @@ import {
 } from "@/components/llm/provider-picker";
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
-import { Dot, Pencil } from "lucide-react";
+import {
+  REALTIME_MODELS,
+  getRealtimeModelMeta,
+} from "../../../../main/config/realtime-models";
+import { AudioWaveform, Dot, Pencil, SlidersHorizontal } from "lucide-react";
 
 interface Step {
   key: string;
   title: string;
   subtitle: string;
   render: () => React.ReactNode;
+}
+
+/** One selectable card in the voice-mode fork step. */
+function VoiceModeCard({
+  selected,
+  onSelect,
+  Icon,
+  title,
+  blurb,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  Icon: typeof AudioWaveform;
+  title: string;
+  blurb: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${
+        selected
+          ? "border-white/60 bg-white/10"
+          : "border-white/10 bg-white/[0.03] hover:border-white/25"
+      }`}
+    >
+      <Icon className="mt-0.5 size-5 shrink-0 text-white/70" />
+      <span>
+        <span className="block text-sm font-medium text-white">{title}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-white/50">{blurb}</span>
+      </span>
+    </button>
+  );
 }
 
 /** Inline, auto-sizing name field rendered mid-sentence ("…my name is Dex").
@@ -114,6 +151,97 @@ export function OnboardingWizard({
       ),
     },
     {
+      key: "voicemode",
+      title: "How conversations run",
+      subtitle: "Two ways to talk to OpenDex — you can switch anytime in Settings.",
+      render: () => (
+        <div className="flex flex-col gap-3">
+          <VoiceModeCard
+            selected={config.voice.mode === "pipeline"}
+            onSelect={() => setConfig({ voice: { mode: "pipeline" } })}
+            Icon={SlidersHorizontal}
+            title="Classic pipeline"
+            blurb="Separate wake word, transcription, language model, and voice. Free, offline options for every stage, and full control over each."
+          />
+          <VoiceModeCard
+            selected={config.voice.mode === "realtime"}
+            onSelect={() => setConfig({ voice: { mode: "realtime" } })}
+            Icon={AudioWaveform}
+            title="Realtime voice"
+            blurb="One speech-to-speech model listens and answers in its own voice — the most natural conversations and the fastest turns. Needs a Vercel AI Gateway key; screen control still runs through your language model."
+          />
+        </div>
+      ),
+    },
+    ...(config.voice.mode === "realtime"
+      ? [
+          {
+            key: "realtime",
+            title: "Realtime voice",
+            subtitle: "The model that listens and speaks, and how a conversation starts.",
+            render: () => {
+              const realtimeMeta = getRealtimeModelMeta(config.realtime.model);
+              return (
+                <>
+                  <SecretField
+                    label="Vercel AI Gateway key"
+                    hint="Realtime sessions connect through the gateway (same key as the gateway model provider)."
+                    present={secrets.AI_GATEWAY_API_KEY}
+                    onSave={(v) => setSecret("AI_GATEWAY_API_KEY", v)}
+                  />
+                  <SelectField
+                    label="Realtime model"
+                    hint={realtimeMeta?.blurb}
+                    value={config.realtime.model}
+                    options={REALTIME_MODELS.map((m) => ({ value: m.id, label: m.label }))}
+                    onChange={(v) => {
+                      const meta = getRealtimeModelMeta(v);
+                      setConfig({
+                        realtime: {
+                          ...config.realtime,
+                          model: v,
+                          voice: meta?.voices[0]?.id ?? "",
+                        },
+                      });
+                    }}
+                  />
+                  {realtimeMeta && realtimeMeta.voices.length > 0 && (
+                    <SelectField
+                      label="Voice"
+                      value={config.realtime.voice}
+                      options={realtimeMeta.voices.map((v) => ({
+                        value: v.id,
+                        label: v.label,
+                      }))}
+                      onChange={(v) =>
+                        setConfig({ realtime: { ...config.realtime, voice: v } })
+                      }
+                    />
+                  )}
+                  <SelectField
+                    label="How a conversation starts"
+                    hint="The wake word (or push-to-talk) connects a session; it hangs up after a stretch of silence."
+                    value={config.voiceInput.wakeMode}
+                    options={[
+                      { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
+                      { value: "vosk", label: "Wake word (Vosk — free, offline)" },
+                      { value: "webspeech", label: "Wake word (Web Speech)" },
+                    ]}
+                    onChange={(v) =>
+                      setConfig({ voiceInput: { ...config.voiceInput, wakeMode: v } })
+                    }
+                  />
+                  <p className="text-xs text-white/40">
+                    Sessions are billed by the provider and capped at twenty-five
+                    minutes — the wake word reconnects seamlessly.
+                  </p>
+                </>
+              );
+            },
+          } satisfies Step,
+        ]
+      : [
+    {
       key: "voice",
       title: "Voice",
       subtitle: "How OpenDex speaks back to you.",
@@ -199,6 +327,7 @@ export function OnboardingWizard({
         </>
       ),
     },
+        ]),
     {
       key: "appearance",
       title: "Voice visualization",
@@ -248,8 +377,11 @@ export function OnboardingWizard({
 
   const step = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
-  // Block advancing past the model step until a provider is chosen and usable.
-  const blocked = step.key === "llm" && !isProviderReady(data, chosenProvider, apple);
+  // Block advancing past the model step until a provider is chosen and usable,
+  // and past the realtime step until the gateway key is saved.
+  const blocked =
+    (step.key === "llm" && !isProviderReady(data, chosenProvider, apple)) ||
+    (step.key === "realtime" && !secrets.AI_GATEWAY_API_KEY);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a] p-0 md:p-6">

@@ -9,7 +9,9 @@
          script-src; it's a deliberate tradeoff for the offline Vosk engine.
          The renderer only loads our own bundle + trusted model CDNs.)
          connect-src allows on-demand model downloads (Hugging Face for Whisper,
-         GitHub Pages for the Vosk model, jsDelivr for the ONNX runtime). -->
+         GitHub Pages for the Vosk model, jsDelivr for the ONNX runtime). The
+         realtime-voice WebSocket is NOT here on purpose: it lives in the main
+         process (the gateway key authenticates the upgrade). -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self';

@@ -10,6 +10,14 @@ export type WakeMode = "webspeech" | "manual" | "vosk";
 /** Window layout: the full themed experience, or a slim top-pinned bar. */
 export type WindowMode = "full" | "notch";
 export type SttProvider = "webspeech" | "openai" | "whisper-local" | "vosk-local";
+/** How the voice session runs: `pipeline` = wake → STT → LLM → TTS (separate
+ *  engines, free/local options); `realtime` = one speech-to-speech model over a
+ *  WebSocket (most natural voice, needs a gateway key). */
+export type VoiceMode = "pipeline" | "realtime";
+/** Which backend hosts the realtime session. `gateway` is the Vercel AI Gateway
+ *  (one key, OpenAI + xAI realtime models); `openai` is reserved for a direct
+ *  BYOK connection (not implemented yet). */
+export type RealtimeProvider = "gateway" | "openai";
 /** Which provider routes chat completions. `apple` is free + on-device (macOS);
  *  `openai`/`anthropic` are bring-your-own-key; `gateway` is the Vercel AI
  *  Gateway (one key, any provider); `opendex` is our hosted subscription
@@ -56,10 +64,27 @@ export interface OpenDexConfig {
     mode: GreetingMode;
     customPrompt: string;
   };
+  voice: {
+    /** pipeline = today's wake→STT→LLM→TTS flow · realtime = speech-to-speech session */
+    mode: VoiceMode;
+  };
+  realtime: {
+    /** Which backend hosts the realtime session (v1 ships gateway only). */
+    provider: RealtimeProvider;
+    /** Gateway slash-form model id, e.g. "openai/gpt-realtime-2". */
+    model: string;
+    /** Provider voice id the model speaks with, e.g. "marin". */
+    voice: string;
+    /** Seconds of user inactivity before the session disconnects back to
+     *  passive wake. Must stay under the gateway's 300s idle kill. */
+    idleDisconnectSec: number;
+  };
   voiceInput: {
-    /** How active listening is triggered. */
+    /** How active listening is triggered. In realtime mode this still gates
+     *  when a session connects; `sttProvider` is unused there (the realtime
+     *  model transcribes). */
     wakeMode: WakeMode;
-    /** Which engine transcribes the captured command. */
+    /** Which engine transcribes the captured command (pipeline mode). */
     sttProvider: SttProvider;
     /** transformers.js Whisper model id (local STT). */
     whisperModel: string;
@@ -122,6 +147,19 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     system: { voiceURI: null, rate: 1, pitch: 1 },
   },
   greeting: { mode: "none", customPrompt: "" },
+  // Pipeline by default — realtime is an explicit choice (it needs a gateway
+  // key and bills per session). mergeConfig back-fills these sections into
+  // configs written before they existed.
+  voice: { mode: "pipeline" },
+  realtime: {
+    provider: "gateway",
+    model: "openai/gpt-realtime-2",
+    voice: "marin",
+    // Short follow-up window: sessions bill by the minute, so hang up quickly
+    // once nobody is talking (the timer never counts mid-speech or during
+    // playback — see realtime-session.ts resetIdle).
+    idleDisconnectSec: 10,
+  },
   voiceInput: {
     // Free, offline defaults: Vosk wake word + local Whisper transcription.
     wakeMode: "vosk",

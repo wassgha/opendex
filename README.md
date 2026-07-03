@@ -29,22 +29,33 @@ Or browse every version on the [Releases](https://github.com/wassgha/opendex/rel
 
 The app **auto-updates**: it checks GitHub Releases on launch (and hourly), downloads new versions in the background, and prompts you to restart when one is ready.
 
+## Notch mode
+
+When you click away, OpenDex collapses into a compact bar that hangs from the top of your screen — flush with the MacBook notch. Stay hands-free while the agent works; summon it back with ⌥Space.
+
+<div align="center">
+
+[![Notch mode — compact bar in the MacBook notch](screenshots/notch-mode.gif)](https://getopendex.com/)
+
+</div>
+
 ## What is OpenDex?
 
-OpenDex is a desktop app that turns any LLM into a hands-free, **Iron-Man-style voice assistant**. Say the wake word (or push to talk), speak naturally, and the agent thinks, uses tools, and replies out loud — streaming its answer into a live visualization.
+OpenDex is a fully open-source, free and customizable voice-first desktop assistant that you simply talk to. Wake it, ask for something, and let it answer or execute tasks on your behale while your own customized UI shows what's happening.
 
-It's a **harness**, not a single bot: the model, the voice, the wake/transcription engines, the on-screen theme, the greeting, and the agent's skills are all configurable, and it can run **fully offline and free** (local speech in, local speech recognition, system voice out) — and on a Mac with Apple Intelligence, even the model runs on-device, so the whole loop is free with no key.
+OpenDex is an agentic harness built around voice. It's fully customizable: change its personality, its voice, its UI or its underlaying LLM. Simple settings make it easy to swap the model, the voice, wake/STT engines, theme, greeting, and which skills are enabled.
 
 ## Features
 
-- 🎙️ **Voice-first loop** — wake word → listen → think (with tools) → speak, plus natural follow-ups and opt-in barge-in (interrupt mid-reply).
-- 🧠 **Bring any model** — pick your provider in setup: **Apple Intelligence** (on-device, free, no key — macOS), your own **OpenAI** or **Anthropic** key, or the **Vercel AI Gateway** (one key → Claude, GPT, Gemini, and more). _(An OpenDex hosted subscription — sign in, no keys, cloud-synced — is coming soon.)_
-- 🆓 **Free & offline option** — Vosk wake word + local Whisper transcription (WASM, no signup) and your OS's built-in voice. No data leaves the machine except the LLM call.
-- 🔌 **Pluggable voice I/O** — wake via push-to-talk, Vosk, or Web Speech; transcribe via local Whisper/Vosk, OpenAI, or Web Speech; speak via ElevenLabs or system TTS.
-- 🎨 **Full-interface themes** — the theme *is* the whole UI: a cinematic **Jarvis HUD** with an animated arc reactor, a minimal **Talking Dot**, or a **Typing Cursor** terminal. All react to your voice.
-- 🛠️ **Agentic skills with a permission gate** — the agent can take real actions (e.g. open apps & URLs); sensitive actions pop an **Allow once / Always / Deny** prompt that's remembered per skill.
-- 🖥️ **Computer-use (opt-in)** — let it *see the screen and drive the mouse & keyboard* to operate apps for you. Works with any vision model (screenshots stream back as images), and stays behind the permission gate.
-- 🔐 **Secure by design** — API keys are encrypted with your OS keychain and live only in the main process, never in the UI.
+- 🎙️ **Voice-first, real-time loop** — wake word or hotkey, then speak. Follow-ups work in the same session; say the wake word again to cut it off mid-reply.
+- 🧠 **Bring any model**  — Apple Intelligence on-device (macOS, free), your own OpenAI or Anthropic key, or Vercel AI Gateway (one key, many models). A hosted OpenDex plan is on the way.
+- **Can run offline** — Vosk wake word + local Whisper + system TTS are a local-first option. No accounts, no uploads — only the LLM call leaves your machine, and you can skip that too on Apple Silicon.
+- 🔌 **Pluggable voice I/O**  —  Choose between push-to-talk, Vosk, or Web Speech for wake; local Whisper/Vosk, OpenAI, or Web Speech for transcription; ElevenLabs or the OS voice for output or switch to a fully-integrated Realtime stack using OpenAI Realtime or xAI Voice for a more natural conversation
+- 🎨 **Build your own themes** — Jarvis HUD, Talking Dot, or Typing Cursor. Each one is a full interface, not just a skin, and they react to your mic.
+- 🛠️ **Build your own Skills** — the agent can open apps, search the web, and more. Risky actions pause for Allow once / Always / Deny; your choice sticks per skill.
+- **Computer-use (off by default)** — with your OK, it can screenshot the desktop and drive mouse and keyboard. Any vision model works; every action goes through the same permission gate.
+- 🔐 **Secure by design** — API keys are encrypted with your OS keychain and live only 
+in the main process, never in the UI.
 
 ## Themability
 

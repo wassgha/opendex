@@ -20,6 +20,11 @@ export interface SkillMeta {
   sensitive: boolean;
   /** When true, the skill is OFF unless the user explicitly enables it. */
   optIn?: boolean;
+  /** When true, this skill's tools return images (screenshots) to the model.
+   *  Realtime speech-to-speech sessions take no image input, so these tools are
+   *  never exposed to a realtime session directly — they run inside a delegated
+   *  run_task agent instead (see src/main/agent/realtime). */
+  imageResults?: boolean;
 }
 
 /** What a tool's `execute` result is transformed into before it reaches the
