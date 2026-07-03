@@ -14,9 +14,9 @@ const NOTCH_GAP = 190; // reserved center gap ≈ physical notch width
 const COMPACT_WIDTH = 200; // at rest: status indicator + mic, no text
 const WIDE_WIDTH = 420; // expanded for a caption / controls / type field
 const BAR_H = 44; // the always-visible bar
-const CARD_H = 96; // body region for a tool-result card'
-const CAPTION_H = 24; // body region for a caption
-const TYPE_H = 52; // the type field, revealed on hover/focus
+const CARD_H = 80; // body region for a tool-result card'
+const CAPTION_H = 36; // body region for a caption
+const TYPE_H = 42; // the type field, revealed on hover/focus
 
 // The notch bar's presentation. It fills its transparent, screen-centered host
 // window (createNotchWindow), drawing a flat top edge flush to the screen and a
@@ -66,7 +66,8 @@ export function CompactBar({
   // focused field (e.g. on an empty desktop, where nothing blurs it) must not
   // keep it open. Collapse half a second after hover drops so a quick pointer
   // drift doesn't snap it shut.
-  const rawExpanded = hovered || pinned;
+  const hasText = value.trim().length > 0;
+  const rawExpanded = hovered || pinned || hasText;
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -230,7 +231,7 @@ export function CompactBar({
         {hasCaption && (
           <motion.div
             key="caption"
-            className="min-w-0 flex-1 truncate text-[13px] text-foreground/80 px-3 py-1"
+            className="min-w-0 truncate text-[13px] mb-2 text-foreground/80 px-3 py-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -296,11 +297,8 @@ export function CompactBar({
                   inputRef.current?.blur();
                 }
               }}
-              // Hide the native caret while empty so the synthetic blinking one
-              // below is the only cursor (and it shows even when this window
-              // isn't focused, signalling "ready to type").
               className={cn(
-                "h-full w-full bg-transparent text-[13px] text-foreground/90 outline-none",
+                "h-full w-full bg-transparent text-[13px] text-foreground/90 outline-none pr-6",
                 value === "" && "caret-transparent",
               )}
               aria-label={`Type to ${agentName || "your assistant"}`}
@@ -311,6 +309,28 @@ export function CompactBar({
                 <span>Type to {agentName || "your assistant"}</span>
               </div>
             )}
+            <AnimatePresence>
+              {hasText && (
+                <motion.button
+                  type="button"
+                  tabIndex={-1}
+                  key="clear"
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.6 }}
+                  transition={{ duration: 0.12, ease: "easeOut" }}
+                  onClick={() => {
+                    setValue("");
+                    setPinned(false);
+                    inputRef.current?.blur();
+                  }}
+                  aria-label="Clear and close"
+                  className="absolute right-2 grid size-5 cursor-pointer place-items-center rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
         </form>
       )}
