@@ -48,7 +48,7 @@ export function ThemeTopBar({
           </>
         )}
       </div>
-      <div className="pointer-events-auto flex shrink-0 items-center gap-2">
+      <div className="titlebar-no-drag pointer-events-auto relative z-40 flex shrink-0 items-center gap-2">
         {showStatus && (
           <StatusPill status={status} className="hidden sm:inline-flex" />
         )}

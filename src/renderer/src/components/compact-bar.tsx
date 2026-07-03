@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Maximize2, Mic, MicOff, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToolCardLayer } from "@skills/tool-card-layer";
@@ -9,11 +10,12 @@ import type { SessionToolInvocation } from "../../../main/ipc/channels";
 // Notch sizing (px). The window stays screen-centered, so a fixed center gap
 // always lands under the physical laptop notch and the two wings (flex-1, equal
 // share) keep it centered at any width.
-const NOTCH_GAP = 200; // reserved center gap ≈ physical notch width
-const COMPACT_WIDTH = 300; // at rest: status indicator + mic, no text
-const WIDE_WIDTH = 460; // expanded for a caption / controls / type field
+const NOTCH_GAP = 190; // reserved center gap ≈ physical notch width
+const COMPACT_WIDTH = 200; // at rest: status indicator + mic, no text
+const WIDE_WIDTH = 420; // expanded for a caption / controls / type field
 const BAR_H = 44; // the always-visible bar
-const CARD_H = 96; // body region for a tool-result card
+const CARD_H = 96; // body region for a tool-result card'
+const CAPTION_H = 24; // body region for a caption
 const TYPE_H = 52; // the type field, revealed on hover/focus
 
 // The notch bar's presentation. It fills its transparent, screen-centered host
@@ -72,7 +74,7 @@ export function CompactBar({
       setExpanded(true);
       return;
     }
-    const timer = setTimeout(() => setExpanded(false), 500);
+    const timer = setTimeout(() => setExpanded(false), 200);
     return () => clearTimeout(timer);
   }, [rawExpanded]);
 
@@ -82,8 +84,8 @@ export function CompactBar({
   // Drive the host window. Width is two-tier (compact at rest, wide when there's
   // something to show) so the centered gap stays under the physical notch; height
   // grows downward for the card + type field. The window animates between sizes.
-  const width = hasCaption || hasCard || expanded ? WIDE_WIDTH : COMPACT_WIDTH;
-  const height = BAR_H + (hasCard ? CARD_H : 0) + (expanded ? TYPE_H : 0);
+  const width = hasCard || expanded ? WIDE_WIDTH : COMPACT_WIDTH;
+  const height = BAR_H + (hasCard ? CARD_H : 0) + (hasCaption ? CAPTION_H : 0) + (expanded ? TYPE_H : 0);
   useEffect(() => {
     window.opendex.setNotchSize(width, height);
   }, [width, height]);
@@ -156,80 +158,117 @@ export function CompactBar({
       {/* Top bar: equal-share wings (so the fixed center gap stays centered under
           the physical notch) — status indicator + optional caption on the left,
           controls on the right. */}
-      <div className="flex h-11 shrink-0 items-center pl-3.5 pr-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex w-full h-10 shrink-0 items-start pl-2 pr-2">
+        <div className="flex h-9 min-w-0 flex-1 items-center justify-start pl-3 gap-2">
           <StatusIndicator status={status} />
-          {hasCaption && (
-            <div className="min-w-0 flex-1 truncate text-[13px] text-foreground/80">
-              {caption}
-            </div>
-          )}
         </div>
 
-        <div className="shrink-0" style={{ width: NOTCH_GAP }} aria-hidden />
+        <div className="shrink-0 h-9" style={{ width: NOTCH_GAP }} aria-hidden />
 
-        <div className="flex flex-1 items-center justify-end gap-1">
-          {expanded && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                tabIndex={-1}
-                onClick={onExpand}
-                aria-label="Expand to full window"
-                title="Expand to full window"
-                className={iconButton}
+        <div className="flex flex-1 h-9 items-center justify-start gap-1">
+          <AnimatePresence>
+            {canInteract && (
+              <motion.div
+                key="mic"
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
               >
-                <Maximize2 />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                tabIndex={-1}
-                onClick={onOpenSettings}
-                aria-label="Settings"
-                className={iconButton}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  tabIndex={-1}
+                  onClick={onToggleMute}
+                  aria-pressed={isMuted}
+                  aria-label={isMuted ? "Resume listening" : "Stand by"}
+                  title={isMuted ? "On standby — click to resume" : "Listening — click to stand by"}
+                  className={iconButton}
+                >
+                  {isMuted ? <MicOff /> : <Mic />}
+                </Button>
+              </motion.div>
+            )}
+            {expanded && (
+              <motion.div
+                key="expand-controls"
+                className="flex items-center gap-1"
+                initial={{ opacity: 0, scale: 0.6, width: 0 }}
+                animate={{ opacity: 1, scale: 1, width: "auto" }}
+                exit={{ opacity: 0, scale: 0.6, width: 0 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
               >
-                <Settings />
-              </Button>
-            </>
-          )}
-          {canInteract && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              tabIndex={-1}
-              onClick={onToggleMute}
-              aria-pressed={isMuted}
-              aria-label={isMuted ? "Resume listening" : "Stand by"}
-              title={isMuted ? "On standby — click to resume" : "Listening — click to stand by"}
-              className={iconButton}
-            >
-              {isMuted ? <MicOff /> : <Mic />}
-            </Button>
-          )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  tabIndex={-1}
+                  onClick={onExpand}
+                  aria-label="Expand to full window"
+                  title="Expand to full window"
+                  className={iconButton}
+                >
+                  <Maximize2 />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  tabIndex={-1}
+                  onClick={onOpenSettings}
+                  aria-label="Settings"
+                  className={iconButton}
+                >
+                  <Settings />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
+      {/* Speech */}
+      <AnimatePresence>
+        {hasCaption && (
+          <motion.div
+            key="caption"
+            className="min-w-0 flex-1 truncate text-[13px] text-foreground/80 px-3 py-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {caption}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Tool-result card — in the body, below the bar (the physical notch only
           covers the top bar), Dynamic-Island style. */}
-      {hasCard && (
-        <div className="flex shrink-0 justify-center px-3 pb-2">
-          <div className="relative w-full max-w-[360px]">
-            <ToolCardLayer invocations={toolInvocations} surface="notch" />
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={onNewConversation}
-              aria-label="Dismiss"
-              title="Dismiss"
-              className="absolute -right-1.5 -top-1.5 grid size-5 cursor-pointer place-items-center rounded-full bg-black/40 text-white/80 backdrop-blur hover:bg-black/60 hover:text-white"
-            >
-              <X className="size-3" />
-            </button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {hasCard && (
+          <motion.div
+            key="tool-card"
+            className="flex shrink-0 justify-center px-3 pb-2"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <div className="relative w-full max-w-[360px]">
+              <ToolCardLayer invocations={toolInvocations} surface="notch" />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={onNewConversation}
+                aria-label="Dismiss"
+                title="Dismiss"
+                className="absolute -right-1.5 -top-1.5 grid size-5 cursor-pointer place-items-center rounded-full bg-black/40 text-white/80 backdrop-blur hover:bg-black/60 hover:text-white"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Type field — revealed when expanded; the window grows to reveal it. */}
       {canInteract && (
