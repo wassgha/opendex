@@ -22,7 +22,7 @@ When you click away, OpenDex collapses into a compact bar that hangs from the to
 
 <div align="center">
 
-<a href="https://getopendex.com/"><img alt="Notch mode — compact bar in the MacBook notch" src="screenshots/notch-mode.gif" style="max-width: 90%;" /></a>
+<a href="https://getopendex.com/"><img alt="Notch mode — compact bar in the MacBook notch" src="screenshots/notch-mode.gif" style="max-width: 60%;" /></a>
 
 </div>
 
