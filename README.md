@@ -15,15 +15,14 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 [![Latest release](https://img.shields.io/github/v/release/wassgha/opendex?label=latest%20release&sort=semver&style=flat-square&color=111)](https://github.com/wassgha/opendex/releases/latest)
 
 <a href="https://getopendex.com/"><img alt="OpenDex — Control your computer with voice" src="screenshots/open-music.png" style="max-width: 90%;" /></a>
-
+<br/>
 </div>
-
 
 When you click away, OpenDex collapses into a compact bar that hangs from the top of your screen — flush with the MacBook notch. Stay hands-free while the agent works; summon it back with ⌥Space.
 
 <div align="center">
 
-[![Notch mode — compact bar in the MacBook notch](screenshots/notch-mode.gif)](https://getopendex.com/)
+<a href="https://getopendex.com/"><img alt="Notch mode — compact bar in the MacBook notch" src="screenshots/notch-mode.gif" style="max-width: 90%;" /></a>
 
 </div>
 
