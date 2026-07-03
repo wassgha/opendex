@@ -124,9 +124,9 @@ The agent's capabilities are **skills** — declarative tool bundles. Sensitive 
 - [x] Skills + permission gate *(Open apps & URLs)*
 - [x] Computer-use — screen capture + mouse/keyboard control, gated & opt-in
 - [x] Pluggable model providers — Apple on-device, OpenAI/Anthropic keys, AI Gateway
+- [x] Signed GitHub releases + auto-update
 - [ ] OpenDex hosted subscription — sign in, no keys, cloud-synced settings & history
-- [ ] MCP servers + more built-in skills (shell, filesystem, …)
-- [ ] Signed GitHub releases + auto-update
+- [ ] More built-in skills (filesystem, maps, timers, etc …)
 
 ## Scripts
 
