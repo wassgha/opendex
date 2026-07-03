@@ -18,18 +18,6 @@ Wake it, talk to it, and a tool-using agent talks back — in a cinematic interf
 
 </div>
 
-## Download
-
-<div align="center">
-
-<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg"><img src="assets/download/download-macos-arm64.svg" alt="Download for macOS — Apple Silicon" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg"><img src="assets/download/download-macos-x64.svg" alt="Download for macOS — Intel" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe"><img src="assets/download/download-windows.svg" alt="Download for Windows" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb"><img src="assets/download/download-debian-deb.svg" alt="Download the .deb for Debian" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage"><img src="assets/download/download-linux-appimage.svg" alt="Download the AppImage for Linux" height="48"></a>
-</div>
-
-Or browse every version on the [Releases](https://github.com/wassgha/opendex/releases) page.
-
-The app **auto-updates**: it checks GitHub Releases on launch (and hourly), downloads new versions in the background, and prompts you to restart when one is ready.
-
-## Notch mode
 
 When you click away, OpenDex collapses into a compact bar that hangs from the top of your screen — flush with the MacBook notch. Stay hands-free while the agent works; summon it back with ⌥Space.
 
@@ -38,6 +26,16 @@ When you click away, OpenDex collapses into a compact bar that hangs from the to
 [![Notch mode — compact bar in the MacBook notch](screenshots/notch-mode.gif)](https://getopendex.com/)
 
 </div>
+
+
+## Download
+
+<div align="center">
+
+<a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-arm64.dmg"><img src="assets/download/download-macos-arm64.svg" alt="Download for macOS — Apple Silicon" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-mac-x64.dmg"><img src="assets/download/download-macos-x64.svg" alt="Download for macOS — Intel" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-Setup.exe"><img src="assets/download/download-windows.svg" alt="Download for Windows" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.deb"><img src="assets/download/download-debian-deb.svg" alt="Download the .deb for Debian" height="48"></a> &nbsp; <a href="https://github.com/wassgha/opendex/releases/latest/download/OpenDex-linux.AppImage"><img src="assets/download/download-linux-appimage.svg" alt="Download the AppImage for Linux" height="48"></a>
+</div>
+
+See the [Releases](https://github.com/wassgha/opendex/releases) page.
 
 ## What is OpenDex?
 
