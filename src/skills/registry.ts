@@ -27,6 +27,7 @@ export const SKILL_METAS: SkillMeta[] = BUILTIN_SKILLS.map((s) => ({
   description: s.description,
   sensitive: s.sensitive,
   optIn: s.optIn,
+  imageResults: s.imageResults,
 }));
 
 /** Whether a skill is active for this config (opt-in skills default OFF). */
@@ -46,19 +47,24 @@ export function skillSystemPrompts(config: OpenDexConfig): string[] {
 
 /**
  * Assemble the tool set for a chat turn: every enabled skill's tools. Sensitive
- * skills' tools are wrapped so each call passes through the permission gate first.
+ * skills' tools are wrapped so each call passes through the permission gate
+ * first. `include` narrows the set further (realtime sessions pass only their
+ * direct, non-image skills).
  */
 export function buildToolSet({
   config,
   requestPermission,
+  include,
 }: {
   config: OpenDexConfig;
   requestPermission: PermissionRequester;
+  include?: (skill: Skill) => boolean;
 }): ToolSet {
   const set: ToolSet = {};
 
   for (const skill of BUILTIN_SKILLS) {
     if (!isSkillEnabled(skill, config)) continue;
+    if (include && !include(skill)) continue;
     for (const t of skill.tools) {
       set[t.name] = tool({
         description: t.description,

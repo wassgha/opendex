@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { config as loadEnv } from "dotenv";
 import {
   app,
@@ -14,13 +15,22 @@ import {
 import {
   IPC,
   type ChatStartPayload,
+  type RealtimeClientMessage,
+  type RealtimeStartResult,
   type SessionState,
   type ViewCommand,
   type WindowMode,
 } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
 import { resolveModel, checkAppleAvailability } from "./agent/llm/resolve-model";
-import { buildSystemPrompt } from "./agent/system-prompt";
+import { buildRealtimeInstructions, buildSystemPrompt } from "./agent/system-prompt";
+import {
+  endRealtimeSession,
+  sendRealtimeClientMessage,
+  startRealtimeSession,
+} from "./agent/realtime/session-host";
+import { buildRealtimeToolDefs, directRealtimeSkills } from "./agent/realtime/realtime-tools";
+import { getRealtimeModelMeta } from "./config/realtime-models";
 import { buildToolSet, skillSystemPrompts } from "../skills/registry";
 import {
   makePermissionRequester,
@@ -590,6 +600,88 @@ function registerIpc() {
     ) as ArrayBuffer;
   });
 
+  // Realtime voice sessions --------------------------------------------------
+  // The WebSocket + direct tool execution live in main (session-host.ts); the
+  // renderer streams mic PCM up and receives audio/transcript/tool notices on
+  // the per-session event channel. Tools are permission-wrapped per session so
+  // direct calls get the same session-grant semantics as one pipeline command
+  // loop ("Allow once" covers the conversation; a new session re-prompts).
+  //
+  // One live session per window: a new start ends whatever session the same
+  // sender still has. Belt-and-braces under the renderer's own connect lock —
+  // two concurrent sessions would mean two voices talking over each other.
+  const realtimeSessionBySender = new Map<number, string>();
+  ipcMain.handle(
+    IPC.realtimeStart,
+    async (event, opts: { briefing: boolean }): Promise<RealtimeStartResult> => {
+      const config = getConfig();
+      if (config.voice.mode !== "realtime") {
+        throw new Error("Realtime voice is not enabled in Settings.");
+      }
+      const briefing = Boolean(opts?.briefing);
+      const modelMeta = getRealtimeModelMeta(config.realtime.model);
+      track("realtime_session", { model: config.realtime.model });
+
+      const sender = event.sender;
+      const previousSession = realtimeSessionBySender.get(sender.id);
+      if (previousSession) endRealtimeSession(previousSession);
+      const skillPrompts = directRealtimeSkills(config)
+        .map((s) => s.systemPrompt)
+        .filter((p): p is string => Boolean(p));
+      // Only the direct (non-image) skills are executable in-session; the
+      // computer skill is reachable solely through run_task delegation.
+      const directIds = new Set(directRealtimeSkills(config).map((s) => s.id));
+      const tools = buildToolSet({
+        config,
+        requestPermission: makePermissionRequester(sender),
+        include: (skill) => directIds.has(skill.id),
+      });
+
+      // Throws user-facing reasons (unset key, failed connection) — the
+      // renderer surfaces them as a spoken apology, like resolveModel failures.
+      const sessionId = randomUUID();
+      await startRealtimeSession({
+        sessionId,
+        model: config.realtime.model,
+        voice: config.realtime.voice,
+        instructions: buildRealtimeInstructions({ config, briefing, skillPrompts }),
+        toolDefs: buildRealtimeToolDefs(config),
+        tools,
+        transcribesInput: modelMeta?.transcribes ?? true,
+        notify: (notice) => {
+          if (notice.type === "tool-call") {
+            track("tool_used", { tool_name: notice.call.toolName });
+          }
+          if (!sender.isDestroyed()) {
+            sender.send(IPC.realtimeEvent(sessionId), notice);
+          }
+        },
+      });
+      realtimeSessionBySender.set(sender.id, sessionId);
+      sender.once("destroyed", () => {
+        endRealtimeSession(sessionId);
+        if (realtimeSessionBySender.get(sender.id) === sessionId) {
+          realtimeSessionBySender.delete(sender.id);
+        }
+      });
+      return {
+        sessionId,
+        greetingPrompt: briefing ? "Give me my briefing." : null,
+      };
+    },
+  );
+
+  ipcMain.on(
+    IPC.realtimeClient,
+    (_event, sessionId: string, msg: RealtimeClientMessage) => {
+      sendRealtimeClientMessage(sessionId, msg);
+    },
+  );
+
+  ipcMain.on(IPC.realtimeEnd, (_event, sessionId: string) => {
+    endRealtimeSession(sessionId);
+  });
+
   // Config / secrets ---------------------------------------------------------
   ipcMain.handle(IPC.configGet, () => getPublicConfig());
 
@@ -624,6 +716,8 @@ function registerIpc() {
     const c = result.config;
     track("onboarding_completed", {
       theme: c.appearance.theme,
+      voice_mode: c.voice.mode,
+      ...(c.voice.mode === "realtime" ? { realtime_model: c.realtime.model } : {}),
       wake_mode: c.voiceInput.wakeMode,
       stt_provider: c.voiceInput.sttProvider,
       tts_engine: c.tts.engine,

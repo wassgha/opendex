@@ -6,6 +6,7 @@ import {
   Blocks,
   Cpu,
   AudioLines,
+  AudioWaveform,
   MessageSquare,
   ShieldCheck,
   RotateCcw,
@@ -26,6 +27,10 @@ import {
   TextField,
 } from "../ui/fields";
 import { useSystemVoices } from "@/lib/use-system-voices";
+import {
+  REALTIME_MODELS,
+  getRealtimeModelMeta,
+} from "../../../../main/config/realtime-models";
 import { ThemePicker } from "@/components/themes/theme-picker";
 import { SKILL_METAS } from "@skills/metas";
 import {
@@ -100,13 +105,89 @@ function AssistantSection({ data, setConfig }: SectionProps) {
   );
 }
 
+function VoiceModeSection({ data, setConfig, setSecret }: SectionProps) {
+  const { config, secrets } = data;
+  const modelMeta = getRealtimeModelMeta(config.realtime.model);
+  return (
+    <>
+      <SegmentedControl
+        value={config.voice.mode}
+        options={[
+          { value: "pipeline", label: "Pipeline" },
+          { value: "realtime", label: "Realtime voice" },
+        ]}
+        onChange={(v) => setConfig({ voice: { mode: v } })}
+      />
+      <div className="text-xs text-muted-foreground">
+        {config.voice.mode === "pipeline"
+          ? "Separate wake word, transcription, language model, and voice — with free, offline options for each."
+          : "One speech-to-speech model handles listening, thinking, and speaking. Most natural voice and fastest turns; needs a Vercel AI Gateway key. Sessions are capped at twenty-five minutes and reconnect on the wake word. Screen control still runs through your language model."}
+      </div>
+      {config.voice.mode === "realtime" && (
+        <>
+          <SecretField
+            label="Vercel AI Gateway key"
+            hint="Realtime sessions connect through the gateway. Same key as the gateway LLM provider."
+            present={secrets.AI_GATEWAY_API_KEY}
+            onSave={(v) => setSecret("AI_GATEWAY_API_KEY", v)}
+          />
+          <SelectField
+            label="Realtime model"
+            value={config.realtime.model}
+            options={REALTIME_MODELS.map((m) => ({ value: m.id, label: m.label }))}
+            hint={modelMeta?.blurb}
+            onChange={(v) => {
+              const meta = getRealtimeModelMeta(v);
+              setConfig({
+                realtime: {
+                  ...config.realtime,
+                  model: v,
+                  // Reset to the new model's first voice ("" = model default).
+                  voice: meta?.voices[0]?.id ?? "",
+                },
+              });
+            }}
+          />
+          {modelMeta && modelMeta.voices.length > 0 && (
+            <SelectField
+              label="Voice"
+              value={config.realtime.voice}
+              options={modelMeta.voices.map((v) => ({ value: v.id, label: v.label }))}
+              onChange={(v) => setConfig({ realtime: { ...config.realtime, voice: v } })}
+            />
+          )}
+          <SelectField
+            label="Hang up after silence"
+            hint="How long a session stays connected with nobody talking before it drops back to the wake word. Sessions bill by the minute — shorter saves money."
+            value={String(config.realtime.idleDisconnectSec)}
+            options={[
+              { value: "10", label: "10 seconds" },
+              { value: "30", label: "30 seconds" },
+              { value: "60", label: "1 minute" },
+              { value: "180", label: "3 minutes" },
+            ]}
+            onChange={(v) =>
+              setConfig({ realtime: { ...config.realtime, idleDisconnectSec: Number(v) } })
+            }
+          />
+        </>
+      )}
+    </>
+  );
+}
+
 function VoiceInputSection({ data, setConfig, setSecret }: SectionProps) {
   const { config, secrets } = data;
+  const realtimeActive = config.voice.mode === "realtime";
   return (
     <>
       <SelectField
         label="How to start listening"
-        hint="Push-to-talk and Vosk work without any paid key."
+        hint={
+          realtimeActive
+            ? "In realtime voice mode this is what connects a session."
+            : "Push-to-talk and Vosk work without any paid key."
+        }
         value={config.voiceInput.wakeMode}
         options={[
           { value: "manual", label: "Push to talk (click / ⌘⇧Space)" },
@@ -115,40 +196,46 @@ function VoiceInputSection({ data, setConfig, setSecret }: SectionProps) {
         ]}
         onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, wakeMode: v } })}
       />
-      <SelectField
-        label="Transcription (speech-to-text)"
-        hint="Whisper-local and Vosk-local are free and offline (one-time model download)."
-        value={config.voiceInput.sttProvider}
-        options={[
-          { value: "whisper-local", label: "Local Whisper (free, offline)" },
-          { value: "vosk-local", label: "Local Vosk (free, offline, fast)" },
-          { value: "openai", label: "OpenAI Whisper (cloud)" },
-          { value: "webspeech", label: "Web Speech (browser)" },
-        ]}
-        onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, sttProvider: v } })}
-      />
-      {config.voiceInput.sttProvider === "openai" && (
-        <SecretField
-          label="OpenAI API key"
-          hint="Used in the main process to transcribe captured audio."
-          present={secrets.OPENAI_API_KEY}
-          onSave={(v) => setSecret("OPENAI_API_KEY", v)}
-        />
-      )}
-      {config.voiceInput.sttProvider === "whisper-local" && (
-        <SelectField
-          label="Whisper model"
-          hint="Bigger = more accurate but larger download + slower on CPU."
-          value={config.voiceInput.whisperModel}
-          options={[
-            { value: "Xenova/whisper-tiny.en", label: "tiny.en (~75MB)" },
-            { value: "Xenova/whisper-base.en", label: "base.en (~145MB)" },
-            { value: "Xenova/whisper-small.en", label: "small.en (~480MB)" },
-          ]}
-          onChange={(v) =>
-            setConfig({ voiceInput: { ...config.voiceInput, whisperModel: v } })
-          }
-        />
+      {/* Transcription is the realtime model's job in realtime mode — these
+          pipeline-only controls hide rather than sit disabled. */}
+      {!realtimeActive && (
+        <>
+          <SelectField
+            label="Transcription (speech-to-text)"
+            hint="Whisper-local and Vosk-local are free and offline (one-time model download)."
+            value={config.voiceInput.sttProvider}
+            options={[
+              { value: "whisper-local", label: "Local Whisper (free, offline)" },
+              { value: "vosk-local", label: "Local Vosk (free, offline, fast)" },
+              { value: "openai", label: "OpenAI Whisper (cloud)" },
+              { value: "webspeech", label: "Web Speech (browser)" },
+            ]}
+            onChange={(v) => setConfig({ voiceInput: { ...config.voiceInput, sttProvider: v } })}
+          />
+          {config.voiceInput.sttProvider === "openai" && (
+            <SecretField
+              label="OpenAI API key"
+              hint="Used in the main process to transcribe captured audio."
+              present={secrets.OPENAI_API_KEY}
+              onSave={(v) => setSecret("OPENAI_API_KEY", v)}
+            />
+          )}
+          {config.voiceInput.sttProvider === "whisper-local" && (
+            <SelectField
+              label="Whisper model"
+              hint="Bigger = more accurate but larger download + slower on CPU."
+              value={config.voiceInput.whisperModel}
+              options={[
+                { value: "Xenova/whisper-tiny.en", label: "tiny.en (~75MB)" },
+                { value: "Xenova/whisper-base.en", label: "base.en (~145MB)" },
+                { value: "Xenova/whisper-small.en", label: "small.en (~480MB)" },
+              ]}
+              onChange={(v) =>
+                setConfig({ voiceInput: { ...config.voiceInput, whisperModel: v } })
+              }
+            />
+          )}
+        </>
       )}
     </>
   );
@@ -513,15 +600,25 @@ export interface SettingsSection {
   label: string;
   Icon: LucideIcon;
   Component: ComponentType<SectionProps>;
+  /** Hide this section for the current config (e.g. TTS in realtime mode). */
+  hidden?: (data: PublicConfig) => boolean;
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "assistant", label: "Assistant", Icon: User, Component: AssistantSection },
+  { id: "voice-mode", label: "Voice mode", Icon: AudioWaveform, Component: VoiceModeSection },
   { id: "voice-input", label: "Voice input", Icon: Mic, Component: VoiceInputSection },
   { id: "appearance", label: "Appearance", Icon: Palette, Component: AppearanceSection },
   { id: "skills", label: "Skills & tools", Icon: Blocks, Component: SkillsSection },
   { id: "model", label: "Language model", Icon: Cpu, Component: ModelSection },
-  { id: "tts", label: "Voice (TTS)", Icon: AudioLines, Component: TtsSection },
+  {
+    id: "tts",
+    label: "Voice (TTS)",
+    Icon: AudioLines,
+    Component: TtsSection,
+    // The realtime model speaks with its own voice — the TTS engine is unused.
+    hidden: (data) => data.config.voice.mode === "realtime",
+  },
   { id: "greeting", label: "Greeting", Icon: MessageSquare, Component: GreetingSection },
   { id: "privacy", label: "Privacy", Icon: ShieldCheck, Component: PrivacySection },
   { id: "reset", label: "Reset", Icon: RotateCcw, Component: ResetSection },

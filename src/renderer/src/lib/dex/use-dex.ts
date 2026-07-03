@@ -16,13 +16,18 @@ import {
 import { AudioMeter } from "./audio-meter";
 import { vlog } from "./voice-timing";
 import { CloudSttEngine } from "./engines/cloud-stt";
+import { RealtimeVoiceSession } from "./realtime/realtime-session";
 import type { SttEngine, WakeEngine } from "./engines/types";
 import type { DexStatus, TranscriptTurn } from "./state";
 import { formatToolCall } from "../format-tool-call";
 import type { ToolInvocation } from "@skills/tool-view";
-import type { ToolCallEvent, ToolResultEvent } from "../../../../main/ipc/channels";
+import {
+  RUN_TASK_TOOL,
+  type ToolCallEvent,
+  type ToolResultEvent,
+} from "../../../../main/ipc/channels";
 import type { ChatMessage } from "../../../../main/agent/chat";
-import type { SttProvider, WakeMode } from "../../../../main/config/schema";
+import type { SttProvider, VoiceMode, WakeMode } from "../../../../main/config/schema";
 
 export interface ModelLoadingState {
   active: boolean;
@@ -98,6 +103,12 @@ const FOLLOW_UP_ECHO_REJECT_RATIO = 0.45;
 // the assistant's own audio, so it's always on (no AEC gymnastics needed). Brief
 // cooldown so the tail of the previous turn can't immediately re-trigger it.
 const BARGE_COOLDOWN_MS = 600;
+// While a delegated run_task runs in realtime mode, ask the realtime voice for
+// a spoken progress update at most this often (and only between its sentences).
+// Deliberately sparse — every request WILL make the model say something, and a
+// stream of "still working on it" is worse than quiet work under the overlay's
+// visual activity banners.
+const REALTIME_NARRATION_MIN_MS = 25000;
 
 type Mode = "off" | "wake" | "command" | "follow_up";
 
@@ -107,6 +118,11 @@ interface RunningCommand {
 }
 
 export interface UseDexOptions {
+  /** pipeline = wake→STT→LLM→TTS · realtime = one speech-to-speech session
+   *  (the wake word still gates when a session connects). */
+  voiceMode: VoiceMode;
+  /** Realtime: seconds of all-quiet before the session hangs up back to wake. */
+  realtimeIdleDisconnectSec: number;
   /** Wake word that triggers active listening (Web Speech wake mode). */
   wakeWord: string;
   /** How active listening is triggered. */
@@ -662,6 +678,285 @@ export function useDex(options: UseDexOptions): UseDexResult {
   // Hook between TtsPlayer's "speaking" transition and the barge monitor start.
   const bargeOnSpeakingRef = useRef<(() => void) | null>(null);
 
+  // ---- Realtime voice mode ----
+  // One speech-to-speech session replaces the STT→chat→TTS pipeline. The wake
+  // word still gates when it connects; server VAD handles turns + barge-in
+  // (the wake-word barge monitor is never armed — runCommand isn't used).
+  const realtimeSessionRef = useRef<RealtimeVoiceSession | null>(null);
+  // In-flight run_task delegation (a pipeline chat driven on the session's behalf).
+  const realtimeTaskRef = useRef<{ cancel: () => void } | null>(null);
+  // Options carried into the next realtime conversation (set by the wake paths,
+  // consumed by startMode's realtime branch — so all entry points still funnel
+  // through startMode's teardown).
+  const realtimePendingRef = useRef<{ briefing?: boolean; initialText?: string } | null>(null);
+  const realtimeTurnTextRef = useRef("");
+  const realtimeHadTurnRef = useRef(false);
+  // Monotonic token guarding the (multi-await) session connect flow. Every
+  // teardown and every newer connect bumps it; an in-flight connect re-checks
+  // it after each await and abandons — ending its half-started session — when
+  // superseded. Without this, two overlapping connects both pass the
+  // "no session yet" check and the loser leaks as a second live voice.
+  const realtimeGenRef = useRef(0);
+
+  const closeRealtime = useCallback(() => {
+    realtimeGenRef.current += 1;
+    realtimeTaskRef.current?.cancel();
+    realtimeTaskRef.current = null;
+    realtimeSessionRef.current?.close();
+    realtimeSessionRef.current = null;
+  }, []);
+
+  // Drive a delegated run_task: the realtime model handed us a task, we run it
+  // through the EXISTING pipeline chat path (configured LLM, full toolset incl.
+  // computer-use, permission gate, activity banners), feed progress notes back
+  // into the session so the realtime voice can narrate, and answer the tool
+  // call with the agent's final report.
+  const runDelegatedTask = useCallback(
+    (session: RealtimeVoiceSession, toolCallId: string, task: string) => {
+      realtimeTaskRef.current?.cancel();
+      setStatus("thinking");
+      const buffer = createSentenceBuffer();
+      let finalText = "";
+      // Start the throttle "full": the model already acknowledged out loud when
+      // it called run_task, so the first spoken update comes only after real
+      // progress has accumulated. Actions/sentences are still injected silently
+      // — the model reads them all next time it's asked to speak.
+      let lastNarration = Date.now();
+      // Ask the voice for a brief spoken update — sparsely, and never over its
+      // own speech.
+      const narrate = () => {
+        const now = Date.now();
+        if (now - lastNarration < REALTIME_NARRATION_MIN_MS) return;
+        if (session.isSpeaking) return;
+        lastNarration = now;
+        session.requestResponse();
+      };
+      const handle = window.opendex.chat({
+        messages: [{ role: "user", content: task }],
+        onToolCall: (call) => {
+          // The sub-agent's own actions surface as activity banners (overlay)
+          // and as silent context notes; only progress *sentences* may trigger
+          // a spoken update — per-click narration was a bombardment.
+          addToolActivity(call);
+          session.injectContext(`[task action] ${formatToolCall(call).label}`);
+        },
+        onDelta: (value) => {
+          finalText += value;
+          for (const sentence of buffer.push(value)) {
+            session.injectContext(`[task progress] ${sentence}`);
+            narrate();
+          }
+        },
+      });
+      const cancel = () => handle.cancel();
+      realtimeTaskRef.current = { cancel };
+      const settle = (output: unknown) => {
+        if (realtimeTaskRef.current?.cancel === cancel) realtimeTaskRef.current = null;
+        recordToolResult({ toolCallId, toolName: RUN_TASK_TOOL, output });
+        // Only answer if the session that asked is still the live one.
+        if (realtimeSessionRef.current === session) {
+          session.sendToolResult(toolCallId, RUN_TASK_TOOL, output);
+        }
+      };
+      handle.done
+        .then(() =>
+          settle({ result: finalText.trim() || "The task finished with no report." }),
+        )
+        .catch((err) =>
+          settle({ error: err instanceof Error ? err.message : String(err) }),
+        );
+    },
+    [addToolActivity, recordToolResult],
+  );
+
+  // Open a realtime session and wire it into the same state surface the
+  // pipeline uses (statuses, transcript, captions, tool records) — so themes,
+  // the overlay, and the notch work unchanged.
+  const startRealtimeConversation = useCallback(
+    async (convOpts?: { briefing?: boolean; initialText?: string }) => {
+      if (mutedRef.current) return;
+      // Already connected (typed input mid-conversation): just send the text.
+      const existing = realtimeSessionRef.current;
+      if (existing) {
+        if (convOpts?.initialText) {
+          existing.cancelResponse();
+          appendTurn("user", convOpts.initialText);
+          messagesRef.current.push({ role: "user", content: convOpts.initialText });
+          setStatus("thinking");
+          existing.sendUserText(convOpts.initialText);
+        }
+        return;
+      }
+
+      vlog("realtime:connect:start", { briefing: Boolean(convOpts?.briefing) });
+      // Claim the connect slot: any older in-flight connect is now stale and
+      // will abandon at its next checkpoint.
+      const gen = ++realtimeGenRef.current;
+      setStatus("thinking");
+      setLiveCaption("");
+      spokenFreshRef.current = true;
+      if (convOpts?.briefing) setBriefingActive(true);
+
+      let start: Awaited<ReturnType<typeof window.opendex.realtimeStart>>;
+      try {
+        start = await window.opendex.realtimeStart({
+          briefing: Boolean(convOpts?.briefing),
+        });
+      } catch (err) {
+        if (realtimeGenRef.current !== gen) return; // superseded — not ours to handle
+        // Unset key / failed connect — surface the user-facing reason in the
+        // transcript (there is no TTS engine to speak it in this mode).
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[opendex] realtime start failed", err);
+        updateLastAssistant(message);
+        setBriefingActive(false);
+        startModeRef.current?.("wake");
+        return;
+      }
+      // Superseded / muted / torn down while connecting — end the fresh
+      // session in main (it's fully registered once realtimeStart resolves).
+      if (
+        realtimeGenRef.current !== gen ||
+        mutedRef.current ||
+        modeRef.current !== "command"
+      ) {
+        window.opendex.realtimeEnd(start.sessionId);
+        return;
+      }
+
+      realtimeTurnTextRef.current = "";
+      realtimeHadTurnRef.current = false;
+      const isBriefing = Boolean(convOpts?.briefing);
+
+      const session = new RealtimeVoiceSession({
+        micStream: micStreamRef.current!,
+        idleDisconnectSec: optionsRef.current.realtimeIdleDisconnectSec,
+        callbacks: {
+          onUserSpeechStart: () => {
+            if (realtimeSessionRef.current !== session) return;
+            setStatus("active_listening");
+            setLiveCaption("");
+          },
+          onUserTranscript: (text) => {
+            if (realtimeSessionRef.current !== session) return;
+            appendTurn("user", text);
+            messagesRef.current.push({ role: "user", content: text });
+          },
+          onAssistantDelta: (text) => {
+            if (realtimeSessionRef.current !== session) return;
+            realtimeTurnTextRef.current += text;
+            // The realtime transcript tracks the audio, so it doubles as the
+            // speech-synced caption.
+            updateLastAssistant(realtimeTurnTextRef.current);
+            setSpokenCaption(realtimeTurnTextRef.current);
+          },
+          onTurnDone: () => {
+            if (realtimeSessionRef.current !== session) return;
+            const turn = realtimeTurnTextRef.current.trim();
+            if (turn) messagesRef.current.push({ role: "assistant", content: turn });
+            realtimeTurnTextRef.current = "";
+            realtimeHadTurnRef.current = true;
+            if (isBriefing) setBriefingActive(false);
+          },
+          onSpeakingChange: (speaking) => {
+            if (realtimeSessionRef.current !== session) return;
+            if (speaking) setStatus("speaking");
+            else if (realtimeTaskRef.current) setStatus("thinking");
+            else {
+              setStatus(
+                realtimeHadTurnRef.current
+                  ? "follow_up_listening"
+                  : "active_listening",
+              );
+            }
+          },
+          onToolCall: (call) => {
+            if (realtimeSessionRef.current !== session) return;
+            // No banner for run_task — its input is the full task prompt
+            // (way too long for a hint), and the delegated sub-agent's own
+            // actions stream their own banners the moment it starts working.
+            if (call.toolName !== RUN_TASK_TOOL) addToolActivity(call);
+            recordToolCall(call);
+            setStatus("thinking");
+          },
+          onToolResult: (result) => {
+            if (realtimeSessionRef.current !== session) return;
+            recordToolResult(result);
+          },
+          onRunTask: (toolCallId, task) => {
+            if (realtimeSessionRef.current !== session) return;
+            runDelegatedTask(session, toolCallId, task);
+          },
+          onDisconnect: (reason) => {
+            if (realtimeSessionRef.current !== session) return;
+            vlog("realtime:disconnect", { reason });
+            realtimeSessionRef.current = null;
+            realtimeTaskRef.current?.cancel();
+            realtimeTaskRef.current = null;
+            setBriefingActive(false);
+            if (mutedRef.current) setStatus("muted");
+            else startModeRef.current?.("wake");
+          },
+          onAudioBlocked: () => setAudioBlocked(true),
+        },
+      });
+      realtimeSessionRef.current = session;
+
+      try {
+        await session.connect(start);
+      } catch (err) {
+        console.error("[opendex] realtime audio setup failed", err);
+        if (realtimeSessionRef.current === session) realtimeSessionRef.current = null;
+        session.close();
+        if (realtimeGenRef.current === gen) startModeRef.current?.("wake");
+        return;
+      }
+      // Superseded while the audio path was built (a teardown or a newer
+      // conversation claimed the slot) — close this session and step aside.
+      if (realtimeGenRef.current !== gen) {
+        if (realtimeSessionRef.current === session) realtimeSessionRef.current = null;
+        session.close();
+        return;
+      }
+      vlog("realtime:connect:open");
+
+      // No session resume across reconnects — seed the fresh session with the
+      // recent conversation so "what did I just ask you?" keeps working.
+      const history = messagesRef.current
+        .filter(
+          (m) =>
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string",
+        )
+        .slice(-10);
+      if (history.length > 0) {
+        session.injectContext(
+          `[earlier conversation]\n${history
+            .map((m) => `${m.role}: ${m.content as string}`)
+            .join("\n")}`,
+        );
+      }
+
+      if (isBriefing && start.greetingPrompt) {
+        session.sendUserText(start.greetingPrompt);
+      } else if (convOpts?.initialText) {
+        appendTurn("user", convOpts.initialText);
+        messagesRef.current.push({ role: "user", content: convOpts.initialText });
+        session.sendUserText(convOpts.initialText);
+      } else {
+        setStatus("active_listening");
+      }
+    },
+    [
+      addToolActivity,
+      appendTurn,
+      recordToolCall,
+      recordToolResult,
+      runDelegatedTask,
+      updateLastAssistant,
+    ],
+  );
+
   const startMode = useCallback(
     (mode: Mode) => {
       stopRecognition();
@@ -671,6 +966,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
       // Tear down the wake-word barge monitor too — any transition out of the
       // speaking phase should release its mic (no-op if not running).
       stopBargeMonitor();
+      // Returning to passive wake (or off) ends any realtime session — it
+      // reconnects on the next wake. No-op in pipeline mode / when closed.
+      if (mode === "wake" || mode === "off") closeRealtime();
 
       // Hard standby guard. A wake event that fired just before mute (vosk match,
       // a queued Web Speech onresult) runs its callback *after* mute tore
@@ -706,12 +1004,21 @@ export function useDex(options: UseDexOptions): UseDexResult {
         }
 
         // Fire the proactive greeting on first wake (if enabled), else listen
-        // for a command.
+        // for a command. In realtime mode "listen for a command" means
+        // "connect a session" — the pending options ride realtimePendingRef
+        // through startMode("command") so its teardown still runs.
         const onWake = () => {
           // A wake detection queued just before mute can fire after the engine
           // was torn down. Ignore it so voice never re-engages while on standby.
           if (mutedRef.current) return;
-          if (!hasBriefedRef.current && opts.greetingEnabled) {
+          const briefing = !hasBriefedRef.current && opts.greetingEnabled;
+          if (optionsRef.current.voiceMode === "realtime") {
+            if (briefing) hasBriefedRef.current = true;
+            realtimePendingRef.current = { briefing };
+            startModeRef.current?.("command");
+            return;
+          }
+          if (briefing) {
             hasBriefedRef.current = true;
             void runCommand("Give me my briefing.", { mode: "briefing" });
           } else {
@@ -724,7 +1031,12 @@ export function useDex(options: UseDexOptions): UseDexResult {
           // first greeting proactively so manual users get the briefing.
           if (!hasBriefedRef.current && opts.greetingEnabled) {
             hasBriefedRef.current = true;
-            void runCommand("Give me my briefing.", { mode: "briefing" });
+            if (optionsRef.current.voiceMode === "realtime") {
+              realtimePendingRef.current = { briefing: true };
+              startModeRef.current?.("command");
+            } else {
+              void runCommand("Give me my briefing.", { mode: "briefing" });
+            }
           }
           return;
         }
@@ -775,9 +1087,21 @@ export function useDex(options: UseDexOptions): UseDexResult {
           if (match && match.index !== undefined) {
             const trailing = combined.slice(match.index + match[0].length).trim();
             resultBaseline = event.results.length;
+            const briefing =
+              !hasBriefedRef.current && optionsRef.current.greetingEnabled;
+            if (optionsRef.current.voiceMode === "realtime") {
+              if (briefing) hasBriefedRef.current = true;
+              // Words spoken after the wake word become the opening message.
+              realtimePendingRef.current = {
+                briefing,
+                initialText: trailing.length >= 3 ? trailing : undefined,
+              };
+              startModeRef.current?.("command");
+              return;
+            }
             // The first time the operator wakes the assistant, deliver the
             // proactive greeting (if enabled) instead of listening for a command.
-            if (!hasBriefedRef.current && optionsRef.current.greetingEnabled) {
+            if (briefing) {
               hasBriefedRef.current = true;
               stopRecognition();
               void runCommand("Give me my briefing.", { mode: "briefing" });
@@ -843,6 +1167,15 @@ export function useDex(options: UseDexOptions): UseDexResult {
       }
 
       // ---- Command / follow-up capture ----
+      // Realtime mode: "capturing a command" means an open speech-to-speech
+      // session — connect it (statuses are driven by its callbacks) instead of
+      // running an STT capture.
+      if (opts.voiceMode === "realtime") {
+        const pending = realtimePendingRef.current;
+        realtimePendingRef.current = null;
+        void startRealtimeConversation(pending ?? {});
+        return;
+      }
       setStatus(mode === "follow_up" ? "follow_up_listening" : "active_listening");
       setLiveCaption("");
       const noSpeechMs =
@@ -1036,8 +1369,10 @@ export function useDex(options: UseDexOptions): UseDexResult {
     [
       abortStt,
       clearTimers,
+      closeRealtime,
       ensureSttEngine,
       runCommand,
+      startRealtimeConversation,
       stopBargeMonitor,
       stopWakeEngine,
       stopRecognition,
@@ -1147,6 +1482,14 @@ export function useDex(options: UseDexOptions): UseDexResult {
     }
   }, [options.wakeMode, options.wakeWord]);
 
+  // Voice mode (pipeline ↔ realtime) switched live in Settings: end any open
+  // realtime session and re-arm passive wake so the next wake uses the new path.
+  useEffect(() => {
+    if (!startedRef.current) return;
+    closeRealtime();
+    if (!mutedRef.current) startModeRef.current?.("wake");
+  }, [options.voiceMode, closeRealtime]);
+
   const engage = useCallback(async () => {
     if (!isSpeechRecognitionSupported()) {
       setStatus("unsupported");
@@ -1206,6 +1549,18 @@ export function useDex(options: UseDexOptions): UseDexResult {
         runningCommandRef.current = null;
       }
 
+      // Realtime mode: send into the open session (interrupting its reply,
+      // like a barge), or connect one with the text as the opening message.
+      if (optionsRef.current.voiceMode === "realtime") {
+        if (realtimeSessionRef.current) {
+          void startRealtimeConversation({ initialText: text });
+        } else {
+          realtimePendingRef.current = { initialText: text };
+          startModeRef.current?.("command");
+        }
+        return;
+      }
+
       // Make sure a TTS engine exists even if the voice session never engaged.
       ensureTts();
       void runCommand(text, { resumeMode: "wake" });
@@ -1215,6 +1570,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
       clearTimers,
       ensureTts,
       runCommand,
+      startRealtimeConversation,
       stopBargeMonitor,
       stopRecognition,
       stopWakeEngine,
@@ -1232,7 +1588,13 @@ export function useDex(options: UseDexOptions): UseDexResult {
       const level = meterRef.current?.inputLevel() ?? 0;
       return Math.max(level, s === "listening_wake" ? 0.04 : 0.08);
     }
-    if (s === "speaking") return syntheticEnvelope(0.9);
+    if (s === "speaking") {
+      // Realtime playback is metered for real (the model's actual voice);
+      // pipeline TTS keeps the synthetic envelope.
+      const realtime = realtimeSessionRef.current;
+      if (realtime) return Math.max(realtime.outputLevel(), 0.08);
+      return syntheticEnvelope(0.9);
+    }
     if (s === "thinking") return syntheticEnvelope(0.35);
     return 0;
   }, []);
@@ -1240,6 +1602,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
   const unlockAudio = useCallback(() => {
     setAudioBlocked(false);
     ttsRef.current?.unlock();
+    realtimeSessionRef.current?.unlock();
     meterRef.current?.resume();
   }, []);
 
@@ -1252,6 +1615,9 @@ export function useDex(options: UseDexOptions): UseDexResult {
     // already done and only TTS is draining, so gating on a running command
     // would make Stop a no-op exactly when the user can hear it talking.
     ttsRef.current?.stop();
+    // Realtime: kill the session (and any delegated task) outright; the wake
+    // word reconnects. startMode("wake") below is what re-arms listening.
+    closeRealtime();
     stopBargeMonitor();
     bargeOnSpeakingRef.current = null;
     clearToolActivity();
@@ -1266,7 +1632,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     }
     if (mutedRef.current) setStatus("muted");
     else startModeRef.current?.("wake");
-  }, [clearToolActivity, stopBargeMonitor]);
+  }, [clearToolActivity, closeRealtime, stopBargeMonitor]);
 
   // Start a fresh conversation: abort anything in flight, wipe the transcript +
   // model history + result cards + captions, and return to passive listening
@@ -1274,6 +1640,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
   // current turn — e.g. clearing a lingering result card once they've read it.
   const newConversation = useCallback(() => {
     ttsRef.current?.stop();
+    closeRealtime();
     stopBargeMonitor();
     bargeOnSpeakingRef.current = null;
     runningCommandRef.current?.abortController.abort();
@@ -1286,7 +1653,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     clearToolActivity(); // clears the activity banners + the result cards
     if (mutedRef.current) setStatus("muted");
     else startModeRef.current?.("wake");
-  }, [clearToolActivity, stopBargeMonitor]);
+  }, [clearToolActivity, closeRealtime, stopBargeMonitor]);
 
   const stop = useCallback(() => {
     restartGuardRef.current = true;
@@ -1295,6 +1662,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     stopWakeEngine();
     abortStt();
     stopBargeMonitor();
+    closeRealtime();
     runningCommandRef.current?.abortController.abort();
     ttsRef.current?.stop();
     meterRef.current?.dispose();
@@ -1307,7 +1675,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     setStatus("idle");
     setLiveCaption("");
     restartGuardRef.current = false;
-  }, [abortStt, clearTimers, clearToolActivity, stopBargeMonitor, stopWakeEngine, stopRecognition]);
+  }, [abortStt, clearTimers, clearToolActivity, closeRealtime, stopBargeMonitor, stopWakeEngine, stopRecognition]);
 
   const toggleMute = useCallback(() => {
     setIsMuted((current) => {
@@ -1325,6 +1693,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
         stopWakeEngine();
         abortStt();
         stopBargeMonitor();
+        closeRealtime();
         bargeOnSpeakingRef.current = null;
         const running = runningCommandRef.current;
         if (running) {
@@ -1349,6 +1718,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
     abortStt,
     clearTimers,
     clearToolActivity,
+    closeRealtime,
     startMode,
     stopBargeMonitor,
     stopRecognition,
@@ -1372,6 +1742,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
       stopWakeEngine();
       abortStt();
       stopBargeMonitor();
+      closeRealtime();
       runningCommandRef.current?.abortController.abort();
       ttsRef.current?.stop();
       sttEngineRef.current?.engine.dispose();
@@ -1383,7 +1754,7 @@ export function useDex(options: UseDexOptions): UseDexResult {
       toolTimersRef.current.forEach(clearTimeout);
       toolTimersRef.current.clear();
     };
-  }, [abortStt, clearTimers, stopBargeMonitor, stopWakeEngine, stopRecognition]);
+  }, [abortStt, clearTimers, closeRealtime, stopBargeMonitor, stopWakeEngine, stopRecognition]);
 
   // Global hotkey (registered in main) → push to talk, in manual wake mode.
   useEffect(() => {

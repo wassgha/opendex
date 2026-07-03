@@ -15,6 +15,16 @@ export const IPC = {
   chatDone: (id: string) => `chat:done:${id}`,
   chatError: (id: string) => `chat:error:${id}`,
   ttsSynthesize: "tts:synthesize",
+  // Realtime voice sessions (speech-to-speech). The WebSocket lives in MAIN —
+  // the gateway authenticates the upgrade with the raw AI_GATEWAY_API_KEY (no
+  // ephemeral secret is minted), so the renderer can never host the socket
+  // without seeing the key. The renderer owns only the audio I/O: it streams
+  // mic PCM frames up via `realtimeClient` and receives audio + transcript +
+  // tool notices back on the per-session `realtime:event:<id>` channel.
+  realtimeStart: "realtime:start",
+  realtimeClient: "realtime:client",
+  realtimeEvent: (id: string) => `realtime:event:${id}`,
+  realtimeEnd: "realtime:end",
   // Config
   configGet: "config:get",
   configSet: "config:set",
@@ -157,6 +167,49 @@ export type ViewCommand =
   | { type: "toggleMute" }
   | { type: "newConversation" }
   | { type: "expand" };
+
+/** The delegation tool a realtime session uses to hand a task to the pipeline
+ *  agent (full toolset incl. computer-use). Declared here — the shared IPC
+ *  contract — because main defines it and the renderer executes it. */
+export const RUN_TASK_TOOL = "run_task";
+
+export interface RealtimeStartResult {
+  sessionId: string;
+  /** The first user message to send when this session opens with the proactive
+   *  greeting, else null. */
+  greetingPrompt: string | null;
+}
+
+/** Renderer → main: drive an open realtime session. `audio` chunks are 24kHz
+ *  mono PCM16 mic frames. `tool-result` answers a delegated run_task call.
+ *  `inject-context` adds a conversation item without requesting a response
+ *  (task-progress narration feed); `request-response` asks the model to speak. */
+export type RealtimeClientMessage =
+  | { type: "audio"; chunk: ArrayBuffer }
+  | { type: "user-text"; text: string }
+  | { type: "inject-context"; text: string }
+  | { type: "request-response" }
+  | { type: "tool-result"; toolCallId: string; name: string; output: unknown }
+  | { type: "cancel-response" };
+
+/** Main → renderer: everything the session surfaces. `audio` chunks are 24kHz
+ *  mono PCM16 of the model's voice. `run-task` asks the renderer to drive a
+ *  delegated pipeline command (it answers with a `tool-result` client message).
+ *  `error` is informational (server-side event, usually non-fatal); a dead
+ *  session always arrives as `closed`. */
+export type RealtimeServerNotice =
+  | { type: "open" }
+  | { type: "audio"; chunk: ArrayBuffer }
+  | { type: "speech-started" }
+  | { type: "speech-stopped" }
+  | { type: "user-transcript"; text: string }
+  | { type: "assistant-delta"; text: string }
+  | { type: "turn-done" }
+  | { type: "tool-call"; call: ToolCallEvent }
+  | { type: "tool-result"; result: ToolResultEvent }
+  | { type: "run-task"; toolCallId: string; task: string }
+  | { type: "error"; message: string }
+  | { type: "closed"; reason: "server" | "error" | "ended" };
 
 export interface PermissionRequestPayload {
   id: string;
