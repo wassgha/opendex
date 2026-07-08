@@ -69,7 +69,48 @@ jobs:
   publish:
     needs: release
     runs-on: ubuntu-latest
+    env:
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve previous tag
+        id: tags
+        run: |
+          CURRENT="${{ github.ref_name }}"
+          PREVIOUS=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | grep -v "^${CURRENT}$" | head -1 || true)
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        if: env.AI_GATEWAY_API_KEY != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARGS=("${{ steps.tags.outputs.current }}")
+          if [ -n "${{ steps.tags.outputs.previous }}" ]; then
+            ARGS+=("${{ steps.tags.outputs.previous }}")
+          fi
+          pnpm tsx scripts/generate-release-notes.ts "${ARGS[@]}" > release-notes.md
+          gh release edit "${{ github.ref_name }}" \
+            --repo wassgha/opendex \
+            --notes-file release-notes.md
+
       - name: Publish the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

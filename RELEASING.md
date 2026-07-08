@@ -22,14 +22,17 @@ pnpm cut:major   # 0.1.0 -> 1.0.0
 > These wrap `pnpm version <type> && git push --follow-tags`. `pnpm version`
 > refuses to run with uncommitted changes, so commit your work first.
 
-Then:
+Then watch the build at <https://github.com/wassgha/opendex/actions>.
+electron-builder uploads installers to a **draft** GitHub Release while the
+three platform jobs run. Once they all succeed, the `publish` job writes
+AI-generated release notes (from the diff since the previous tag) and flips
+the release to **published**. Auto-update only picks up published releases.
 
-1. Watch the build at <https://github.com/wassgha/opendex/actions>.
+To preview notes for unreleased commits on your machine:
 
-2. electron-builder publishes to a **draft** GitHub Release. Once all three
-   platform jobs finish, open <https://github.com/wassgha/opendex/releases>,
-   edit the draft, add release notes, and **Publish**. Auto-update only picks
-   up published (non-draft) releases.
+```bash
+pnpm notes:preview   # needs AI_GATEWAY_API_KEY in .env
+```
 
 ## Required GitHub secrets
 
@@ -44,6 +47,7 @@ Developer ID cert + App Store Connect API key works across app IDs.
 | `APPLE_API_KEY` | base64-encoded App Store Connect API key (`.p8`) — used for notarization |
 | `APPLE_API_KEY_ID` | the API key's 10-character Key ID |
 | `APPLE_API_ISSUER` | the API key's Issuer ID (UUID) |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key — generates release notes in the publish job (optional; skipped if unset) |
 
 `GITHUB_TOKEN` is provided automatically by Actions — no setup needed.
 

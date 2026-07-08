@@ -28,6 +28,26 @@ const ENDPOINT = "https://www.google-analytics.com/mp/collect";
 
 let clientId = "";
 let sessionId = "";
+let userAgent = "";
+
+// GA4's Measurement Protocol fills the built-in Device / Operating system /
+// Browser dimensions from the request's `User-Agent` header (there is no body
+// field for them). A server request has no browser UA, so without this those
+// dimensions come back "(not set)". We synthesize a desktop UA per platform so
+// GA can categorize the OS + device. (Screen resolution is browser-only and
+// still won't populate from a server hit.)
+function buildUserAgent(): string {
+  const chrome = process.versions.chrome ?? "120.0.0.0";
+  const webkit = "AppleWebKit/537.36 (KHTML, like Gecko)";
+  switch (process.platform) {
+    case "win32":
+      return `Mozilla/5.0 (Windows NT 10.0; Win64; x64) ${webkit} Chrome/${chrome} Safari/537.36`;
+    case "linux":
+      return `Mozilla/5.0 (X11; Linux ${process.arch === "arm64" ? "aarch64" : "x86_64"}) ${webkit} Chrome/${chrome} Safari/537.36`;
+    default:
+      return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ${webkit} Chrome/${chrome} Safari/537.36`;
+  }
+}
 
 /** A stable, anonymous id persisted in userData (not tied to any account/PII). */
 function loadClientId(): string {
@@ -52,6 +72,7 @@ function loadClientId(): string {
 export function initAnalytics(): void {
   clientId = loadClientId();
   sessionId = String(Date.now());
+  userAgent = buildUserAgent();
 }
 
 /** Inert until real GA4 credentials are configured (placeholder → no sends). */
@@ -100,7 +121,11 @@ export function track(
   try {
     void fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        // Lets GA4 derive the built-in Device / OS / Browser dimensions.
+        "user-agent": userAgent || buildUserAgent(),
+      },
       body,
     }).catch(() => {});
   } catch {
