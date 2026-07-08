@@ -91,6 +91,22 @@ export const LLM_PROVIDERS: LlmProviderMeta[] = [
     ],
   },
   {
+    id: "xai",
+    label: "xAI (Grok)",
+    blurb: "Use your own xAI API key.",
+    kind: "byok",
+    auth: "key",
+    secretName: "XAI_API_KEY",
+    keyUrl: "https://console.x.ai/team/default/api-keys",
+    supportsTools: true,
+    models: [
+      { id: "grok-4.20-reasoning", label: "Grok 4.20 (reasoning)" },
+      { id: "grok-4.20-non-reasoning", label: "Grok 4.20 (fast)" },
+      { id: "grok-4.3", label: "Grok 4.3" },
+      { id: "grok-3-mini", label: "Grok 3 mini" },
+    ],
+  },
+  {
     id: "gateway",
     label: "Vercel AI Gateway",
     blurb: "Advanced — one key, any provider. Use a provider/model id.",
@@ -102,6 +118,7 @@ export const LLM_PROVIDERS: LlmProviderMeta[] = [
     models: [
       { id: "anthropic/claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
       { id: "openai/gpt-5", label: "openai/gpt-5" },
+      { id: "xai/grok-4.20-reasoning", label: "xai/grok-4.20-reasoning" },
       { id: "google/gemini-2.5-pro", label: "google/gemini-2.5-pro" },
     ],
   },

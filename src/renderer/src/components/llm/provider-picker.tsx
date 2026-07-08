@@ -19,6 +19,7 @@ const PROVIDER_ICON: Record<LlmProvider, LucideIcon> = {
   apple: Cpu,
   openai: KeyRound,
   anthropic: KeyRound,
+  xai: KeyRound,
   gateway: Network,
   opendex: Cloud,
 };

@@ -45,7 +45,7 @@ OpenDex is an agentic harness built around voice. It's fully customizable: chang
 ## Features
 
 - 🎙️ **Voice-first, real-time loop** — wake word or hotkey, then speak. Follow-ups work in the same session; say the wake word again to cut it off mid-reply.
-- 🧠 **Bring any model**  — Apple Intelligence on-device (macOS, free), your own OpenAI or Anthropic key, or Vercel AI Gateway (one key, many models). A hosted OpenDex plan is on the way.
+- 🧠 **Bring any model**  — Apple Intelligence on-device (macOS, free), your own OpenAI, Anthropic, or xAI key, or Vercel AI Gateway (one key, many models). A hosted OpenDex plan is on the way.
 - **Can run offline** — Vosk wake word + local Whisper + system TTS are a local-first option. No accounts, no uploads — only the LLM call leaves your machine, and you can skip that too on Apple Silicon.
 - 🔌 **Pluggable voice I/O**  —  Choose between push-to-talk, Vosk, or Web Speech for wake; local Whisper/Vosk, OpenAI, or Web Speech for transcription; ElevenLabs or the OS voice for output or switch to a fully-integrated Realtime stack using OpenAI Realtime or xAI Voice for a more natural conversation
 - 🎨 **Build your own themes** — Jarvis HUD, Talking Dot, or Typing Cursor. Each one is a full interface, not just a skin, and they react to your mic.
@@ -81,7 +81,7 @@ On first launch a short **onboarding wizard** walks you through choosing a model
 
 Pick where the thinking happens — every part of the loop can be free/offline:
 
-- **Model:** **Apple Intelligence** (on-device, free, no key — macOS only), your own **OpenAI**/**Anthropic** key, or the **Vercel AI Gateway** (one key, any provider).
+- **Model:** **Apple Intelligence** (on-device, free, no key — macOS only), your own **OpenAI**/**Anthropic**/**xAI** key, or the **Vercel AI Gateway** (one key, any provider).
 - **Voice out:** "System voice" (free) or ElevenLabs (key).
 - **Voice in:** local **Whisper**/**Vosk** (free, offline, one-time model download) or OpenAI Whisper (key).
 - **Wake:** push-to-talk / Vosk (free, offline) or Web Speech (browser).
@@ -101,10 +101,11 @@ cp .env.local.example .env
 | `AI_GATEWAY_API_KEY` | chat via the Vercel AI Gateway |
 | `OPENAI_API_KEY` | chat via OpenAI directly, **and/or** OpenAI Whisper transcription |
 | `ANTHROPIC_API_KEY` | chat via Anthropic (Claude) directly |
+| `XAI_API_KEY` | chat via xAI (Grok) directly |
 | `ELEVENLABS_API_KEY` | ElevenLabs TTS (skip if using the system voice) |
 | `TAVILY_API_KEY` | web-search tool (optional) |
 
-> The chat provider needs **one** of `AI_GATEWAY_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — matching the provider you select. Apple Intelligence needs none.
+> The chat provider needs **one** of `AI_GATEWAY_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` — matching the provider you select. Apple Intelligence needs none.
 
 ## Skills & permissions
 
@@ -120,7 +121,7 @@ The agent's capabilities are **skills** — declarative tool bundles. Sensitive 
 - [x] Pluggable wake-word + speech-to-text (incl. free offline Whisper & Vosk)
 - [x] Skills + permission gate *(Open apps & URLs)*
 - [x] Computer-use — screen capture + mouse/keyboard control, gated & opt-in
-- [x] Pluggable model providers — Apple on-device, OpenAI/Anthropic keys, AI Gateway
+- [x] Pluggable model providers — Apple on-device, OpenAI/Anthropic/xAI keys, AI Gateway
 - [x] Signed GitHub releases + auto-update
 - [ ] OpenDex hosted subscription — sign in, no keys, cloud-synced settings & history
 - [ ] More built-in skills (filesystem, maps, timers, etc …)

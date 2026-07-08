@@ -19,10 +19,10 @@ export type VoiceMode = "pipeline" | "realtime";
  *  BYOK connection (not implemented yet). */
 export type RealtimeProvider = "gateway" | "openai";
 /** Which provider routes chat completions. `apple` is free + on-device (macOS);
- *  `openai`/`anthropic` are bring-your-own-key; `gateway` is the Vercel AI
+ *  `openai`/`anthropic`/`xai` are bring-your-own-key; `gateway` is the Vercel AI
  *  Gateway (one key, any provider); `opendex` is our hosted subscription
  *  (reserved — not implemented yet). */
-export type LlmProvider = "apple" | "openai" | "anthropic" | "gateway" | "opendex";
+export type LlmProvider = "apple" | "openai" | "anthropic" | "xai" | "gateway" | "opendex";
 /** How a provider authenticates: `none` (local), `key` (user-pasted secret), or
  *  `account` (a session we manage — reserved for the OpenDex subscription). */
 export type ProviderAuth = "none" | "key" | "account";
@@ -31,7 +31,8 @@ export type SecretName =
   | "ELEVENLABS_API_KEY"
   | "TAVILY_API_KEY"
   | "OPENAI_API_KEY"
-  | "ANTHROPIC_API_KEY";
+  | "ANTHROPIC_API_KEY"
+  | "XAI_API_KEY";
 
 export interface OpenDexConfig {
   version: 1;
@@ -124,6 +125,7 @@ export interface SecretsPresence {
   TAVILY_API_KEY: boolean;
   OPENAI_API_KEY: boolean;
   ANTHROPIC_API_KEY: boolean;
+  XAI_API_KEY: boolean;
 }
 
 /** What the renderer receives — config plus which secrets are set (never the values). */
@@ -188,6 +190,7 @@ export const SECRET_NAMES: SecretName[] = [
   "TAVILY_API_KEY",
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
+  "XAI_API_KEY",
 ];
 
 /** Deep-merge a partial patch into a config (one level of nesting is enough here). */

@@ -1,5 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createXai } from "@ai-sdk/xai";
 import type { LanguageModel } from "ai";
 import type { OpenDexConfig } from "../../config/schema";
 
@@ -27,6 +28,9 @@ export async function resolveModel(config: OpenDexConfig): Promise<LanguageModel
     case "anthropic":
       if (!process.env.ANTHROPIC_API_KEY) throw new Error("no Anthropic API key is set");
       return createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })(model);
+    case "xai":
+      if (!process.env.XAI_API_KEY) throw new Error("no xAI API key is set");
+      return createXai({ apiKey: process.env.XAI_API_KEY })(model);
     case "apple": {
       // Native (Swift/Rust), macOS-only — dynamic-imported so non-darwin builds
       // never load the binary, and the chunk is only pulled when selected.

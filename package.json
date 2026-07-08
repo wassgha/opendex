@@ -30,6 +30,7 @@
     "@ai-sdk/anthropic": "^3.0.86",
     "@ai-sdk/gateway": "4.0.0-canary.107",
     "@ai-sdk/openai": "^3.0.74",
+    "@ai-sdk/xai": "^3.0.104",
     "@elevenlabs/elevenlabs-js": "^2.49.1",
     "@huggingface/transformers": "^4.2.0",
     "@meridius-labs/apple-on-device-ai": "^1.6.2",
