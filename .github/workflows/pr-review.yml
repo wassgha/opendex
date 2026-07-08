@@ -1,0 +1,71 @@
+name: AI PR Review
+
+on:
+  pull_request:
+    branches: [main]
+
+# Supersede older reviews on the same PR when new commits land.
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Only trusted collaborators — blocks fork/external authors from burning the
+    # gateway key or steering the review via prompt injection in the diff.
+    if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+    runs-on: ubuntu-latest
+    env:
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+    steps:
+      - name: Check for gateway key
+        id: gate
+        run: |
+          if [ -n "$AI_GATEWAY_API_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "AI_GATEWAY_API_KEY unset — skipping review."
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        if: steps.gate.outputs.enabled == 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate and post review
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## 🤖 AI review"
+            echo ""
+            pnpm tsx scripts/review-pr.ts "origin/$BASE_REF" HEAD
+          } > review.md
+
+          # Keep one rolling review comment: edit the bot's last one, or create
+          # it on the first run. Avoids spamming a fresh comment per push.
+          gh pr comment "$PR_NUMBER" --edit-last --create-if-none --body-file review.md
