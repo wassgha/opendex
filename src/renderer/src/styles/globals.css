@@ -169,6 +169,30 @@ body {
   --dex-surface: #241f19;
 }
 
+[data-dex-theme="siri"] {
+  --background: #000000;
+  --foreground: #f5f5f7;
+  --card: #131316;
+  --card-foreground: #f5f5f7;
+  --popover: #0c0c0e;
+  --popover-foreground: #f5f5f7;
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
+  --secondary: #1c1c1f;
+  --secondary-foreground: #f5f5f7;
+  --muted: #1c1c1f;
+  --muted-foreground: #98989f;
+  --accent: #1f1f23;
+  --accent-foreground: #ffffff;
+  --border: #2c2c30;
+  --input: #2c2c30;
+  --ring: #0a84ff;
+  --dex-glow: #7cc4ff;
+  --dex-active: #9bd1ff;
+  --dex-idle: #4a4a52;
+  --dex-surface: #161619;
+}
+
 @keyframes dex-rise {
   from { transform: translateY(6px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
@@ -209,6 +233,18 @@ body {
 @keyframes dex-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* Siri orb: slow undulation for each aurora ribbon (per-path duration/delay/
+   direction) + a hue cycle for the notch's mini rainbow orb. */
+@keyframes dex-siri-wave {
+  0%, 100% { transform: translate(0px, 0px) rotate(0deg) scaleY(1); }
+  50% { transform: translate(3px, -3px) rotate(1.5deg) scaleY(1.08); }
+}
+
+@keyframes dex-siri-hue {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
 }
 
 .bg-gradient-radial {
