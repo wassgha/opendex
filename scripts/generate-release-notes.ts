@@ -30,7 +30,7 @@ function gatherContext(): { commits: string; diffStat: string; changedFiles: str
 
   if (!previous) {
     return {
-      commits: sh(`git log ${current} --pretty=format:%h %s -20`),
+      commits: sh(`git log ${current} -n 20 --pretty=format:'%h %s'`),
       diffStat: "(first release)",
       changedFiles: "",
     };
@@ -38,7 +38,7 @@ function gatherContext(): { commits: string; diffStat: string; changedFiles: str
 
   const range = `${previous}..${current}`;
   return {
-    commits: sh(`git log ${range} --pretty=format:%h %s`),
+    commits: sh(`git log ${range} --pretty=format:'%h %s'`),
     diffStat: sh(`git diff ${range} --stat ${excludeLock}`),
     changedFiles: sh(`git diff ${range} --name-only ${excludeLock}`),
   };
