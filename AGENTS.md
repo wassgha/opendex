@@ -1,5 +1,13 @@
 # OpenDex — agent notes
 
+## Self-diagnostics and local agent milestones
+
+For diagnostics, self-healing, or local Codex integration work, read and update
+`docs/SELF_HEALING.md`. It records acceptance gates, verified connection limits,
+decisions, and next actions. Never mark a milestone complete from mocks alone
+when its acceptance gate requires a live desktop round trip. Keep raw runtime
+logs and conversation content out of that progress record.
+
 OpenDex is an **Electron** desktop app (electron-vite + React + Tailwind v4). It is a voice-first agentic harness, generalized from a Next.js demo.
 
 ## Process model (important)
@@ -60,7 +68,7 @@ OpenDex is an **Electron** desktop app (electron-vite + React + Tailwind v4). It
 - **Session grant:** `makePermissionRequester(sender)` holds a per-requester `sessionAllow` set, so an "Allow once" approval covers the rest of *that command's* multi-step tool loop (a fresh requester is built per `chatStart`, so it never silently persists across commands). Needed so computer-use doesn't re-prompt on every click.
 
 ## Computer-use (Phase 6) — see & control the desktop
-- **Model-agnostic, gated.** `src/skills/computer/` is the `computer` skill (`sensitive`, `optIn`; `skill.ts` + `screen-capture.ts` + `view.tsx`). Tools: `captureScreen` (optional `region` to **zoom** + `displayId` to pick a monitor), `click`, `moveMouse`, `drag`, `typeText`, `pressKeys`, `scroll` (optional `x,y` to aim the target pane), `wait`. Acting tools return a **fresh screenshot to the model** via the AI SDK's `toModelOutput` content path (`{type:"content", value:[{type:"text"},{type:"media", data, mediaType}]}`) — so the screenshot→act→screenshot loop works through the AI Gateway with **any vision model**, not just Anthropic's beta computer-use tool. `SkillTool.toModelOutput` is threaded through `buildToolSet` → `tool()`.
+- **Model-agnostic, gated.** `src/skills/computer/` is the `computer` skill (`sensitive`, `optIn`; `skill.ts` + `screen-capture.ts` + `view.tsx`). Tools: `captureScreen` (no arguments, full screenshot), `zoomScreen` (required `region`, needs a prior screenshot), `captureDisplay` (known `displayId` to pick a monitor), `click`, `moveMouse`, `drag`, `typeText`, `pressKeys`, `scroll` (optional `x,y` to aim the target pane), `wait`. Acting tools return a **fresh screenshot to the model** via the AI SDK's `toModelOutput` content path (`{type:"content", value:[{type:"text"},{type:"media", data, mediaType}]}`) — so the screenshot→act→screenshot loop works through the AI Gateway with **any vision model**, not just Anthropic's beta computer-use tool. `SkillTool.toModelOutput` is threaded through `buildToolSet` → `tool()`.
 - **Adaptive screenshot cadence** (`finishAction`): not every action snapshots. `click`/`drag`/`scroll`/`wait` default to returning a screenshot (they change the view); `typeText`/`pressKeys` default to **none** so the model can chain related keystrokes without a round-trip per key. Every acting tool takes an optional `screenshot` boolean to override, and the system prompt instructs the model to batch and only look when it needs to. Pairs with the `prepareStep` pruning (keep last 2 images) to keep the loop fast.
 - **Settled + diffed frames.** When an action does snapshot, it goes through `captureStable()` (re-captures until two consecutive frames stop differing, capped ~1s) so the model never acts on a half-loaded/spinner frame, then frame-diffs against the last frame the model saw (32×32 grayscale `signature` + `framesDiffer`): if nothing changed it returns a short **"no visible change"** text note and **omits the image** (cheaper, and a misclick signal). Net per-step image payload trends down.
 - **Human-like mechanics.** Long `typeText` is **pasted** via the Electron `clipboard` (save → write → ⌘/Ctrl+V → restore) instead of per-keystroke; short text still types. `drag` uses nut.js press/animated-move/release. Cursor moves **animate** (`mouse.move`+`straightTo`) so the session is watchable; the `computer.animateCursor` config flag (Settings → Skills) flips to instant `setPosition` for max speed.
@@ -88,3 +96,85 @@ OpenDex is an **Electron** desktop app (electron-vite + React + Tailwind v4). It
 
 ## Status
 Phases 1–4 done (4a cloud/web + 4b free offline); **5a done** (skills + permission gate + Open built-in); **6 done** (computer-use: screen capture + mouse/keyboard, gated & opt-in); **7 done** (always-on visibility: overlay HUD + notch mode + summon hotkey + tray, hide-not-close window model). Roadmap: 5b MCP + more built-ins → signed releases + auto-update.
+
+## Cool tricks
+
+`src/skills/tricks/` provides `listTricks`, `chooseTrick`, and `showPlayground`.
+The chooser returns a recipe, not completion; the normal agent loop performs it
+through existing tools and permission gates. Eligibility uses main-only
+`SkillExecutionContext` from `buildToolSet`, filtering disabled/unready/never-granted
+skills and macOS desktop permissions. `catalog.ts` is the extension point; see
+`docs/COOL_TRICKS.md`. The local particle playground runs in its own `#playground`
+window, owned by `src/main/demos/playground-window.ts`. Choosing a trick does not
+start recording. Selection history is in memory for the current app run.
+
+## Manual interaction recordings
+
+Settings → Recordings (also in the tray) records a selected display plus optional
+microphone/system audio. Capture is manual, off until Start; the tray shows REC
+and offers Stop. The Settings renderer owns the recorder and its window hides on
+close while recording. Main owns bounded file writes, library/export/trash, and
+the range-capable playback protocol. Code: `src/main/recordings/` and
+`src/renderer/src/lib/recordings/`; see `docs/RECORDINGS.md`. Files live only in
+userData/recordings, outside the repo. Do not upload or commit recording files.
+This is separate from diagnostic logs, which still contain no audio or images.
+
+## Local interaction diagnosis
+
+When the user asks about their last Dex interaction, run `pnpm diagnose` first (or `node scripts/diagnose.mjs`). Use `--last 3` to compare sessions. The local recorder is initialized at app startup and writes `diagnostics/interactions.jsonl` under Electron userData, normally `~/Library/Application Support/opendex`. It retains three approximately 5 MB files. Override the read directory with `OPENDEX_DIAGNOSTICS_DIR` when testing. Reports include transcripts, response IDs/status, tools, playback/interruption events and model/capture timings. Audio and images are not stored. Assistant transcripts describe generated content, not proof every word was heard; compare playback events. No transcript can be reconstructed for interactions before recording was installed. Do not ask the user to repeat their interaction until checking this report. Logs contain conversation content; do not upload or commit them.
+
+### Recording quick controls
+
+`controlRecording` (the recording skill, direct in both voice modes) and the notch
+record/stop button share `recordings/host.ts` coordination. The Settings renderer
+can be created hidden and announces readiness before main sends a start request;
+results are correlated and time-bounded. Capture still belongs exclusively to
+Settings. Saved screen/audio preferences live in renderer localStorage and are
+shared by Settings and quick starts. Stop waits briefly for the final file flush
+before returning to the model. Recording must only start on an explicit user request.
+
+### English transcription and screen demos
+
+Realtime input transcription explicitly sends `language: "en"`; do not add a
+transcription `prompt` without checking model support (the configured gateway
+model rejects that field). Display transcripts are asynchronous guidance, not
+proof of exactly what the voice model heard. Prefer user corrections over logs.
+Cloud STT also specifies English.
+
+Screen detective now uses `computer.describeScreen` as a direct, permission-gated
+read-only tool: one fresh capture plus a bounded vision description, returning
+text to realtime. It reuses the wake observer with a task-oriented demo purpose,
+not the older wake image or a multi-step desktop agent. Ignore Dex overlays and
+never infer blocked controls merely from a progress indicator.
+
+### Realtime barge-in audio forwarding
+
+The active session forwards every echo-cancelled microphone frame exactly once
+to server turn detection. Silero/SpeechGate now supplies diagnostics only, never
+zeroes or delays mic frames: low-confidence double-talk was previously discarded
+and barge-in requests disappeared before the model heard them. Wake detection
+remains the gate for opening a session. Echo-reference output and browser audio
+processing remain enabled. No raw audio is added to diagnostics.
+
+For realtime models with input transcription, `SpokenTurnGuard` holds spoken
+response audio, captions, and tool execution until a nonempty transcript arrives
+for that input item. Empty transcription or a five-second post-speech timeout
+ends the session quietly, discarding invented server context and returning to
+wake listening. Typed requests and tool continuations remain explicit. This is
+an output guard, not a microphone gate; transcription can still misrecognize
+noise, and models without transcription retain their existing behavior.
+
+### Guided browser research
+
+`src/skills/research/` adds `updateResearch`: a complete, validated snapshot of
+the plan, source status, sourced findings, and gaps. It is a display tool, not a
+search service or independent verifier. The model must actually read sources
+through existing browser/computer tools. Main and notch show the latest active
+research record; notch height is contributed by `ToolView.notchHeight`.
+Realtime delegated workers send substantive milestones through the existing
+session IPC, keyed to the active tool's response epoch. `ResponseCoordinator`
+serializes narration and rejects stale progress; progress-only responses cannot
+execute tools. `ResearchMilestones` throttles speech without periodic updates.
+`delegatedReport` selects the final report instead of concatenated narration.
+Research gets 96 steps after using the progress tool; ordinary tasks retain 40.
+See `docs/RESEARCH.md` for the workflow, validation, and limitations.

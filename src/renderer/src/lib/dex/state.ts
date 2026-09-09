@@ -15,14 +15,27 @@ export interface TranscriptTurn {
   content: string;
 }
 
+/** Keep the latest input available even as assistant turns stream after it. */
+export function inputTranscript(turns: TranscriptTurn[], liveCaption: string): string {
+  if (liveCaption.trim()) return liveCaption;
+  for (let i = turns.length - 1; i >= 0; i--) {
+    if (turns[i].role === "user") return turns[i].content;
+  }
+  return "";
+}
+
 export const STATUS_LABELS: Record<DexStatus, string> = {
   idle: "Initialising…",
-  listening_wake: "Standing by…",
-  active_listening: "Listening…",
-  follow_up_listening: "Anything else, sir?",
-  thinking: "Thinking…",
-  speaking: "Speaking…",
-  muted: "Muted",
+  listening_wake: "Asleep · waiting for wake word",
+  active_listening: "Awake · listening to you",
+  follow_up_listening: "Awake · listening to you",
+  thinking: "Awake · thinking",
+  speaking: "Awake · speaking",
+  muted: "Paused · microphone off",
   error: "Something went wrong",
   unsupported: "Voice not supported in this browser",
 };
+
+export function awarenessLabel(status: DexStatus, wakeWord = "Dex"): string {
+  return status === "listening_wake" ? `Asleep · say ${wakeWord}` : STATUS_LABELS[status];
+}

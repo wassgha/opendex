@@ -12,11 +12,11 @@ export type WindowMode = "full" | "notch";
 export type SttProvider = "webspeech" | "openai" | "whisper-local" | "vosk-local";
 /** How the voice session runs: `pipeline` = wake → STT → LLM → TTS (separate
  *  engines, free/local options); `realtime` = one speech-to-speech model over a
- *  WebSocket (most natural voice, needs a gateway key). */
+ *  WebSocket (requires the selected provider's API key). */
 export type VoiceMode = "pipeline" | "realtime";
 /** Which backend hosts the realtime session. `gateway` is the Vercel AI Gateway
- *  (one key, OpenAI + xAI realtime models); `openai` is reserved for a direct
- *  BYOK connection (not implemented yet). */
+ *  (one key, OpenAI + xAI realtime models); `openai` connects directly
+ *  using an OpenAI API key. */
 export type RealtimeProvider = "gateway" | "openai";
 /** Which provider routes chat completions. `apple` is free + on-device (macOS);
  *  `openai`/`anthropic`/`xai` are bring-your-own-key; `gateway` is the Vercel AI
@@ -70,7 +70,7 @@ export interface OpenDexConfig {
     mode: VoiceMode;
   };
   realtime: {
-    /** Which backend hosts the realtime session (v1 ships gateway only). */
+    /** Which backend hosts the realtime session. */
     provider: RealtimeProvider;
     /** Gateway slash-form model id, e.g. "openai/gpt-realtime-2". */
     model: string;
@@ -107,6 +107,8 @@ export interface OpenDexConfig {
     permissions: Record<string, SkillPermission>;
   };
   computer: {
+    /** Opt-in, read-only screenshot description when a wake word opens realtime voice. */
+    screenOnWake: boolean;
     /** Animate cursor moves (watchable) vs teleport instantly (fastest). */
     animateCursor: boolean;
   };
@@ -149,7 +151,7 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     system: { voiceURI: null, rate: 1, pitch: 1 },
   },
   greeting: { mode: "none", customPrompt: "" },
-  // Pipeline by default — realtime is an explicit choice (it needs a gateway
+  // Pipeline by default — realtime is an explicit choice (it needs a provider
   // key and bills per session). mergeConfig back-fills these sections into
   // configs written before they existed.
   voice: { mode: "pipeline" },
@@ -178,7 +180,7 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     enabled: { open: true, computer: false },
     permissions: { open: "ask", computer: "ask" },
   },
-  computer: { animateCursor: true },
+  computer: { animateCursor: true, screenOnWake: false },
   // Anonymous usage analytics, on by default (opt-out in onboarding/Settings).
   analytics: { enabled: true },
   onboarding: { completed: false },

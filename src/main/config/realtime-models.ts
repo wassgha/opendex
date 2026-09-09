@@ -1,3 +1,4 @@
+import type { RealtimeProvider, SecretName } from "./schema";
 // Realtime speech-to-speech model metadata: pure data, no dependencies, so both
 // the main process (session init) and the renderer (settings/onboarding pickers)
 // can import it as a value — same pattern as llm-providers.ts.
@@ -48,4 +49,13 @@ export const REALTIME_MODELS: RealtimeModelMeta[] = [
 
 export function getRealtimeModelMeta(id: string): RealtimeModelMeta | undefined {
   return REALTIME_MODELS.find((m) => m.id === id);
+}
+
+/** Keep slash-form IDs in config so shared tool/voice metadata stays stable. */
+export function realtimeModelsFor(provider: RealtimeProvider): RealtimeModelMeta[] {
+  return provider === "openai" ? REALTIME_MODELS.filter(m => m.id.startsWith("openai/")) : REALTIME_MODELS;
+}
+
+export function realtimeSecretName(provider: RealtimeProvider): SecretName {
+  return provider === "openai" ? "OPENAI_API_KEY" : "AI_GATEWAY_API_KEY";
 }

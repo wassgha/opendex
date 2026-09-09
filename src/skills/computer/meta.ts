@@ -1,7 +1,11 @@
 import type { SkillMeta } from "../types";
 
 export const TOOLS = {
+  controlDesktop: "controlDesktop",
+  describeScreen: "describeScreen",
   captureScreen: "captureScreen",
+  zoomScreen: "zoomScreen",
+  captureDisplay: "captureDisplay",
   click: "click",
   moveMouse: "moveMouse",
   drag: "drag",

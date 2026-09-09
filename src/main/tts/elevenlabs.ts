@@ -1,3 +1,6 @@
+import { recordLatency } from "../diagnostics/latency-summary";
+import { beginUsage, finishUsage } from "../usage/ledger";
+import { unknownCharge, quantity } from "../usage/pricing";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
 const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // George — deep British male
@@ -30,19 +33,30 @@ export async function synthesizeSpeech(text: string): Promise<Buffer> {
   const voiceId = process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
   const modelId = process.env.ELEVENLABS_MODEL_ID ?? "eleven_turbo_v2_5";
 
-  const stream = await client().textToSpeech.stream(voiceId, {
-    text: trimmed,
-    modelId,
-    outputFormat: "mp3_44100_128",
-    optimizeStreamingLatency: 3,
-  });
+  const tts = client();
+  const usageId = beginUsage({ provider: "elevenlabs", model: modelId, category: "speech" });
+  const start = performance.now();
+  try {
+    const { data: stream, rawResponse } = await tts.textToSpeech.stream(voiceId, {
+      text: trimmed,
+      modelId,
+      outputFormat: "mp3_44100_128",
+      optimizeStreamingLatency: 3,
+    }).withRawResponse();
 
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (value) chunks.push(value);
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+    finishUsage(usageId, { characters: trimmed.length, credits: quantity(rawResponse.headers.get("character-cost") ?? undefined) }, unknownCharge("ElevenLabs credit usage depends on your plan and allowance. Dollar cost is unavailable."));
+    const buffer = Buffer.concat(chunks);
+    recordLatency("speech-synthesis", performance.now() - start);
+    return buffer;
+  } catch (error) {
+    finishUsage(usageId, { characters: trimmed.length }, unknownCharge("Speech generation ended without final usage; charges may apply."), true);
+    throw error;
   }
-  return Buffer.concat(chunks);
 }

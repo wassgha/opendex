@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Regression tests
+        run: pnpm test
+
       # Full electron-vite build (main + preload + renderer). Catches bundling
       # and import errors that `tsc --noEmit` alone misses. No secrets required.
       - name: Build

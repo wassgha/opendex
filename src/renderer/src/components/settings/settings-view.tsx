@@ -1,15 +1,42 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConfig } from "@/lib/use-config";
 import { cn } from "@/lib/utils";
 import { SETTINGS_SECTIONS } from "./sections";
+import { recordingPreferences } from "@/lib/recordings/preferences";
+import { interactionRecorder } from "@/lib/recordings/recorder";
 
 // The settings experience for the dedicated settings window: a sidebar of
 // sections on the left, the active section's controls on the right. Config is
 // loaded + mutated through the same IPC as the main window, and the main process
 // broadcasts changes so both windows stay in sync live.
 export function SettingsApp() {
+  useEffect(() => {
+    let generation = 0;
+    const offStop = window.opendex.onRecordingStop(() => { generation++; interactionRecorder.stop(); });
+    const offStart = window.opendex.onRecordingStart(id => {
+      const current = ++generation;
+      void (async () => {
+        try {
+          const options = recordingPreferences();
+          const sources = await window.opendex.recordingSources();
+          if (generation !== current) throw new Error("Recording cancelled.");
+          if (!sources.some(source => source.id === options.sourceId)) options.sourceId = sources[0]?.id ?? "";
+          if (!options.sourceId) throw new Error("No screen is available to record.");
+          await interactionRecorder.start(options);
+          window.opendex.recordingStartResult(id);
+        } catch (error) { window.opendex.recordingStartResult(id, String(error)); }
+      })();
+    });
+    window.opendex.recordingReady();
+    return () => { generation++; offStart(); offStop(); };
+  }, []);
   const { data, loading, setConfig, setSecret, resetConfig } = useConfig();
   const [active, setActive] = useState(SETTINGS_SECTIONS[0].id);
+  useEffect(() => {
+    const off = window.opendex.onSettingsNavigate(setActive);
+    void window.opendex.getSettingsSection().then(setActive);
+    return off;
+  }, []);
 
   if (loading || !data) {
     return (

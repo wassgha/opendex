@@ -5,25 +5,32 @@ import { NotchApp } from "./NotchApp";
 import { OverlayApp } from "./OverlayApp";
 import { PermissionApp } from "./PermissionApp";
 import { SettingsApp } from "./components/settings/settings-view";
+import { PlaygroundApp } from "./components/playground/playground-app";
+import { FloatingWidgetApp } from "./components/floating-widget";
+import { WidgetSlotPickerApp } from "./components/widget-slot-picker";
 import "./styles/globals.css";
 
 // All windows load this same bundle; the URL hash selects which experience
 // mounts: `#settings` → settings, `#overlay` → the always-on-top action HUD,
 // `#permission` → the sensitive-tool prompt popup, `#notch` → the compact top
 // bar, otherwise the main voice experience.
-const route = window.location.hash.replace(/^#\/?/, "");
+const route = window.location.hash.replace(/^#\/?/, "").split("?")[0];
 const ROUTES = {
+  "widget-slots": WidgetSlotPickerApp,
+  widget: FloatingWidgetApp,
   settings: SettingsApp,
   overlay: OverlayApp,
   permission: PermissionApp,
   notch: NotchApp,
+  playground: PlaygroundApp,
 } as const;
 const isRoute = (r: string): r is keyof typeof ROUTES => r in ROUTES;
 
 // Expose host platform + which window this is so CSS can adapt the chrome (the
 // frameless main window's traffic lights; the transparent overlay/popup/notch
 // bodies).
-document.documentElement.dataset.platform = window.opendex.platform;
+document.documentElement.dataset.platform = route === "widget" || route === "widget-slots"
+  ? window.opendexWidget.platform : window.opendex.platform;
 document.documentElement.dataset.window = isRoute(route) ? route : "main";
 
 const Root = isRoute(route) ? ROUTES[route] : App;

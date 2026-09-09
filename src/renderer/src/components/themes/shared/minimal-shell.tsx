@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { ThemeTopBar } from "./theme-top-bar";
 import { TextComposer } from "./text-composer";
 import type { DexThemeProps } from "../types";
+import { InputTranscript } from "@/components/input-transcript";
+import { inputTranscript } from "@/lib/dex/state";
 
 // Shared chrome for the minimalist themes (dot, cursor): a solid background, a
 // centred visual, and a borderless transcript that only appears when there's
@@ -42,11 +44,12 @@ export function MinimalShell({
   return (
     <div
       data-dex-theme={themeId}
-      className={`relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-background px-6 text-foreground ${
+      className={`relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-background px-4 pb-20 pt-24 sm:px-6 text-foreground ${
         mono ? "font-mono" : ""
       }`}
     >
       <ThemeTopBar
+        wakeWord={props.wakeWord}
         name={name}
         status={status}
         onOpenSettings={props.onOpenSettings}
@@ -88,6 +91,11 @@ export function MinimalShell({
       </section>
 
       {/* Borderless transcript overlay — only when there's content, fading up. */}
+      {hideTranscript && (
+        <div className="absolute inset-x-0 bottom-20 z-10 mx-auto w-full max-w-2xl px-6">
+          <InputTranscript text={inputTranscript(props.transcript, props.liveCaption)} interim={Boolean(props.liveCaption)} />
+        </div>
+      )}
       {hasTranscript && (
         <div className="pointer-events-none absolute inset-x-0 bottom-20 z-10 flex justify-center">
           <div

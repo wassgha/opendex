@@ -14,5 +14,7 @@ export function formatToolCall(call: ToolCallEvent): ToolActivityLabel {
   if (call.toolName === RUN_TASK_TOOL) {
     return { icon: "🛠️", label: "Working on it…" };
   }
+  if (call.toolName === 'read_wake_screen') return { icon: '📸', label: 'Looking at the screen' };
+  if (call.toolName === 'go_to_sleep') return { icon: '🌙', label: 'Going to sleep' };
   return getToolView(call.toolName).label(call.input);
 }

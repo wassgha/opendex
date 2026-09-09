@@ -1,14 +1,15 @@
-// Standalone smoke test for the gateway realtime codec — mints a token, opens
+// Standalone smoke test for either realtime provider — connects, opens
 // the WebSocket from Node (no Electron, no audio), runs a text round-trip and a
 // tool-call round-trip, and prints the streamed transcript.
-// Usage: `pnpm smoke:realtime [model-id]` (default: openai/gpt-realtime-2)
+// Usage: `pnpm smoke:realtime [model-id] [--openai]` (default: gateway, openai/gpt-realtime-2)
 import { config as loadEnv } from "dotenv";
-import { gateway } from "@ai-sdk/gateway";
+import { connectRealtime } from "../src/main/agent/realtime/connection";
 import { z } from "zod";
 
-loadEnv();
+loadEnv({ quiet: true });
 
-const modelId = process.argv[2] ?? "openai/gpt-realtime-2";
+const provider = process.argv.includes("--openai") ? "openai" : "gateway";
+const modelId = process.argv.slice(2).find(arg => !arg.startsWith("--")) ?? "openai/gpt-realtime-2";
 const TIMEOUT_MS = 60_000;
 
 // Mirrors how realtime-tools.ts will flatten a skill tool for the session.
@@ -22,18 +23,8 @@ const weatherTool = {
 };
 
 async function main() {
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    console.error("[smoke] FAIL: AI_GATEWAY_API_KEY not set");
-    process.exit(1);
-  }
-
-  console.log(`[smoke] model=${modelId}`);
-  const { token, url } = await gateway.experimental_realtime.getToken({ model: modelId });
-  console.log(`[smoke] token minted, url=${url.split("?")[0]}`);
-
-  const model = gateway.experimental_realtime(modelId);
-  const config = model.getWebSocketConfig({ token, url });
-  const ws = new WebSocket(config.url, config.protocols);
+  console.log(`[smoke] provider=${provider} model=${modelId}`);
+  const { codec: model, ws } = await connectRealtime(provider, modelId);
 
   const send = async (event: Parameters<typeof model.serializeClientEvent>[0]) =>
     ws.send(JSON.stringify(await model.serializeClientEvent(event)));
@@ -69,7 +60,7 @@ async function main() {
     await send({ type: "response-create" });
   });
 
-  ws.addEventListener("message", async (msg) => {
+  ws.addEventListener("message", async (msg: { data: unknown }) => {
     const raw = JSON.parse(String(msg.data));
     const keepalive = model.getHealthCheckResponse?.(raw);
     if (keepalive) {
@@ -132,8 +123,10 @@ async function main() {
     }
   });
 
-  ws.addEventListener("close", (e) => {
-    console.log(`[smoke] ws closed code=${e.code} reason=${e.reason}`);
+  ws.addEventListener("close", (e: { code: number }) => {
+    console.log(`[smoke] ws closed code=${e.code}`);
+    clearTimeout(timeout);
+    process.exit(1);
   });
   ws.addEventListener("error", () => {
     console.error("[smoke] FAIL: ws error");
@@ -142,6 +135,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("[smoke] error", err);
+  console.error("[smoke] error", err instanceof Error ? err.message : "Connection failed");
   process.exit(1);
 });

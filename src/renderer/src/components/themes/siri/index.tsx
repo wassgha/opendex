@@ -45,14 +45,14 @@ function SiriOrb({
 
   return (
     <div
-      className={`flex h-64 w-64 items-center justify-center ${
+      className={`flex aspect-square w-[min(16rem,60vw,calc(100dvh-15rem))] items-center justify-center ${
         status === "idle" ? "animate-dex-breath" : ""
       }`}
       aria-hidden="true"
     >
       <div
         ref={orbRef}
-        className={`relative h-52 w-52 transition-opacity duration-500 ${
+        className={`relative aspect-square w-[81.25%] transition-opacity duration-500 ${
           dim ? "opacity-50" : ""
         }`}
         style={

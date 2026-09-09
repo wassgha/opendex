@@ -26,7 +26,7 @@ export class StreamingPcmPlayer {
   private drainTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
-  constructor(ctx: AudioContext, callbacks: PcmPlayerCallbacks) {
+  constructor(ctx: AudioContext, callbacks: PcmPlayerCallbacks, output: AudioNode = ctx.destination) {
     this.ctx = ctx;
     this.callbacks = callbacks;
     this.gain = ctx.createGain();
@@ -35,7 +35,7 @@ export class StreamingPcmPlayer {
     this.analyser.smoothingTimeConstant = 0.8;
     this.data = new Uint8Array(this.analyser.fftSize);
     this.gain.connect(this.analyser);
-    this.analyser.connect(ctx.destination);
+    this.analyser.connect(output);
   }
 
   /** Queue one PCM16 chunk for seamless playback. */
@@ -106,6 +106,8 @@ export class StreamingPcmPlayer {
     const rms = Math.sqrt(sum / this.data.length);
     return Math.max(0, Math.min(1, rms * 3.2));
   }
+
+  get queuedUntil(): number { return Math.max(this.ctx.currentTime, this.cursor); }
 
   get isPlaying(): boolean {
     return this.playing;

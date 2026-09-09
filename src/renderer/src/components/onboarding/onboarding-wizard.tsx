@@ -22,7 +22,8 @@ import {
 import { useSystemVoices } from "@/lib/use-system-voices";
 import { ThemePicker } from "@/components/themes/theme-picker";
 import {
-  REALTIME_MODELS,
+  realtimeModelsFor,
+  realtimeSecretName,
   getRealtimeModelMeta,
 } from "../../../../main/config/realtime-models";
 import { AudioWaveform, Dot, Pencil, SlidersHorizontal } from "lucide-react";
@@ -168,7 +169,7 @@ export function OnboardingWizard({
             onSelect={() => setConfig({ voice: { mode: "realtime" } })}
             Icon={AudioWaveform}
             title="Realtime voice"
-            blurb="One speech-to-speech model listens and answers in its own voice — the most natural conversations and the fastest turns. Needs a Vercel AI Gateway key; screen control still runs through your language model."
+            blurb="One speech-to-speech model listens and answers in its own voice — the most natural conversations and the fastest turns. Uses an OpenAI or Vercel AI Gateway key; screen control still runs through your language model."
           />
         </div>
       ),
@@ -183,17 +184,31 @@ export function OnboardingWizard({
               const realtimeMeta = getRealtimeModelMeta(config.realtime.model);
               return (
                 <>
+                  <SelectField
+                    label="Voice provider"
+                    value={config.realtime.provider}
+                    options={[
+                      { value: "openai", label: "OpenAI direct" },
+                      { value: "gateway", label: "Vercel AI Gateway" },
+                    ]}
+                    onChange={(provider) => {
+                      const models = realtimeModelsFor(provider);
+                      const model = models.find(m => m.id === config.realtime.model) ?? models[0];
+                      setConfig({ realtime: { ...config.realtime, provider, model: model.id,
+                        voice: model.voices.some(v => v.id === config.realtime.voice) ? config.realtime.voice : model.voices[0]?.id ?? "" } });
+                    }}
+                  />
                   <SecretField
-                    label="Vercel AI Gateway key"
-                    hint="Realtime sessions connect through the gateway (same key as the gateway model provider)."
-                    present={secrets.AI_GATEWAY_API_KEY}
-                    onSave={(v) => setSecret("AI_GATEWAY_API_KEY", v)}
+                    label={config.realtime.provider === "openai" ? "OpenAI API key" : "Vercel AI Gateway key"}
+                    hint={config.realtime.provider === "openai" ? "Connects directly to OpenAI with your API key." : "Uses the same key as the Gateway language model provider."}
+                    present={secrets[realtimeSecretName(config.realtime.provider)]}
+                    onSave={(v) => setSecret(realtimeSecretName(config.realtime.provider), v)}
                   />
                   <SelectField
                     label="Realtime model"
                     hint={realtimeMeta?.blurb}
                     value={config.realtime.model}
-                    options={REALTIME_MODELS.map((m) => ({ value: m.id, label: m.label }))}
+                    options={realtimeModelsFor(config.realtime.provider).map((m) => ({ value: m.id, label: m.label }))}
                     onChange={(v) => {
                       const meta = getRealtimeModelMeta(v);
                       setConfig({
@@ -232,8 +247,8 @@ export function OnboardingWizard({
                     }
                   />
                   <p className="text-xs text-white/40">
-                    Sessions are billed by the provider and capped at twenty-five
-                    minutes — the wake word reconnects seamlessly.
+                    Sessions are billed by the selected provider. The wake word
+                    reconnects after a session ends.
                   </p>
                 </>
               );
@@ -378,10 +393,10 @@ export function OnboardingWizard({
   const step = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
   // Block advancing past the model step until a provider is chosen and usable,
-  // and past the realtime step until the gateway key is saved.
+  // and past the realtime step until the selected voice provider key is saved.
   const blocked =
     (step.key === "llm" && !isProviderReady(data, chosenProvider, apple)) ||
-    (step.key === "realtime" && !secrets.AI_GATEWAY_API_KEY);
+    (step.key === "realtime" && !secrets[realtimeSecretName(config.realtime.provider)]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a] p-0 md:p-6">

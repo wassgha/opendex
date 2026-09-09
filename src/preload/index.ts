@@ -1,5 +1,7 @@
+import type { UsageSummary, UsageHistory } from "../main/usage/types";
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { randomUUID } from "node:crypto";
+import type { RecordingEntry, RecordingOptions, RecordingSource, RecordingState } from "../main/recordings/types";
 import {
   IPC,
   type ChatMessage,
@@ -14,6 +16,7 @@ import {
   type ViewCommand,
   type WindowMode,
 } from "../main/ipc/channels";
+import type { ScreenHealth } from "../main/config/screen-health";
 import type { PermissionDecision } from "../main/agent/permissions";
 import type {
   DeepPartial,
@@ -26,6 +29,7 @@ import type {
 export interface ChatRequest {
   messages: ChatMessage[];
   mode?: "briefing";
+  delegation?: { sessionId: string; toolCallId: string };
   onDelta: (text: string) => void;
   /** Fired when the agent invokes a tool (for the activity UI). */
   onToolCall?: (call: ToolCallEvent) => void;
@@ -40,6 +44,42 @@ export interface ChatHandle {
 }
 
 const opendex = {
+  openWidgets: (): Promise<void> => ipcRenderer.invoke(IPC.widgetsOpen),
+  usageSummary: (): Promise<UsageSummary> => ipcRenderer.invoke(IPC.usageSummary),
+  usageHistory: (offset = 0): Promise<UsageHistory> => ipcRenderer.invoke(IPC.usageHistory, offset),
+  onUsageChanged: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on(IPC.usageChanged, listener);
+    return () => { ipcRenderer.removeListener(IPC.usageChanged, listener); };
+  },
+  recordingControl: (action: "start" | "stop"): Promise<RecordingState> => ipcRenderer.invoke(IPC.recordingControl, action),
+  recordingReady: () => ipcRenderer.send(IPC.recordingReady),
+  recordingStartResult: (id: string, error?: string) => ipcRenderer.send(IPC.recordingStartResult, id, error),
+  onRecordingStart: (callback: (id: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, id: string) => callback(id);
+    ipcRenderer.on(IPC.recordingStartRequested, listener);
+    return () => { ipcRenderer.removeListener(IPC.recordingStartRequested, listener); };
+  },
+  recordingSources: (): Promise<RecordingSource[]> => ipcRenderer.invoke(IPC.recordingSources),
+  recordingPrepare: (options: RecordingOptions, mime: string): Promise<string> => ipcRenderer.invoke(IPC.recordingPrepare, options, mime),
+  recordingStarted: (id: string): Promise<void> => ipcRenderer.invoke(IPC.recordingStarted, id),
+  recordingChunk: (id: string, bytes: ArrayBuffer): Promise<void> => ipcRenderer.invoke(IPC.recordingChunk, id, bytes),
+  recordingFinish: (id: string, duration: number, error?: string): Promise<void> => ipcRenderer.invoke(IPC.recordingFinish, id, duration, error),
+  recordingState: (): Promise<RecordingState> => ipcRenderer.invoke(IPC.recordingState),
+  recordingStop: (): Promise<void> => ipcRenderer.invoke(IPC.recordingStop),
+  recordingList: (): Promise<RecordingEntry[]> => ipcRenderer.invoke(IPC.recordingList),
+  recordingExport: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.recordingExport, id),
+  recordingTrash: (id: string): Promise<void> => ipcRenderer.invoke(IPC.recordingTrash, id),
+  recordingReveal: (id: string): Promise<void> => ipcRenderer.invoke(IPC.recordingReveal, id),
+  onRecordingState: (callback: (state: RecordingState) => void) => {
+    const listener = (_event: IpcRendererEvent, state: RecordingState) => callback(state);
+    ipcRenderer.on(IPC.recordingChanged, listener);
+    return () => { ipcRenderer.removeListener(IPC.recordingChanged, listener); };
+  },
+  onRecordingStop: (callback: () => void) => {
+    ipcRenderer.on(IPC.recordingStopRequested, callback);
+    return () => { ipcRenderer.removeListener(IPC.recordingStopRequested, callback); };
+  },
   /** The host OS platform (e.g. "darwin"), so the renderer can adapt its chrome
    *  to the frameless title bar (traffic-light clearance, drag regions). */
   platform: process.platform as NodeJS.Platform,
@@ -49,7 +89,7 @@ const opendex = {
    * resolves with the generated messages (or rejects on error). `cancel()`
    * aborts the main-process stream (used for barge-in / stop).
    */
-  chat({ messages, mode, onDelta, onToolCall, onToolResult }: ChatRequest): ChatHandle {
+  chat({ messages, mode, delegation, onDelta, onToolCall, onToolResult }: ChatRequest): ChatHandle {
     const requestId = randomUUID();
     const deltaCh = IPC.chatDelta(requestId);
     const toolCh = IPC.chatTool(requestId);
@@ -92,7 +132,7 @@ const opendex = {
     ipcRenderer.on(toolResultCh, onToolResultEvt);
     ipcRenderer.once(doneCh, onDoneEvt);
     ipcRenderer.once(errorCh, onErrorEvt);
-    ipcRenderer.send(IPC.chatStart, { requestId, messages, mode });
+    ipcRenderer.send(IPC.chatStart, { requestId, messages, mode, delegation });
 
     return {
       cancel: () => {
@@ -110,12 +150,12 @@ const opendex = {
   },
 
   // ── Realtime voice sessions ───────────────────────────────────────────────
-  // The WebSocket lives in main (the gateway key authenticates the upgrade);
+  // The WebSocket and provider credentials live in main;
   // the renderer streams mic PCM up and plays the audio notices coming back.
 
   /** Open a realtime session in main. `briefing` opens it with the proactive
    *  greeting. Rejects with a user-facing reason (unset key, failed connect). */
-  realtimeStart(opts: { briefing: boolean }): Promise<RealtimeStartResult> {
+  realtimeStart(opts: { briefing: boolean; wake?: boolean }): Promise<RealtimeStartResult> {
     return ipcRenderer.invoke(IPC.realtimeStart, opts);
   },
 
@@ -135,6 +175,7 @@ const opendex = {
     const listener = (_e: IpcRendererEvent, notice: RealtimeServerNotice) =>
       handler(notice);
     ipcRenderer.on(channel, listener);
+    ipcRenderer.send(IPC.realtimeReady, sessionId);
     return () => ipcRenderer.removeListener(channel, listener);
   },
 
@@ -169,8 +210,22 @@ const opendex = {
   },
 
   /** Open the dedicated settings window (creates it, or focuses if already open). */
-  openSettings(): Promise<void> {
-    return ipcRenderer.invoke(IPC.settingsOpen);
+  openSettings(section?: string): Promise<void> {
+    return ipcRenderer.invoke(IPC.settingsOpen, section);
+  },
+  getSettingsSection(): Promise<string> { return ipcRenderer.invoke(IPC.settingsSectionGet); },
+  onSettingsNavigate(handler: (section: string) => void): () => void {
+    const listener = (_event: IpcRendererEvent, section: string) => handler(section);
+    ipcRenderer.on(IPC.settingsNavigate, listener);
+    return () => ipcRenderer.removeListener(IPC.settingsNavigate, listener);
+  },
+  getScreenHealth(): Promise<ScreenHealth> { return ipcRenderer.invoke(IPC.screenHealthGet); },
+  retryScreen(): Promise<ScreenHealth> { return ipcRenderer.invoke(IPC.screenHealthRetry); },
+  fixScreen(action: "billing" | "permission" | "model"): Promise<void> { return ipcRenderer.invoke(IPC.screenHealthFix, action); },
+  onScreenHealth(handler: (status: ScreenHealth) => void): () => void {
+    const listener = (_event: IpcRendererEvent, status: ScreenHealth) => handler(status);
+    ipcRenderer.on(IPC.screenHealthChanged, listener);
+    return () => ipcRenderer.removeListener(IPC.screenHealthChanged, listener);
   },
 
   /** Subscribe to config changes broadcast from the main process (so windows
@@ -207,6 +262,15 @@ const opendex = {
   },
 
   // ── Session state relay (main window → view surfaces) ─────────────────────
+
+  publishMicrophoneLevel(level: number | null): void {
+    ipcRenderer.send(IPC.microphoneLevel, level);
+  },
+  onMicrophoneLevel(handler: (level: number | null) => void): () => void {
+    const listener = (_e: IpcRendererEvent, level: number | null) => handler(level);
+    ipcRenderer.on(IPC.microphoneLevel, listener);
+    return () => ipcRenderer.removeListener(IPC.microphoneLevel, listener);
+  },
 
   /** Main window: publish a fresh snapshot of the live voice session. */
   publishSessionState(state: SessionState): void {

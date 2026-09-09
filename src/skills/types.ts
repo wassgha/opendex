@@ -1,5 +1,6 @@
 import type { ZodType } from "zod";
 import type { Tool } from "ai";
+import type { OpenDexConfig } from "../main/config/schema";
 
 // ── Skill model (shared / main process) ─────────────────────────────────────
 // A skill bundles one or more related tools the agent can call. Each skill lives
@@ -32,19 +33,33 @@ export interface SkillMeta {
 export type ToModelOutput = NonNullable<Tool["toModelOutput"]>;
 
 export interface SkillTool {
+  /** Require a fresh permission popup even with a standing/session grant. */
+  confirmEachCall?: boolean;
+  /** Explicit opt-in for non-image controls within an image-producing skill. */
+  realtime?: boolean;
   name: string;
   description: string;
   inputSchema: ZodType;
   /** Build a short human summary of a call, shown in the permission prompt. */
   summarize?: (input: unknown) => string;
-  execute: (input: never) => Promise<unknown>;
+  execute: (input: never, context?: SkillExecutionContext) => Promise<unknown>;
   /** Optional: convert the execute result into model-facing content (e.g. an image). */
   toModelOutput?: ToModelOutput;
+}
+
+/** Main-only context for capability-aware tools. Never returned to the renderer. */
+export interface SkillExecutionContext {
+  signal?: AbortSignal;
+  config: OpenDexConfig;
+  availableSkillIds: readonly string[];
+  platform: NodeJS.Platform;
 }
 
 /** The executable skill (main process). Extends its renderer-safe `SkillMeta`
  *  with the actual tools. */
 export interface Skill extends SkillMeta {
+  /** Main-only readiness check, evaluated when assembling tools and manuals. */
+  isReady?: () => boolean;
   tools: SkillTool[];
   /** Optional operating instructions appended to the system prompt when this
    *  skill is enabled (non-briefing turns) — e.g. how to drive computer-use. */
@@ -56,4 +71,5 @@ export type PermissionRequester = (
   skillId: string,
   label: string,
   detail: string,
+  options?: { confirmEachCall?: boolean },
 ) => Promise<boolean>;

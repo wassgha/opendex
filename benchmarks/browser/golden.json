@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "id": "dex-browser-golden",
+  "scenarios": [
+    {
+      "id": "catalog-search",
+      "task": "Search the catalog for lantern, then open the Amber Lantern (not the Blue Lantern).",
+      "budgetMs": 120000,
+      "steps": [
+        { "title": "Catalog search", "controls": [
+          { "id": "query", "label": "Search catalog", "kind": "input" },
+          { "id": "search", "label": "Search", "kind": "button" },
+          { "id": "offers", "label": "Special offers", "kind": "button" }
+        ], "success": { "target": "search", "values": { "query": "lantern" } } },
+        { "title": "Search results", "controls": [
+          { "id": "blue", "label": "Blue Lantern — $30", "kind": "button" },
+          { "id": "amber", "label": "Amber Lantern — $25", "kind": "button" },
+          { "id": "back", "label": "Back to catalog", "kind": "button" }
+        ], "success": { "target": "amber", "values": {} } }
+      ]
+    },
+    {
+      "id": "delivery-form",
+      "task": "Complete the fictional delivery form: recipient Alex Example, city Austin, delivery Express. Save the delivery. This fixture sends nothing and makes no purchase.",
+      "budgetMs": 180000,
+      "steps": [
+        { "title": "Delivery details", "controls": [
+          { "id": "recipient", "label": "Recipient", "kind": "input" },
+          { "id": "city", "label": "City", "kind": "input" },
+          { "id": "delivery", "label": "Delivery", "kind": "select", "options": ["Choose delivery", "Standard", "Express"] },
+          { "id": "save", "label": "Save delivery", "kind": "button" },
+          { "id": "reset", "label": "Cancel delivery", "kind": "button" }
+        ], "success": { "target": "save", "values": { "recipient": "Alex Example", "city": "Austin", "delivery": "Express" } } }
+      ]
+    },
+    {
+      "id": "settings-navigation",
+      "task": "Navigate to Settings, then Notifications. Set frequency to Weekly and save preferences.",
+      "budgetMs": 150000,
+      "steps": [
+        { "title": "Workspace", "controls": [
+          { "id": "projects", "label": "Projects", "kind": "button" },
+          { "id": "settings", "label": "Settings", "kind": "button" },
+          { "id": "help", "label": "Help", "kind": "button" }
+        ], "success": { "target": "settings", "values": {} } },
+        { "title": "Settings", "controls": [
+          { "id": "profile", "label": "Profile", "kind": "button" },
+          { "id": "notifications", "label": "Notifications", "kind": "button" },
+          { "id": "billing", "label": "Billing", "kind": "button" }
+        ], "success": { "target": "notifications", "values": {} } },
+        { "title": "Notifications", "controls": [
+          { "id": "frequency", "label": "Frequency", "kind": "select", "options": ["Daily", "Weekly", "Never"] },
+          { "id": "save", "label": "Save preferences", "kind": "button" }
+        ], "success": { "target": "save", "values": { "frequency": "Weekly" } } }
+      ]
+    }
+  ]
+}

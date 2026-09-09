@@ -1,3 +1,4 @@
+import type { WakeAudio } from "./wake-audio";
 // Wake/STT engine contracts. Web Speech and the keyless "manual" path stay
 // inline in use-dex (they're tightly coupled to the state machine); Vosk wake
 // and cloud STT are encapsulated here behind these interfaces.
@@ -6,7 +7,7 @@ export type EngineStatus = "ok" | "needs-key" | "unsupported" | "error";
 
 export interface WakeEngine {
   /** Begin listening for the wake trigger; `onWake` fires on detection. */
-  start(onWake: () => void): Promise<void>;
+  start(onWake: (initialText?: string, audio?: WakeAudio) => void): Promise<void>;
   stop(): Promise<void>;
   dispose(): Promise<void>;
 }

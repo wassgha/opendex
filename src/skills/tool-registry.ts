@@ -10,8 +10,8 @@ export function registerToolView(view: ToolView): void {
 }
 
 // Resolve a view by tool name. Unknown tools get a label-only fallback (generic
-// icon + the raw tool name, no card) — deliberately no auto-JSON card, so an
+// icon + a plain-language message, no card) — deliberately no auto-JSON card, so an
 // unregistered tool surfaces as a banner, not a wall of JSON.
 export function getToolView(name: string): ToolView {
-  return VIEWS[name] ?? { name, label: () => ({ icon: "⚙️", label: name }) };
+  return VIEWS[name] ?? { name, label: () => ({ icon: "⚙️", label: "Working on your request" }) };
 }

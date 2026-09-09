@@ -48,15 +48,16 @@ export function resolvePermission(id: string, decision: PermissionDecision) {
  * task (e.g. a computer-use session) doesn't re-prompt on every action. A new
  * command builds a fresh requester, so the grant doesn't silently persist.
  */
-export function makePermissionRequester(sender: WebContents): PermissionRequester {
+export function makePermissionRequester(sender: WebContents, signal?: AbortSignal): PermissionRequester {
   const sessionAllow = new Set<string>();
-  return (skillId, label, detail) =>
+  const inFlight = new Map<string, Promise<boolean>>();
+  const request: PermissionRequester = (skillId, label, detail, options) =>
     new Promise<boolean>((resolve) => {
+      if (signal?.aborted || sender.isDestroyed()) return resolve(false);
       // Persisted standing decisions short-circuit the prompt.
       const standing = getConfig().skills.permissions[skillId];
-      if (standing === "always") return resolve(true);
       if (standing === "never") return resolve(false);
-      if (sessionAllow.has(skillId)) return resolve(true);
+      if (!options?.confirmEachCall && (standing === "always" || sessionAllow.has(skillId))) return resolve(true);
 
       if (sender.isDestroyed()) return resolve(false);
 
@@ -71,16 +72,20 @@ export function makePermissionRequester(sender: WebContents): PermissionRequeste
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener("abort", onDestroyed);
         pending.delete(id);
         if (!sender.isDestroyed()) sender.off("destroyed", onDestroyed);
         // Drop the prompt from the popup (no-op if the user just answered it).
         permissionUi?.dismiss(id);
-        const allowed = decision === "allow_once" || decision === "always";
+        const allowed = (decision === "allow_once" || decision === "always") &&
+          !signal?.aborted && !sender.isDestroyed() &&
+          getConfig().skills.permissions[skillId] !== "never";
         if (allowed) sessionAllow.add(skillId);
         resolve(allowed);
       };
 
       pending.set(id, settle);
+      signal?.addEventListener("abort", onDestroyed, { once: true });
       sender.once("destroyed", onDestroyed);
       timer = setTimeout(() => {
         console.warn(
@@ -93,6 +98,20 @@ export function makePermissionRequester(sender: WebContents): PermissionRequeste
       // agent is driving) — without disturbing the main window's layout.
       permissionUi?.present({ id, skillId, label, detail });
     });
+
+  return async (skillId, label, detail, options) => {
+    // Parallel tool calls share an unanswered skill prompt within this requester.
+    // Fresh action confirmations must never join or seed this shared decision.
+    if (options?.confirmEachCall) return request(skillId, label, detail, options);
+    let decision = inFlight.get(skillId);
+    if (!decision) {
+      decision = request(skillId, label, detail, options).finally(() => inFlight.delete(skillId));
+      inFlight.set(skillId, decision);
+    }
+    const allowed = await decision;
+    return allowed && !signal?.aborted && !sender.isDestroyed() &&
+      getConfig().skills.permissions[skillId] !== "never";
+  };
 }
 
 /** Persist a remembered decision, then resolve the pending request. */

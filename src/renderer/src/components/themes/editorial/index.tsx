@@ -5,6 +5,7 @@ import { TextComposer } from "../shared/text-composer";
 import { useAmplitudeFrame, ACTIVE_STATES } from "../shared/use-amplitude";
 import { STATUS_LABELS, type DexStatus } from "@/lib/dex/state";
 import { Card } from "@/components/ui/card";
+import { AwarenessIndicator } from "@/components/status-bar";
 import { ToolCardLayer } from "@skills/tool-card-layer";
 import { cn } from "@/lib/utils";
 import type { DexThemeProps, DexThemeDef } from "../types";
@@ -53,7 +54,6 @@ function EditorialTheme(props: DexThemeProps) {
     status,
     transcript,
     liveCaption,
-    spokenCaption,
     getAmplitude,
     canPushToTalk,
     onPushToTalk,
@@ -63,20 +63,12 @@ function EditorialTheme(props: DexThemeProps) {
 
   const isInterim = liveCaption.length > 0;
   const lastAssistant = [...transcript].reverse().find((t) => t.role === "assistant");
-  // While the assistant is thinking/speaking, follow the *spoken* caption (it
-  // lags the model's much faster token stream) so the hero stays in sync with the
-  // voice instead of racing to the end of the sentence. The prior reply stays up
-  // during the thinking gap (spokenCaption isn't cleared until the first new
-  // spoken chunk). Once settled, show the full last reply.
-  const tracking = status === "thinking" || status === "speaking";
-  const hero =
-    isInterim
-      ? liveCaption
-      : tracking
-        ? cleanText(spokenCaption || lastAssistant?.content || "")
-        : lastAssistant
-          ? cleanText(lastAssistant.content)
-          : `Good to see you${name ? `, this is ${name}` : ""}. Say “${wakeWord}” or type below to begin.`;
+  // Text streams independently of audio playback; no artificial caption delay.
+  const hero = isInterim
+    ? liveCaption
+    : lastAssistant
+      ? cleanText(lastAssistant.content)
+      : `Good to see you${name ? `, this is ${name}` : ""}. Say “${wakeWord}” or type below to begin.`;
 
   // The card is the running transcript — show every turn in order, including the
   // assistant's in-progress reply (it streams in live here). Don't drop the
@@ -98,7 +90,7 @@ function EditorialTheme(props: DexThemeProps) {
   const mark = (
     <span className="flex items-center gap-3">
       <WavesHorizontal className="size-6 text-foreground" strokeWidth={2.4} />
-      <PulseDot status={status} getAmplitude={getAmplitude} />
+      <AwarenessIndicator status={status}><PulseDot status={status} getAmplitude={getAmplitude} /></AwarenessIndicator>
     </span>
   );
 
@@ -108,19 +100,20 @@ function EditorialTheme(props: DexThemeProps) {
       className="relative flex flex-1 flex-col overflow-hidden bg-background px-6 text-foreground sm:px-10"
     >
       <ThemeTopBar
+        wakeWord={props.wakeWord}
         name={name}
         status={status}
         onOpenSettings={props.onOpenSettings}
         onMinimize={props.onMinimize}
         onNewConversation={props.onNewConversation}
         showBrand={false}
-        showStatus={false}
+        showStatus
         isMuted={props.isMuted}
         onToggleMute={unsupported || status === "error" ? undefined : props.toggleMute}
       />
 
       {/* Brand mark — top-left, with the live accent dot (tap-to-talk in manual mode). */}
-      <div className="traffic-light-pad pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center px-6 py-4 sm:px-10 sm:py-5">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-12 items-center px-4 sm:h-14 sm:px-6">
         {canPushToTalk ? (
           <button
             type="button"

@@ -1,8 +1,8 @@
 import type { ToolActivity } from "@/lib/dex/use-dex";
+import { Command } from "lucide-react";
 
 const IS_MAC =
   typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
-const STOP_HINT = IS_MAC ? "⌘⎋" : "Ctrl+Esc";
 
 // Always-available emergency stop, shown whenever the agent is busy. The global
 // ⌘/Ctrl+Esc hotkey does the same thing and works even when another app has
@@ -23,8 +23,9 @@ export function StopControl({ onStop }: { onStop: () => void }) {
       >
         <span className="h-2.5 w-2.5 rounded-[2px] bg-destructive" aria-hidden />
         Stop
-        <kbd className="rounded bg-foreground/10 px-1.5 py-0.5 text-[10px] font-normal text-destructive-foreground/70">
-          {STOP_HINT}
+        <kbd aria-label={IS_MAC ? "Command Escape" : "Control Escape"} className="inline-flex h-5 shrink-0 items-center justify-center gap-1 rounded bg-foreground/10 px-1.5 font-sans text-[10px] font-normal leading-none text-destructive-foreground/70">
+          {IS_MAC ? <Command className="size-3 shrink-0" aria-hidden="true" /> : <span>Ctrl</span>}
+          <span>Esc</span>
         </kbd>
       </button>
     </div>

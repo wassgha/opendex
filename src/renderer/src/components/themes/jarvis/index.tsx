@@ -127,6 +127,7 @@ function JarvisTheme(props: DexThemeProps) {
       <Corner className="bottom-5 right-5 border-b-2 border-r-2" />
 
       <ThemeTopBar
+        wakeWord={props.wakeWord}
         name={name}
         status={status}
         onOpenSettings={props.onOpenSettings}
