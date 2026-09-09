@@ -1,89 +1,65 @@
-// Streams the session mic as 24kHz mono PCM16 frames for the realtime model.
-// An AudioWorklet on the shared 24kHz AudioContext taps the existing mic stream
-// (echo cancellation / noise suppression already applied by getUserMedia — the
-// context resamples the hardware rate for us) and posts raw Float32 quanta;
-// this class batches them into ~40ms Int16 frames. WVP isn't reusable here —
-// it's pinned to 16kHz.
+import type { MicVAD } from '@ricky0123/vad-web';
+import { SpeechGate, pcm24k } from './speech-gate';
 
-// Registered once per AudioContext (see ensureWorkletModule).
-const WORKLET_CODE = `
-class PcmFeedProcessor extends AudioWorkletProcessor {
-  process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
-    if (channel) this.port.postMessage(channel.slice(0));
-    return true;
-  }
-}
-registerProcessor("opendex-pcm-feed", PcmFeedProcessor);
-`;
-
-// ~40ms at 24kHz — small enough for low latency, large enough to keep IPC
-// message rate modest (~25/s).
-const FRAME_SAMPLES = 960;
-
-const moduleReady = new WeakMap<AudioContext, Promise<void>>();
-
-function ensureWorkletModule(ctx: AudioContext): Promise<void> {
-  let ready = moduleReady.get(ctx);
-  if (!ready) {
-    const url = URL.createObjectURL(
-      new Blob([WORKLET_CODE], { type: "application/javascript" }),
-    );
-    ready = ctx.audioWorklet.addModule(url).finally(() => URL.revokeObjectURL(url));
-    moduleReady.set(ctx, ready);
-  }
-  return ready;
-}
-
+/** Forward the echo-cancelled microphone continuously to the realtime model.
+ * Local speech classification accompanies each frame: double-talk can receive low
+ * confidence and must not be replaced with silence before server VAD hears it.
+ * Original wake audio uses its separate confirmed-wake replay path. */
 export class MicPcmFeed {
-  private constructor(
-    private readonly source: MediaStreamAudioSourceNode,
-    private readonly node: AudioWorkletNode,
-    private readonly sink: GainNode,
-  ) {}
-
-  static async create(
-    ctx: AudioContext,
-    micStream: MediaStream,
-    onFrame: (chunk: ArrayBuffer) => void,
-  ): Promise<MicPcmFeed> {
-    await ensureWorkletModule(ctx);
-    const source = ctx.createMediaStreamSource(micStream);
-    const node = new AudioWorkletNode(ctx, "opendex-pcm-feed", {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      channelCount: 1,
+  private stopped = false;
+  private diagnosticsTimer?: ReturnType<typeof setInterval>;
+  private constructor(private vad: MicVAD, private gate: SpeechGate) {}
+  static async create(ctx: AudioContext, micStream: MediaStream, onFrame: (chunk: ArrayBuffer, speechProbability?: number) => void,
+    onGate: (open: boolean) => void = () => {},
+    onDiagnostics: (stats: Record<string, number | boolean | string>) => void = () => {},
+    isPlayback: () => boolean = () => true,
+    createVad?: (options: Parameters<typeof MicVAD.new>[0]) => Promise<MicVAD>,
+    onPreviewFrame?: (frame: Float32Array) => void): Promise<MicPcmFeed> {
+    const makeVad = createVad ?? ((await import('@ricky0123/vad-web')).MicVAD.new);
+    const assets = new URL('./vad/', document.baseURI).href;
+    let feed: MicPcmFeed | undefined;
+    let frames = 0, peakSpeech = 0, peakRms = 0, highFrames = 0, streak = 0, maxStreak = 0, gateOpen = false;
+    const gate = new SpeechGate(open => { gateOpen = open; onGate(open); });
+    const vad = await makeVad({
+      model: 'v5', startOnLoad: false, audioContext: ctx,
+      baseAssetPath: assets, onnxWASMBasePath: assets,
+      ortConfig: ort => { ort.env.wasm.numThreads = 1; },
+      getStream: async () => micStream,
+      pauseStream: async () => {}, resumeStream: async () => micStream,
+      onFrameProcessed: (probabilities, frame) => {
+        if (!feed || feed.stopped) return;
+        frames++;
+        peakSpeech = Math.max(peakSpeech, probabilities.isSpeech);
+        let energy = 0;
+        for (const sample of frame) energy += sample * sample;
+        peakRms = Math.max(peakRms, Math.sqrt(energy / frame.length));
+        if (probabilities.isSpeech >= 0.65) { highFrames++; streak++; } else streak = 0;
+        maxStreak = Math.max(maxStreak, streak);
+        // Do not forward the gate's zeroed frames or its buffered pre-roll.
+        // Each captured frame must reach the server exactly once, in order.
+        onFrame(pcm24k(frame), probabilities.isSpeech);
+        gate.process(probabilities.isSpeech, frame, isPlayback());
+        onPreviewFrame?.(frame);
+      },
     });
-    // The graph must reach the destination for the worklet to be pulled;
-    // a zero gain keeps the mic inaudible (no feedback).
-    const sink = ctx.createGain();
-    sink.gain.value = 0;
-    source.connect(node);
-    node.connect(sink);
-    sink.connect(ctx.destination);
-
-    let pending = new Int16Array(FRAME_SAMPLES);
-    let filled = 0;
-    node.port.onmessage = (e: MessageEvent<Float32Array>) => {
-      const floats = e.data;
-      for (let i = 0; i < floats.length; i++) {
-        const s = Math.max(-1, Math.min(1, floats[i]));
-        pending[filled++] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        if (filled === FRAME_SAMPLES) {
-          onFrame(pending.buffer);
-          pending = new Int16Array(FRAME_SAMPLES);
-          filled = 0;
-        }
-      }
-    };
-
-    return new MicPcmFeed(source, node, sink);
+    feed = new MicPcmFeed(vad, gate);
+    try { await vad.start(); } catch (error) { feed.stop(); throw error; }
+    // Aggregate only: no samples or recorded audio. A timer also reports zero
+    // frames when capture stalls, unlike a callback-driven diagnostic.
+    feed.diagnosticsTimer = setInterval(() => {
+      const track = micStream.getAudioTracks()[0];
+      onDiagnostics({ frames, peakSpeech: +peakSpeech.toFixed(3), peakRms: +peakRms.toFixed(4), highFrames, maxStreak, gateOpen,
+        forwarding: "continuous", localClassificationOnly: false,
+        onsetThreshold: isPlayback() ? 0.65 : 0.5, onsetFrames: isPlayback() ? 5 : 3,
+        trackState: track?.readyState ?? 'missing', trackMuted: track?.muted ?? true, contextState: ctx.state });
+      frames = 0; peakSpeech = 0; peakRms = 0; highFrames = 0; maxStreak = streak;
+    }, 1000);
+    return feed;
   }
-
   stop(): void {
-    this.node.port.onmessage = null;
-    this.source.disconnect();
-    this.node.disconnect();
-    this.sink.disconnect();
+    if (this.stopped) return;
+    this.stopped = true; this.gate.clear();
+    clearInterval(this.diagnosticsTimer);
+    void this.vad.destroy().catch(() => {});
   }
 }

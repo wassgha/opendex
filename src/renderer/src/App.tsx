@@ -1,3 +1,9 @@
+import { ThemeFeedbackContext } from "@/components/themes/shared/theme-top-bar";
+import { SpendingMeter } from "./components/spending-meter";
+import { MicrophoneFeedback } from "@/components/microphone-feedback";
+import { ScreenAccessPanel } from "@/components/screen-access-panel";
+import { TaskProgress } from "@/components/task-progress";
+import { taskProgress } from "@/lib/task-progress";
 import { useEffect, useMemo } from "react";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { UpdateBanner } from "@/components/update-banner";
@@ -100,47 +106,56 @@ function MainExperience({ data }: { data: PublicConfig }) {
   );
 
   return (
-    <div className="relative flex flex-1 flex-col">
-      {/* Frameless title bar: a draggable strip across the top, inset from the
-          corner controls (brand mark, settings gear). */}
-      {window.opendex.platform === "darwin" && (
-        <div className="titlebar-drag fixed inset-x-[72px] top-0 z-30 h-9" />
-      )}
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Reserve a real title-bar row, including space for native window buttons. */}
+      <div className={`titlebar-drag flex h-9 shrink-0 items-center justify-end pr-4 ${window.opendex.platform === "darwin" ? "pl-[88px]" : "pl-4"}`}>
+        <SpendingMeter />
+      </div>
 
-      <ThemeComponent
-        name={cfg.assistant.name}
-        wakeWord={cfg.assistant.wakeWord}
-        status={dex.status}
-        transcript={dex.transcript}
-        liveCaption={dex.liveCaption}
-        spokenCaption={dex.spokenCaption}
-        getAmplitude={dex.getAmplitude}
-        toolInvocations={dex.toolInvocations}
-        onNewConversation={dex.newConversation}
-        isMuted={dex.isMuted}
-        briefingActive={dex.briefingActive}
-        unsupported={dex.status === "unsupported"}
-        canPushToTalk={dex.canPushToTalk}
-        onPushToTalk={dex.pushToTalk}
-        onSubmitText={dex.submitText}
-        toggleMute={dex.toggleMute}
-        onOpenSettings={() => window.opendex.openSettings()}
-        onMinimize={() => window.opendex.setWindowMode("notch")}
-      />
+      <ThemeFeedbackContext.Provider value={
+        <MicrophoneFeedback feedback={dex.voiceFeedback} status={dex.status} wakeWord={cfg.assistant.wakeWord} getLevel={dex.getMicrophoneLevel} />
+      }>
+        <ThemeComponent
+          name={cfg.assistant.name}
+          wakeWord={cfg.assistant.wakeWord}
+          status={dex.status}
+          transcript={dex.transcript}
+          liveCaption={dex.liveCaption}
+          spokenCaption={dex.spokenCaption}
+          getAmplitude={dex.getAmplitude}
+          toolInvocations={dex.toolInvocations}
+          onNewConversation={dex.newConversation}
+          isMuted={dex.isMuted}
+          briefingActive={dex.briefingActive}
+          unsupported={dex.status === "unsupported"}
+          canPushToTalk={dex.canPushToTalk}
+          onPushToTalk={dex.pushToTalk}
+          onSubmitText={dex.submitText}
+          toggleMute={dex.toggleMute}
+          onOpenSettings={() => window.opendex.openSettings()}
+          onMinimize={() => window.opendex.setWindowMode("notch")}
+        />
+
+      </ThemeFeedbackContext.Provider>
 
       {/* Global chrome. Tool-activity hints + the Stop
           control now live in the always-on-top overlay HUD window (a separate
           renderer), so they stay visible even when this window is hidden or
           behind another app — they're intentionally not rendered here. */}
-      {dex.loadingModel.active && (
-        <div className="fixed inset-x-0 top-16 z-30 flex justify-center">
-          <div className="flex items-center gap-3 rounded-full border border-border bg-dex-surface/85 px-5 py-2 text-sm text-foreground/80 backdrop-blur">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-foreground" />
-            {dex.loadingModel.label || "Loading voice model…"}
-          </div>
+      <div className="pointer-events-none fixed inset-x-4 top-32 z-30 flex max-h-[calc(100dvh-14rem)] flex-col gap-2 overflow-y-auto">
+        <div className="rounded-xl bg-background/95">
+          <TaskProgress progress={taskProgress(dex.status, dex.toolInvocations)} />
         </div>
-      )}
-
+        {dex.loadingModel.active && (
+          <div className="flex justify-center">
+            <div className="flex min-w-0 items-center gap-3 rounded-full border border-border bg-dex-surface/85 px-5 py-2 text-sm text-foreground/80 backdrop-blur">
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-foreground" />
+              <span className="min-w-0 truncate">{dex.loadingModel.label || "Loading voice model…"}</span>
+            </div>
+          </div>
+        )}
+        <div className="pointer-events-auto w-full max-w-[420px] self-end"><ScreenAccessPanel onlyError /></div>
+      </div>
       <UpdateBanner />
 
       {dex.audioBlocked && (

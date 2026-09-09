@@ -1,7 +1,5 @@
-// Mints the short-lived realtime connection token via the Vercel AI Gateway.
-// Runs in MAIN only — the gateway key lives in process.env (set by the config
-// store's applyToEnv) and never reaches the renderer; the token it buys is
-// single-use and expires in seconds, so handing it over is safe.
+// Gateway connection details stay in main. The SDK currently returns the raw
+// Gateway key, so neither the token nor the authenticated socket reaches IPC.
 import { gateway } from "@ai-sdk/gateway";
 
 export interface RealtimeToken {
@@ -9,7 +7,7 @@ export interface RealtimeToken {
   url: string;
 }
 
-/** Mint a connection token for one realtime session. Throws a user-facing
+/** Resolve connection credentials for one realtime session. Throws a user-facing
  *  reason (spoken by the renderer) when the key is missing. */
 export async function mintRealtimeToken(model: string): Promise<RealtimeToken> {
   if (!process.env.AI_GATEWAY_API_KEY) {

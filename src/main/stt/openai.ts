@@ -1,3 +1,5 @@
+import { beginUsage, finishUsage } from "../usage/ledger";
+import { transcriptionCharge, unknownCharge, wavSeconds } from "../usage/pricing";
 // Transcribe a WAV buffer via the OpenAI audio transcription API. Runs in the
 // main process so the API key never reaches the renderer.
 
@@ -15,17 +17,28 @@ export async function transcribeOpenAI(wav: Buffer): Promise<string> {
   );
   form.append("model", model);
   form.append("response_format", "text");
+  form.append("language", "en");
+  form.append("prompt", "English conversation with the desktop assistant Dex. Safari, Chrome, OpenDex.");
 
-  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
+  const seconds = wavSeconds(wav);
+  const usageId = beginUsage({ provider: "openai", model, category: "transcription" });
+  try {
+    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
 
-  if (!res.ok) {
-    const detail = await res.text().catch(() => res.statusText);
-    throw new Error(`OpenAI transcription failed: ${res.status} ${detail.slice(0, 200)}`);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => res.statusText);
+      throw new Error(`OpenAI transcription failed: ${res.status} ${detail.slice(0, 200)}`);
+    }
+    // response_format=text returns a plain string body.
+    const text = (await res.text()).trim();
+    finishUsage(usageId, { seconds }, transcriptionCharge(model, seconds));
+    return text;
+  } catch (error) {
+    finishUsage(usageId, { seconds }, unknownCharge("Transcription ended without confirmed usage."), true);
+    throw error;
   }
-  // response_format=text returns a plain string body.
-  return (await res.text()).trim();
 }

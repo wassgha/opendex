@@ -14,19 +14,30 @@
   },
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "benchmark:browser": "tsx scripts/browser-benchmark.ts",
+    "test:browser-benchmark": "tsx --test scripts/test-browser-benchmark.ts",
+    "dev": "node scripts/build-window-control.mjs && electron-vite dev",
+    "build": "electron-vite build && node scripts/build-window-control.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "smoke:chat": "tsx scripts/smoke-chat.ts",
     "smoke:realtime": "tsx scripts/smoke-realtime.ts",
-    "dist": "electron-vite build && electron-builder",
-    "release": "electron-vite build && electron-builder --publish always",
+    "dist": "pnpm build && electron-builder",
+    "release": "pnpm build && electron-builder --publish always",
     "cut:patch": "pnpm version patch -m \"Release v%s\" && git push --follow-tags",
     "cut:minor": "pnpm version minor -m \"Release v%s\" && git push --follow-tags",
     "cut:major": "pnpm version major -m \"Release v%s\" && git push --follow-tags",
     "notes:preview": "tsx scripts/generate-release-notes.ts HEAD \"$(git tag --sort=-v:refname | head -1)\"",
-    "review:pr": "tsx scripts/review-pr.ts origin/main HEAD"
+    "review:pr": "tsx scripts/review-pr.ts origin/main HEAD",
+    "diagnose": "node scripts/diagnose.mjs",
+    "dex:doctor": "tsx scripts/doctor.ts",
+    "test:voice-turns": "tsx --test scripts/test-desktop-execution.ts scripts/test-archive-delegation.ts scripts/test-new-session-command.ts scripts/test-incidental-speech.ts scripts/test-playback-acknowledgment.ts scripts/test-confirmed-speech.ts scripts/test-playback-speech-evidence.ts scripts/test-playback-turn-policy.ts scripts/test-response-coordinator.ts scripts/test-spoken-turn-host.ts scripts/test-realtime-feedback.ts",
+    "test:bridge-history": "tsx --test scripts/test-codex-history-integration.ts",
+    "test:self-enhancement": "tsx --test scripts/test-self-enhancement.ts scripts/test-enhancement-permissions.ts",
+    "test:maintenance": "tsx --test scripts/test-diagnostic-report.ts scripts/test-local-agents.ts scripts/test-diagnostic-runtime.ts scripts/test-local-agent-context.ts scripts/test-desktop-bridge.ts",
+    "diagnose:latency": "tsx scripts/latency-report.ts",
+    "test:latency": "tsx --test scripts/test-latency-summary.ts",
+    "test": "node scripts/run-tests.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.86",
@@ -38,11 +49,13 @@
     "@meridius-labs/apple-on-device-ai": "^1.6.2",
     "@nut-tree-fork/nut-js": "^4.2.6",
     "@picovoice/web-voice-processor": "^4.0.10",
+    "@ricky0123/vad-web": "^0.0.30",
     "ai": "^6.0.193",
     "dotenv": "^17.4.2",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.6.2",
     "vosk-browser": "^0.0.8",
+    "ws": "^8.21.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -54,6 +67,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -62,6 +76,7 @@
     "electron-vite": "^5.0.0",
     "lucide-react": "^1.21.0",
     "motion": "^12.42.2",
+    "node-api-headers": "^1.9.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.6.0",
@@ -90,7 +105,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/@nut-tree-fork/**/*"
+      "node_modules/@nut-tree-fork/**/*",
+      "out/native/*.node"
     ],
     "mac": {
       "target": [
@@ -118,6 +134,7 @@
       "notarize": true,
       "extendInfo": {
         "NSMicrophoneUsageDescription": "OpenDex listens to your voice to run agentic commands.",
+        "NSAudioCaptureUsageDescription": "OpenDex records system audio, including its spoken replies, when you start an interaction recording.",
         "NSCameraUsageDescription": "OpenDex may capture the screen to see and control your desktop."
       }
     },

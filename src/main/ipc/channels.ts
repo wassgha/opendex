@@ -5,6 +5,34 @@ import type { ChatMessage } from "../agent/chat";
 import type { WindowMode } from "../config/schema";
 
 export const IPC = {
+  widgetsOpen: "widgets:open",
+  widgetsClose: "widgets:close",
+  widgetEdgesGet: "widgets:edges:get",
+  widgetEdgesChanged: "widgets:edges:changed",
+  widgetSlotsShow: "widgets:slots:show",
+  widgetSlotsGet: "widgets:slots:get",
+  widgetSlotsChoose: "widgets:slots:choose",
+  widgetSlotsChanged: "widgets:slots:changed",
+  usageSummary: "usage:summary",
+  usageHistory: "usage:history",
+  usageChanged: "usage:changed",
+  recordingControl: "recording:control",
+  recordingReady: "recording:ready",
+  recordingStartRequested: "recording:start-requested",
+  recordingStartResult: "recording:start-result",
+  recordingSources: "recording:sources",
+  recordingPrepare: "recording:prepare",
+  recordingStarted: "recording:started",
+  recordingChunk: "recording:chunk",
+  recordingFinish: "recording:finish",
+  recordingState: "recording:state",
+  recordingChanged: "recording:changed",
+  recordingStop: "recording:stop",
+  recordingStopRequested: "recording:stop-requested",
+  recordingList: "recording:list",
+  recordingExport: "recording:export",
+  recordingTrash: "recording:trash",
+  recordingReveal: "recording:reveal",
   chatStart: "chat:start",
   chatCancel: "chat:cancel",
   // Per-request reply channels are suffixed with the requestId:
@@ -16,12 +44,12 @@ export const IPC = {
   chatError: (id: string) => `chat:error:${id}`,
   ttsSynthesize: "tts:synthesize",
   // Realtime voice sessions (speech-to-speech). The WebSocket lives in MAIN —
-  // the gateway authenticates the upgrade with the raw AI_GATEWAY_API_KEY (no
-  // ephemeral secret is minted), so the renderer can never host the socket
-  // without seeing the key. The renderer owns only the audio I/O: it streams
+  // provider credentials authenticate the upgrade and never reach the
+  // renderer. The renderer owns only the audio I/O: it streams
   // mic PCM frames up via `realtimeClient` and receives audio + transcript +
   // tool notices back on the per-session `realtime:event:<id>` channel.
   realtimeStart: "realtime:start",
+  realtimeReady: "realtime:ready",
   realtimeClient: "realtime:client",
   realtimeEvent: (id: string) => `realtime:event:${id}`,
   realtimeEnd: "realtime:end",
@@ -35,6 +63,12 @@ export const IPC = {
   configChanged: "config:changed",
   // renderer → main: open the dedicated settings window
   settingsOpen: "settings:open",
+  settingsNavigate: "settings:navigate",
+  settingsSectionGet: "settings:section",
+  screenHealthGet: "screen-health:get",
+  screenHealthChanged: "screen-health:changed",
+  screenHealthRetry: "screen-health:retry",
+  screenHealthFix: "screen-health:fix",
   // STT
   transcribe: "stt:transcribe",
   // LLM: probe Apple on-device model availability (for the provider picker)
@@ -48,6 +82,7 @@ export const IPC = {
   // it to the overlay HUD and any other view-only surface.
   sessionUpdate: "session:update",
   sessionChanged: "session:changed",
+  microphoneLevel: "session:microphone-level",
   // Window mode (full ↔ notch) + Spotlight-style summon:
   // renderer → main: request a window mode; main → renderer: mode applied
   windowSetMode: "window:set-mode",
@@ -83,6 +118,22 @@ export const IPC = {
   updateStatus: "update:status",
 } as const;
 
+export type WidgetId = "light" | "goal";
+export type WidgetSlot = "top-left" | "top-center" | "top-right" | "middle-left"
+  | "middle-right" | "bottom-left" | "bottom-center" | "bottom-right";
+export type WidgetSlotPicker = {
+  width: number;
+  height: number;
+  title: string;
+  slots: Array<{ id: WidgetSlot; occupied: boolean; current: boolean; x: number; y: number; width: number; height: number }>;
+};
+export type WidgetEdges = {
+  horizontal: "left" | "right" | null;
+  vertical: "top" | "bottom" | null;
+  slot: WidgetSlot | null;
+  blockedSlot: WidgetSlot | null;
+};
+
 export interface UpdateStatusPayload {
   /**
    * `available` → an update was found and is downloading; `downloading` carries
@@ -102,6 +153,7 @@ export interface ChatStartPayload {
   requestId: string;
   messages: ChatMessage[];
   mode?: "briefing";
+  delegation?: { sessionId: string; toolCallId: string };
 }
 
 export interface ToolCallEvent {
@@ -143,6 +195,8 @@ export interface SessionToolInvocation {
  * layer to a renderer type).
  */
 export interface SessionState {
+  /** Immediate voice feedback, independent of playback/tool execution. */
+  voiceFeedback?: string;
   status: string;
   muted: boolean;
   activity: SessionActivity[];
@@ -150,6 +204,8 @@ export interface SessionState {
   toolInvocations: SessionToolInvocation[];
   /** The user's in-progress transcription (while listening). */
   liveCaption: string;
+  /** Latest recognized/typed user input, retained while the assistant answers. */
+  inputTranscript?: string;
   /** Assistant text spoken so far this turn (TTS-synced; lags the stream). */
   spokenCaption: string;
   /** The assistant's full streamed reply for the current turn (what the main
@@ -172,6 +228,7 @@ export type ViewCommand =
  *  agent (full toolset incl. computer-use). Declared here — the shared IPC
  *  contract — because main defines it and the renderer executes it. */
 export const RUN_TASK_TOOL = "run_task";
+export const SLEEP_TOOL = "go_to_sleep";
 
 export interface RealtimeStartResult {
   sessionId: string;
@@ -185,10 +242,12 @@ export interface RealtimeStartResult {
  *  `inject-context` adds a conversation item without requesting a response
  *  (task-progress narration feed); `request-response` asks the model to speak. */
 export type RealtimeClientMessage =
-  | { type: "audio"; chunk: ArrayBuffer }
+  | { type: "diagnostic"; event: "microphone-detection" | "local-speech-gate" | "echo-reference-ready" | "microphone-processing" | "wake-audio-replay" | "playback-start" | "playback-stop" | "playback-interrupted" | "client-close"; reason?: string }
+  | { type: "audio"; chunk: ArrayBuffer; speechProbability?: number }
   | { type: "user-text"; text: string }
   | { type: "inject-context"; text: string }
   | { type: "request-response" }
+  | { type: "research-progress"; toolCallId: string; text: string }
   | { type: "tool-result"; toolCallId: string; name: string; output: unknown }
   | { type: "cancel-response" };
 
@@ -198,8 +257,11 @@ export type RealtimeClientMessage =
  *  `error` is informational (server-side event, usually non-fatal); a dead
  *  session always arrives as `closed`. */
 export type RealtimeServerNotice =
+  | { type: "new-session" }
+  | { type: "sleep" }
   | { type: "open" }
   | { type: "audio"; chunk: ArrayBuffer }
+  | { type: "input-state"; state: "hearing" | "processing" | "idle" | "retry" }
   | { type: "speech-started" }
   | { type: "speech-stopped" }
   | { type: "user-transcript"; text: string }

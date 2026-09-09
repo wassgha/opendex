@@ -1,3 +1,5 @@
+import { UsageSection } from "./usage-section";
+import { Receipt } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import {
   User,
@@ -9,9 +11,13 @@ import {
   AudioWaveform,
   MessageSquare,
   ShieldCheck,
+  Monitor,
   RotateCcw,
+  Video,
   type LucideIcon,
 } from "lucide-react";
+import { ScreenAccessPanel } from "../screen-access-panel";
+import { RecordingsSection } from "./recordings-section";
 import { Button } from "../ui/button";
 import type { PublicConfig } from "../../../../main/config/schema";
 import type {
@@ -28,7 +34,8 @@ import {
 } from "../ui/fields";
 import { useSystemVoices } from "@/lib/use-system-voices";
 import {
-  REALTIME_MODELS,
+  realtimeModelsFor,
+  realtimeSecretName,
   getRealtimeModelMeta,
 } from "../../../../main/config/realtime-models";
 import { ThemePicker } from "@/components/themes/theme-picker";
@@ -121,20 +128,34 @@ function VoiceModeSection({ data, setConfig, setSecret }: SectionProps) {
       <div className="text-xs text-muted-foreground">
         {config.voice.mode === "pipeline"
           ? "Separate wake word, transcription, language model, and voice — with free, offline options for each."
-          : "One speech-to-speech model handles listening, thinking, and speaking. Most natural voice and fastest turns; needs a Vercel AI Gateway key. Sessions are capped at twenty-five minutes and reconnect on the wake word. Screen control still runs through your language model."}
+          : "One speech-to-speech model handles listening, thinking, and speaking. Most natural voice and fastest turns; connect directly to OpenAI or through Vercel AI Gateway with your API key. The wake word reconnects after a session ends. Screen control still runs through your language model."}
       </div>
       {config.voice.mode === "realtime" && (
         <>
+          <SelectField
+            label="Voice provider"
+            value={config.realtime.provider}
+            options={[
+              { value: "openai", label: "OpenAI direct" },
+              { value: "gateway", label: "Vercel AI Gateway" },
+            ]}
+            onChange={(provider) => {
+              const models = realtimeModelsFor(provider);
+              const model = models.find(m => m.id === config.realtime.model) ?? models[0];
+              setConfig({ realtime: { ...config.realtime, provider, model: model.id,
+                voice: model.voices.some(v => v.id === config.realtime.voice) ? config.realtime.voice : model.voices[0]?.id ?? "" } });
+            }}
+          />
           <SecretField
-            label="Vercel AI Gateway key"
-            hint="Realtime sessions connect through the gateway. Same key as the gateway LLM provider."
-            present={secrets.AI_GATEWAY_API_KEY}
-            onSave={(v) => setSecret("AI_GATEWAY_API_KEY", v)}
+            label={config.realtime.provider === "openai" ? "OpenAI API key" : "Vercel AI Gateway key"}
+            hint={config.realtime.provider === "openai" ? "Connects directly to OpenAI. Uses the same key as the OpenAI language model provider." : "Uses the same key as the Gateway language model provider."}
+            present={secrets[realtimeSecretName(config.realtime.provider)]}
+            onSave={(v) => setSecret(realtimeSecretName(config.realtime.provider), v)}
           />
           <SelectField
             label="Realtime model"
             value={config.realtime.model}
-            options={REALTIME_MODELS.map((m) => ({ value: m.id, label: m.label }))}
+            options={realtimeModelsFor(config.realtime.provider).map((m) => ({ value: m.id, label: m.label }))}
             hint={modelMeta?.blurb}
             onChange={(v) => {
               const meta = getRealtimeModelMeta(v);
@@ -158,7 +179,7 @@ function VoiceModeSection({ data, setConfig, setSecret }: SectionProps) {
           )}
           <SelectField
             label="Hang up after silence"
-            hint="How long a session stays connected with nobody talking before it drops back to the wake word. Sessions bill by the minute — shorter saves money."
+            hint="How long a session stays connected with nobody talking before it drops back to the wake word. Usage is billed by the selected provider."
             value={String(config.realtime.idleDisconnectSec)}
             options={[
               { value: "10", label: "10 seconds" },
@@ -595,6 +616,15 @@ function ResetSection({ data, resetConfig }: SectionProps) {
   );
 }
 
+function ScreenSection({ data, setConfig }: SectionProps) {
+  return <>
+    <ToggleRow title="See the screen on wake-up" description="Send one screenshot to your vision provider when you say the wake word. Clicking and typing still use your computer-control permission.">
+      <SegmentedControl value={data.config.computer.screenOnWake ? "on" : "off"} options={[{value:"on",label:"On"},{value:"off",label:"Off"}]} onChange={(v) => setConfig({computer:{screenOnWake:v === "on"}})} />
+    </ToggleRow>
+    <ScreenAccessPanel />
+  </>;
+}
+
 export interface SettingsSection {
   id: string;
   label: string;
@@ -605,11 +635,14 @@ export interface SettingsSection {
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
+  { id: "usage", label: "Usage & costs", Icon: Receipt, Component: UsageSection },
   { id: "assistant", label: "Assistant", Icon: User, Component: AssistantSection },
   { id: "voice-mode", label: "Voice mode", Icon: AudioWaveform, Component: VoiceModeSection },
   { id: "voice-input", label: "Voice input", Icon: Mic, Component: VoiceInputSection },
   { id: "appearance", label: "Appearance", Icon: Palette, Component: AppearanceSection },
   { id: "skills", label: "Skills & tools", Icon: Blocks, Component: SkillsSection },
+  { id: "screen", label: "Screen access", Icon: Monitor, Component: ScreenSection },
+  { id: "recordings", label: "Recordings", Icon: Video, Component: RecordingsSection },
   { id: "model", label: "Language model", Icon: Cpu, Component: ModelSection },
   {
     id: "tts",

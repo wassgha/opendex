@@ -1,6 +1,19 @@
+import { delegatedDesktopJob } from "./agent/realtime/session-host";
+import { RealtimeNoticeBuffer } from "./agent/realtime/notice-buffer";
+import { desktopProgress } from "./agent/realtime/desktop-status";
+import { bindBenchmarkWorker } from "./benchmarks/host";
+import { WidgetWindows } from "./widgets/windows";
+import { diagnosticToolOutcome } from "./diagnostics/tool-outcome";
+import { initUsage, usageSummary, usageHistory } from "./usage/ledger";
+import { configureInteractionLog, recordInteraction } from "./diagnostics/interaction-log";
+import { observeDiagnosticSession } from "./diagnostics/runtime";
+import { initRecordings, recordingActive, getRecordingState, stopRecording } from "./recordings/host";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { createTrayIcon } from "./tray-icon";
 import { config as loadEnv } from "dotenv";
+import { tool } from "ai";
+import { z } from "zod";
 import {
   app,
   BrowserWindow,
@@ -9,6 +22,7 @@ import {
   Menu,
   nativeImage,
   screen,
+  systemPreferences,
   shell,
   Tray,
 } from "electron";
@@ -22,6 +36,9 @@ import {
   type WindowMode,
 } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
+import { screenOnWakeEnabled, SCREEN_ON_WAKE_INSTRUCTIONS } from "./agent/screen-on-wake";
+import { checkScreenHealth, clearScreenHealth, getScreenHealth, latestScreenObservation, onScreenHealth } from "./screen-health";
+import { screenBillingUrl } from "./config/screen-health";
 import { resolveModel, checkAppleAvailability } from "./agent/llm/resolve-model";
 import { buildRealtimeInstructions, buildSystemPrompt } from "./agent/system-prompt";
 import {
@@ -32,6 +49,7 @@ import {
 import { buildRealtimeToolDefs, directRealtimeSkills } from "./agent/realtime/realtime-tools";
 import { getRealtimeModelMeta } from "./config/realtime-models";
 import { buildToolSet, skillSystemPrompts } from "../skills/registry";
+import { isDirectTool } from "../skills/realtime-selection";
 import {
   makePermissionRequester,
   pendingPermissions,
@@ -73,6 +91,7 @@ let permissionWindow: BrowserWindow | null = null;
 let notchWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let recordingQuitPending = false;
 
 // Current layout. In `notch`, the main window is hidden and the notch window
 // shown; in `full`, vice-versa. The voice session always lives in the (possibly
@@ -91,7 +110,7 @@ let latestSessionState: SessionState | null = null;
 const NOTCH_SIZE = { width: 320, height: 44 };
 const NOTCH_MIN_WIDTH = 280;
 const NOTCH_MAX_WIDTH = 640;
-const NOTCH_MAX_HEIGHT = 260;
+const NOTCH_MAX_HEIGHT = 640; // research record, captions, and expanded controls
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -120,6 +139,13 @@ function createWindow() {
   });
 
   mainWindow = win;
+  if (!app.isPackaged && process.platform === "darwin") console.log("[computer-permissions]", {
+    screen: systemPreferences.getMediaAccessStatus("screen"),
+    accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+  });
+  if (!app.isPackaged) win.webContents.on("console-message", (_event, _level, message) => {
+    if (message.startsWith("[voice-state]")) console.log(message);
+  });
 
   win.once("ready-to-show", () => win.show());
 
@@ -162,6 +188,12 @@ function loadRenderer(win: BrowserWindow, hash?: string) {
     win.loadFile(join(__dirname, "../renderer/index.html"), { hash }).catch(onLoadError);
   }
 }
+
+// Detached local widgets have no parent and do not follow full/notch mode.
+const widgetWindows = new WidgetWindows(
+  join(__dirname, "../preload/widget.js"),
+  (win, id) => loadRenderer(win, id === "slots" ? "widget-slots" : `widget?id=${id}`),
+);
 
 // ── Overlay HUD ─────────────────────────────────────────────────────────────
 // A transparent, click-through, always-on-top window that floats the action
@@ -433,11 +465,16 @@ function summonWindow({ toggle = true }: { toggle?: boolean } = {}) {
 }
 
 let settingsWindow: BrowserWindow | null = null;
+let settingsSection = "assistant";
 
-function openSettingsWindow() {
+function openSettingsWindow(section?: string, hidden = false) {
+  if (section) settingsSection = section;
+  const navigate = () => {
+    if (section) settingsWindow?.webContents.send(IPC.settingsNavigate, section);
+  };
   if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.show();
-    settingsWindow.focus();
+    if (!hidden) { settingsWindow.show(); settingsWindow.focus(); }
+    navigate();
     return;
   }
 
@@ -454,10 +491,14 @@ function openSettingsWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      backgroundThrottling: false,
     },
   });
 
-  settingsWindow.once("ready-to-show", () => settingsWindow?.show());
+  settingsWindow.once("ready-to-show", () => { if (!hidden) settingsWindow?.show(); navigate(); });
+  settingsWindow.on("close", event => {
+    if (recordingActive() && !isQuitting) { event.preventDefault(); settingsWindow?.hide(); }
+  });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
@@ -483,6 +524,7 @@ function broadcastConfig() {
 // live action hint), so it's invisible at rest.
 function broadcastSessionState(state: SessionState) {
   latestSessionState = state;
+  observeDiagnosticSession(state);
   const busy =
     state.status === "thinking" ||
     state.status === "speaking" ||
@@ -522,6 +564,22 @@ function stripImageOutput(output: unknown): unknown {
 }
 
 function registerIpc() {
+  ipcMain.handle(IPC.widgetsOpen, (event) => {
+    if (event.sender !== mainWindow?.webContents) {
+      throw new Error("Open widgets from the main Dex window.");
+    }
+    widgetWindows.show();
+  });
+  ipcMain.on(IPC.widgetsClose, (event) => widgetWindows.close(event.sender));
+  ipcMain.handle(IPC.widgetEdgesGet, (event) => widgetWindows.getEdges(event.sender));
+  ipcMain.handle(IPC.widgetSlotsShow, (event) => widgetWindows.showSlots(event.sender));
+  ipcMain.handle(IPC.widgetSlotsGet, (event) => widgetWindows.getSlots(event.sender));
+  ipcMain.handle(IPC.widgetSlotsChoose, (event, slot: unknown) => widgetWindows.chooseSlot(event.sender, slot));
+  ipcMain.handle(IPC.usageSummary, () => usageSummary());
+  ipcMain.handle(IPC.usageHistory, (_event, offset: unknown = 0) => {
+    if (typeof offset !== "number" || !Number.isSafeInteger(offset) || offset < 0) throw new Error("Invalid history offset.");
+    return usageHistory(offset);
+  });
   const inFlight = new Map<string, AbortController>();
 
   ipcMain.on(IPC.chatStart, async (event, payload: ChatStartPayload) => {
@@ -530,21 +588,58 @@ function registerIpc() {
     inFlight.set(requestId, ac);
     const sender = event.sender;
     const config = getConfig();
+    const delegation = payload.delegation;
+    const job = delegation && realtimeSessionBySender.get(sender.id) === delegation.sessionId
+      ? delegatedDesktopJob(delegation.sessionId, delegation.toolCallId) : undefined;
+    const cancelDelegation = () => ac.abort();
+    if (delegation && (!job || job.workerRequestId)) ac.abort();
+    else if (job) job.workerRequestId = requestId;
+    job?.controller?.signal.addEventListener("abort", cancelDelegation, { once: true });
+    if (job?.controller?.signal.aborted) ac.abort();
+    const correlation = delegation ? { sessionId: delegation.sessionId, parentCallId: delegation.toolCallId, requestId } : { requestId };
+    const taskText = messages.filter(message => message.role === 'user').at(-1)?.content;
+    let benchmarkWorker = job ? bindBenchmarkWorker(taskText, ac.signal, () => ac.abort(new Error("Benchmark maximum time limit reached"))) : undefined;
+    let benchmarkStarting = false;
+    const archiveTools = new Set(["readLocalAgentTask", "openLocalAgentTask", "verifyLocalAgentTaskArchive", "captureScreen", "click", "moveMouse", "pressKeys", "wait"]);
+    let desktopStage = job?.archiveTarget ? "I’m waiting for the desktop agent’s next action; the archive is not yet confirmed." : "I’m waiting for the desktop agent’s next action. The task is still running.";
+    if (job) job.progress = desktopStage;
+    let lastProgress = "";
+    let lastBenchmarkMilestone: string | undefined;
+    const publishBenchmarkMilestone = () => {
+      if (!benchmarkWorker || !job || !delegation || ac.signal.aborted) return;
+      job.readProgress = benchmarkWorker.progress;
+      const milestone = benchmarkWorker.milestone();
+      if (!milestone || milestone === lastBenchmarkMilestone) return;
+      lastBenchmarkMilestone = milestone;
+      sendRealtimeClientMessage(delegation.sessionId, { type: "research-progress", toolCallId: delegation.toolCallId, text: milestone });
+    };
+    if (job && benchmarkWorker) job.readProgress = benchmarkWorker.progress;
+    const progressTimer = job && delegation ? setInterval(() => {
+      if (benchmarkWorker) { job.progress = benchmarkWorker.progress(); publishBenchmarkMilestone(); return; }
+      if (desktopStage === lastProgress && !job.archiveTarget) return;
+      lastProgress = desktopStage;
+      if (!ac.signal.aborted) sendRealtimeClientMessage(delegation.sessionId, { type: "research-progress", toolCallId: delegation.toolCallId, text: desktopStage });
+    }, 15000) : undefined;
+    // One exact-task archive must not consume minutes of blind exploration.
+    const archiveDeadline = job?.archiveTarget ? setTimeout(() => ac.abort(new Error("The archive attempt exceeded its time limit. Its outcome needs verification.")), 75000) : undefined;
     const briefing = mode === "briefing";
     track("command_run", { mode: briefing ? "briefing" : "command" });
     const system = buildSystemPrompt({
       config,
       briefing,
-      skillPrompts: briefing ? [] : skillSystemPrompts(config),
+      skillPrompts: briefing ? [] : skillSystemPrompts(config, job?.archiveTarget ? skill => skill.tools.some(tool => archiveTools.has(tool.name)) : undefined),
     });
     const tools = buildToolSet({
       config,
-      requestPermission: makePermissionRequester(sender),
+      requestPermission: makePermissionRequester(sender, ac.signal),
+      signal: ac.signal,
+      ...(job?.archiveTarget ? { includeTool: (tool: { name: string }) => archiveTools.has(tool.name) } : {}),
     });
     try {
       // Resolve the configured provider to a model (may throw for an unset key,
       // an unavailable Apple model, or the not-yet-built subscription). The
       // catch below turns it into a spoken apology.
+      ac.signal.throwIfAborted();
       const model = await resolveModel(config);
       const responseMessages = await streamChat({
         messages,
@@ -552,6 +647,7 @@ function registerIpc() {
         model,
         tools,
         briefing,
+        archiveTask: Boolean(job?.archiveTarget),
         signal: ac.signal,
         onDelta: (delta) => {
           if (!ac.signal.aborted && !sender.isDestroyed()) {
@@ -559,13 +655,23 @@ function registerIpc() {
           }
         },
         onToolCall: (call) => {
+          if (call.toolName === 'benchmarkDex') benchmarkStarting = (call.input as { action?: string })?.action === 'start';
           // Tool name only — never the input args.
+          if (job?.archiveTarget) desktopStage = call.toolName === "verifyLocalAgentTaskArchive" ? "I’m checking whether Codex actually saved the archive." : call.toolName === "click" ? "I’m working through the task menu; the archive is not yet verified." : "I’m checking the selected task and its visible controls.";
+          recordInteraction("tool-call", { ...correlation, tool: call.toolName, callId: call.toolCallId });
           track("tool_used", { tool_name: call.toolName });
           if (!ac.signal.aborted && !sender.isDestroyed()) {
             sender.send(IPC.chatTool(requestId), call);
           }
         },
         onToolResult: (result) => {
+          if (result.toolName === 'benchmarkDex' && !benchmarkWorker && (job || benchmarkStarting) && !diagnosticToolOutcome(result.output).failed) benchmarkWorker = bindBenchmarkWorker(taskText, ac.signal, () => ac.abort(new Error("Benchmark maximum time limit reached")));
+          if (job && !job.archiveTarget) {
+            desktopStage = benchmarkWorker?.progress() ?? desktopProgress(result.toolName, diagnosticToolOutcome(result.output).failed === true);
+            job.progress = desktopStage;
+            publishBenchmarkMilestone();
+          }
+          recordInteraction("tool-result", { ...correlation, tool: result.toolName, callId: result.toolCallId, ...diagnosticToolOutcome(result.output) });
           if (!ac.signal.aborted && !sender.isDestroyed()) {
             sender.send(IPC.chatToolResult(requestId), {
               ...result,
@@ -583,6 +689,10 @@ function registerIpc() {
       const message = err instanceof Error ? err.message : String(err);
       if (!sender.isDestroyed()) sender.send(IPC.chatError(requestId), message);
     } finally {
+      clearInterval(progressTimer); clearTimeout(archiveDeadline);
+      await benchmarkWorker?.finish().catch(() => {});
+      job?.controller?.signal.removeEventListener("abort", cancelDelegation);
+      recordInteraction("desktop-worker-ended", { ...correlation, cancelled: ac.signal.aborted });
       inFlight.delete(requestId);
     }
   });
@@ -611,9 +721,23 @@ function registerIpc() {
   // sender still has. Belt-and-braces under the renderer's own connect lock —
   // two concurrent sessions would mean two voices talking over each other.
   const realtimeSessionBySender = new Map<number, string>();
+  const realtimeNoticeBuffers = new Map<string, { senderId: number; buffer: RealtimeNoticeBuffer; timer: ReturnType<typeof setTimeout> }>();
+  const releaseRealtimeNotices = (sessionId: string) => {
+    const entry = realtimeNoticeBuffers.get(sessionId);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    entry.buffer.dispose();
+    realtimeNoticeBuffers.delete(sessionId);
+  };
+  ipcMain.on(IPC.realtimeReady, (event, sessionId: string) => {
+    const entry = realtimeNoticeBuffers.get(sessionId);
+    if (!entry || entry.senderId !== event.sender.id) return;
+    clearTimeout(entry.timer);
+    entry.buffer.subscribe();
+  });
   ipcMain.handle(
     IPC.realtimeStart,
-    async (event, opts: { briefing: boolean }): Promise<RealtimeStartResult> => {
+    async (event, opts: { briefing: boolean; wake?: boolean }): Promise<RealtimeStartResult> => {
       const config = getConfig();
       if (config.voice.mode !== "realtime") {
         throw new Error("Realtime voice is not enabled in Settings.");
@@ -624,7 +748,19 @@ function registerIpc() {
 
       const sender = event.sender;
       const previousSession = realtimeSessionBySender.get(sender.id);
-      if (previousSession) endRealtimeSession(previousSession);
+      if (previousSession) {
+        endRealtimeSession(previousSession);
+        releaseRealtimeNotices(previousSession);
+      }
+      const screenAbort = new AbortController();
+      const screenContext = screenOnWakeEnabled(config, opts?.wake === true)
+        ? {
+            result: checkScreenHealth(config, AbortSignal.any([
+              screenAbort.signal, AbortSignal.timeout(20_000),
+            ])),
+            cancel: () => screenAbort.abort(),
+          }
+        : undefined;
       const skillPrompts = directRealtimeSkills(config)
         .map((s) => s.systemPrompt)
         .filter((p): p is string => Boolean(p));
@@ -635,30 +771,65 @@ function registerIpc() {
         config,
         requestPermission: makePermissionRequester(sender),
         include: (skill) => directIds.has(skill.id),
+        includeTool: isDirectTool,
       });
+      const toolDefs = buildRealtimeToolDefs(config);
+      if (screenContext) {
+        // This only reads the already-captured observation. Computer actions
+        // remain in the permission-wrapped desktop skill.
+        const inputSchema = z.object({});
+        tools.read_wake_screen = tool({
+          inputSchema,
+          execute: async () => ({ observation: await (latestScreenObservation() ?? screenContext.result) }),
+        });
+        toolDefs.push({
+          name: "read_wake_screen",
+          description: "Read the screen snapshot taken when this voice session woke up. Waits for its description if still processing. Does not control the computer or capture again.",
+          parameters: z.toJSONSchema(inputSchema),
+        });
+        skillPrompts.push(SCREEN_ON_WAKE_INSTRUCTIONS);
+      }
 
       // Throws user-facing reasons (unset key, failed connection) — the
       // renderer surfaces them as a spoken apology, like resolveModel failures.
       const sessionId = randomUUID();
-      await startRealtimeSession({
-        sessionId,
-        model: config.realtime.model,
-        voice: config.realtime.voice,
-        instructions: buildRealtimeInstructions({ config, briefing, skillPrompts }),
-        toolDefs: buildRealtimeToolDefs(config),
-        tools,
-        transcribesInput: modelMeta?.transcribes ?? true,
-        notify: (notice) => {
-          if (notice.type === "tool-call") {
-            track("tool_used", { tool_name: notice.call.toolName });
-          }
-          if (!sender.isDestroyed()) {
-            sender.send(IPC.realtimeEvent(sessionId), notice);
-          }
-        },
+      const noticeBuffer = new RealtimeNoticeBuffer(notice => {
+        if (!sender.isDestroyed()) sender.send(IPC.realtimeEvent(sessionId), notice);
+        if (notice.type === "closed") releaseRealtimeNotices(sessionId);
       });
+      const noticeTimer = setTimeout(() => {
+        releaseRealtimeNotices(sessionId);
+        endRealtimeSession(sessionId);
+      }, 30_000);
+      realtimeNoticeBuffers.set(sessionId, { senderId: sender.id, buffer: noticeBuffer, timer: noticeTimer });
+      try {
+        await startRealtimeSession({
+          provider: config.realtime.provider,
+          wakeWord: config.assistant.wakeWord,
+          sessionId,
+          model: config.realtime.model,
+          voice: config.realtime.voice,
+          instructions: buildRealtimeInstructions({ config, briefing, skillPrompts }),
+          toolDefs,
+          tools,
+          screenContext,
+          transcribesInput: modelMeta?.transcribes ?? true,
+          notify: (notice) => {
+            if (notice.type === "tool-call") {
+              track("tool_used", { tool_name: notice.call.toolName });
+            }
+            noticeBuffer.push(notice);
+          },
+        });
+      } catch (err) {
+        releaseRealtimeNotices(sessionId);
+        screenAbort.abort();
+        endRealtimeSession(sessionId);
+        throw err;
+      }
       realtimeSessionBySender.set(sender.id, sessionId);
       sender.once("destroyed", () => {
+        releaseRealtimeNotices(sessionId);
         endRealtimeSession(sessionId);
         if (realtimeSessionBySender.get(sender.id) === sessionId) {
           realtimeSessionBySender.delete(sender.id);
@@ -679,6 +850,7 @@ function registerIpc() {
   );
 
   ipcMain.on(IPC.realtimeEnd, (_event, sessionId: string) => {
+    releaseRealtimeNotices(sessionId);
     endRealtimeSession(sessionId);
   });
 
@@ -687,6 +859,7 @@ function registerIpc() {
 
   ipcMain.handle(IPC.configSet, (_event, patch: DeepPartial<OpenDexConfig>) => {
     const result = updateConfig(patch);
+    if (patch.llm || patch.computer || patch.skills) clearScreenHealth(getConfig());
     broadcastConfig();
     // Re-bind the global summon shortcut if the user rebound it in Settings.
     if (patch.hotkeys?.summon) registerSummonHotkey();
@@ -695,18 +868,47 @@ function registerIpc() {
 
   ipcMain.handle(IPC.secretSet, (_event, name: SecretName, value: string) => {
     const result = setSecret(name, value);
+    clearScreenHealth(getConfig());
     broadcastConfig();
     return result;
   });
 
   ipcMain.handle(IPC.configReset, () => {
     const result = resetConfig();
+    clearScreenHealth(getConfig());
     broadcastConfig();
     track("config_reset");
     return result;
   });
 
-  ipcMain.handle(IPC.settingsOpen, () => openSettingsWindow());
+  ipcMain.handle(IPC.settingsOpen, (_event, section?: string) => openSettingsWindow(section));
+  ipcMain.handle(IPC.settingsSectionGet, () => settingsSection);
+  ipcMain.handle(IPC.screenHealthGet, () => getScreenHealth(getConfig()));
+  onScreenHealth((status) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(IPC.screenHealthChanged, status);
+    }
+  });
+  ipcMain.handle(IPC.screenHealthRetry, async () => {
+    const config = getConfig();
+    if (!config.skills.enabled.computer || config.skills.permissions.computer === "never") {
+      throw new Error("Enable Control the computer in Skills & tools before checking screen access.");
+    }
+    const observation = await checkScreenHealth(config);
+    for (const sessionId of realtimeSessionBySender.values()) {
+      sendRealtimeClientMessage(sessionId, { type: "inject-context", text: `[Screen check requested by the user; context only, do not reply]\n${observation}` });
+    }
+    return getScreenHealth(getConfig());
+  });
+  ipcMain.handle(IPC.screenHealthFix, async (_event, action: string) => {
+    if (action === "billing") {
+      const url = screenBillingUrl(getConfig().llm.provider);
+      if (url) await shell.openExternal(url);
+    } else if (action === "permission" && process.platform === "darwin") {
+      await shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+    } else if (action === "model") openSettingsWindow("model");
+    else throw new Error("This recovery action is unavailable.");
+  });
 
   ipcMain.handle(IPC.onboardingComplete, () => {
     const result = completeOnboarding();
@@ -748,6 +950,15 @@ function registerIpc() {
   // Session-state relay: the main window publishes, main re-broadcasts to views.
   ipcMain.on(IPC.sessionUpdate, (_event, state: SessionState) => {
     broadcastSessionState(state);
+  });
+
+  // Small, ephemeral meter samples bypass transcript snapshots and diagnostics.
+  ipcMain.on(IPC.microphoneLevel, (event, level: unknown) => {
+    if (event.sender !== mainWindow?.webContents) return;
+    if (level !== null && (typeof level !== "number" || !Number.isFinite(level) || level < 0 || level > 1)) return;
+    if (notchWindow && !notchWindow.isDestroyed()) {
+      notchWindow.webContents.send(IPC.microphoneLevel, level);
+    }
   });
 
   // Window mode (full ↔ notch), requested from the renderer.
@@ -842,10 +1053,7 @@ function registerSummonHotkey() {
 
 function createTray() {
   if (tray) return;
-  // A 1px transparent image is a safe cross-platform placeholder; a real
-  // template icon ships in build resources later. An empty tray still works as
-  // the anchor + menu when every window is hidden.
-  const icon = nativeImage.createEmpty();
+  const icon = createTrayIcon();
   try {
     tray = new Tray(icon);
   } catch (err) {
@@ -853,10 +1061,22 @@ function createTray() {
     return;
   }
   tray.setToolTip("OpenDex");
+  updateTrayMenu();
+  tray.on("click", () => summonWindow());
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const recording = recordingActive();
+  tray.setTitle(recording ? "● REC" : "");
+  tray.setToolTip(recording ? "OpenDex is recording" : "OpenDex");
   const menu = Menu.buildFromTemplate([
     { label: "Show OpenDex", click: () => summonWindow({ toggle: false }) },
+    { label: "Show floating widgets", click: () => widgetWindows.show() },
     { type: "separator" },
     { label: "Settings…", click: () => openSettingsWindow() },
+    { label: "Recordings…", click: () => openSettingsWindow("recordings") },
+    ...(recording ? [{ label: "Stop recording", click: () => stopRecording() }] : []),
     { type: "separator" },
     {
       label: "Quit OpenDex",
@@ -867,15 +1087,36 @@ function createTray() {
     },
   ]);
   tray.setContextMenu(menu);
-  tray.on("click", () => summonWindow());
 }
 
+// A Desktop launcher must pass app arguments even if an unrelated Electron
+// window exists. Repeated launches summon Dex instead of opening another mic.
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on("second-instance", () => {
+  if (app.isReady()) summonWindow({ toggle: false });
+});
+
 app.whenReady().then(() => {
+  if (!primaryInstance) return;
+  configureInteractionLog(join(app.getPath("userData"), "diagnostics"));
+  let usageUpdate: ReturnType<typeof setTimeout> | undefined;
+  initUsage(join(app.getPath("userData"), "usage"), () => {
+    if (usageUpdate) return;
+    usageUpdate = setTimeout(() => {
+      usageUpdate = undefined;
+      for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send(IPC.usageChanged);
+    }, 250);
+  });
   initConfig();
   initAnalytics();
   track("app_started");
   if (!getConfig().onboarding.completed) track("onboarding_started");
   registerIpc();
+  initRecordings(() => settingsWindow, () => {
+    updateTrayMenu();
+    if (recordingQuitPending && getRecordingState().phase === "idle") app.quit();
+  }, () => openSettingsWindow(undefined, true));
   createWindow();
   createOverlayWindow();
   createNotchWindow();
@@ -914,7 +1155,14 @@ app.whenReady().then(() => {
   });
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", event => {
+  if (recordingActive() && !recordingQuitPending) {
+    event.preventDefault();
+    recordingQuitPending = true;
+    stopRecording();
+    setTimeout(() => app.quit(), 8000).unref();
+    return;
+  }
   // Let the main window actually close instead of hiding (see its close handler).
   isQuitting = true;
   // Best-effort — the process may exit before the request lands.

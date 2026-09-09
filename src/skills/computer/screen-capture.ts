@@ -1,4 +1,5 @@
 import { desktopCapturer, type NativeImage, screen, systemPreferences } from "electron";
+import { latencySpan } from "../../main/agent/latency";
 
 export interface Screenshot {
   /** Base64-encoded JPEG (no data: prefix). */
@@ -7,6 +8,7 @@ export interface Screenshot {
   /** Pixel size of the image the model sees. */
   width: number;
   height: number;
+  displayId: number;
   /**
    * Mapping from this image's pixel space onto real (logical) display coords:
    *   screenX = offsetX + imgX * scaleX
@@ -19,7 +21,7 @@ export interface Screenshot {
   offsetY: number;
   scaleX: number;
   scaleY: number;
-  /** Tiny 32×32 grayscale fingerprint for cheap frame-diffing (not sent to the model). */
+  /** Tiny 128×128 grayscale fingerprint for cheap frame-diffing (not sent to the model). */
   signature: Uint8Array;
 }
 
@@ -44,11 +46,11 @@ const JPEG_QUALITY = 80;
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** Build a 32×32 grayscale fingerprint from an image, for frame-diffing. */
+/** Build a 128×128 grayscale fingerprint from an image, for frame-diffing. */
 function buildSignature(image: NativeImage): Uint8Array {
-  const small = image.resize({ width: 32, height: 32 });
+  const small = image.resize({ width: 128, height: 128 });
   const bmp = small.toBitmap(); // BGRA, row-major
-  const sig = new Uint8Array(32 * 32);
+  const sig = new Uint8Array(128 * 128);
   for (let i = 0; i < sig.length; i++) {
     const o = i * 4;
     sig[i] = ((bmp[o] + bmp[o + 1] + bmp[o + 2]) / 3) | 0;
@@ -59,9 +61,13 @@ function buildSignature(image: NativeImage): Uint8Array {
 /** True when two fingerprints differ by more than `threshold` mean intensity. */
 export function framesDiffer(a: Uint8Array, b: Uint8Array, threshold = 6): boolean {
   if (a.length !== b.length) return true;
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
-  return sum / a.length > threshold;
+  let sum = 0, changed = 0;
+  for (let i = 0; i < a.length; i++) {
+    const difference = Math.abs(a[i] - b[i]);
+    sum += difference;
+    if (difference > threshold * 2) changed++;
+  }
+  return sum / a.length > threshold || changed > a.length * 0.001;
 }
 
 function pickDisplay(displayId?: number) {
@@ -82,6 +88,7 @@ function pickDisplay(displayId?: number) {
 export async function captureScreen(
   opts: CaptureOptions = {},
 ): Promise<Screenshot | { error: string }> {
+  const trace = latencySpan("capture", { cropped: Boolean(opts.region) });
   if (
     process.platform === "darwin" &&
     systemPreferences.getMediaAccessStatus("screen") !== "granted"
@@ -92,7 +99,9 @@ export async function captureScreen(
     };
   }
 
-  const display = pickDisplay(opts.displayId);
+  const requestedDisplay = opts.displayId ?? opts.regionRef?.displayId;
+  if (requestedDisplay != null && !screen.getAllDisplays().some(d => d.id === requestedDisplay)) return { error: "The captured display is no longer available. Take a new screenshot." };
+  const display = pickDisplay(requestedDisplay);
   const scale = display.scaleFactor || 1;
   const { width: logW, height: logH } = display.size;
 
@@ -105,9 +114,10 @@ export async function captureScreen(
       height: Math.round(logH * scale),
     },
   });
+  trace.mark("sources", { count: sources.length });
 
   const source =
-    sources.find((s) => s.display_id === String(display.id)) ?? sources[0];
+    sources.find((s) => s.display_id === String(display.id));
   if (!source) return { error: "No screen source is available to capture." };
 
   let image = source.thumbnail;
@@ -129,8 +139,11 @@ export async function captureScreen(
   let regionLogW = logW;
   let regionLogH = logH;
 
+  if (opts.region && !opts.regionRef) return { error: "Take a full screenshot before requesting a zoom." };
   if (opts.region && opts.regionRef) {
     const ref = opts.regionRef;
+    if (display.id !== ref.displayId) return { error: "A zoom must use the same display as its reference screenshot." };
+    if (opts.region.x < 0 || opts.region.y < 0 || opts.region.w <= 0 || opts.region.h <= 0 || opts.region.x + opts.region.w > ref.width || opts.region.y + opts.region.h > ref.height) return { error: "Zoom rectangle must fit within the latest screenshot." };
     // region (in ref's image space) → global logical coords.
     const gx = ref.offsetX + opts.region.x * ref.scaleX;
     const gy = ref.offsetY + opts.region.y * ref.scaleY;
@@ -154,12 +167,15 @@ export async function captureScreen(
     image = image.resize({ width: MAX_WIDTH });
   }
   const out = image.getSize();
+  const base64 = image.toJPEG(JPEG_QUALITY).toString("base64");
+  trace.mark("encoded", { width: out.width, height: out.height, bytes: Math.round(base64.length * 0.75) });
 
   return {
-    base64: image.toJPEG(JPEG_QUALITY).toString("base64"),
+    base64,
     mediaType: "image/jpeg",
     width: out.width,
     height: out.height,
+    displayId: display.id,
     offsetX: regionLogX,
     offsetY: regionLogY,
     scaleX: regionLogW / out.width,
@@ -184,7 +200,7 @@ export async function captureStable(
   const start = Date.now();
   for (let i = 0; i < 8; i++) {
     await delay(STEP);
-    const next = await captureScreen(opts);
+    const next = await captureScreen({ ...opts, displayId: prev.displayId });
     if ("error" in next) return prev;
     if (!framesDiffer(prev.signature, next.signature)) return next;
     prev = next;

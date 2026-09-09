@@ -1,3 +1,4 @@
+import { recordLatency } from "../diagnostics/latency-summary";
 import type { SttProvider } from "../config/schema";
 import { transcribeOpenAI } from "./openai";
 
@@ -10,7 +11,12 @@ export async function transcribe(
 ): Promise<string> {
   switch (provider) {
     case "openai":
-      return transcribeOpenAI(wav);
+      {
+        const start = performance.now();
+        const text = await transcribeOpenAI(wav);
+        recordLatency("cloud-transcription", performance.now() - start);
+        return text;
+      }
     default:
       throw new Error(`Provider "${provider}" is not a cloud STT provider.`);
   }

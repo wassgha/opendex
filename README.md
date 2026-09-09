@@ -48,6 +48,8 @@ OpenDex is an agentic harness built around voice. It's fully customizable: chang
 - 🧠 **Bring any model**  — Apple Intelligence on-device (macOS, free), your own OpenAI, Anthropic, or xAI key, or Vercel AI Gateway (one key, many models). A hosted OpenDex plan is on the way.
 - **Can run offline** — Vosk wake word + local Whisper + system TTS are a local-first option. No accounts, no uploads — only the LLM call leaves your machine, and you can skip that too on Apple Silicon.
 - 🔌 **Pluggable voice I/O**  —  Choose between push-to-talk, Vosk, or Web Speech for wake; local Whisper/Vosk, OpenAI, or Web Speech for transcription; ElevenLabs or the OS voice for output or switch to a fully-integrated Realtime stack using OpenAI Realtime or xAI Voice for a more natural conversation
+
+  For direct OpenAI speech-to-speech, select **Settings → Voice mode → Realtime voice → OpenAI direct** and save your OpenAI API key. This uses GPT Realtime 2 without Vercel AI Gateway for voice. Gateway remains available for OpenAI and xAI voice models. Screen control uses the separately configured language model.
 - 🎨 **Build your own themes** — Jarvis HUD, Talking Dot, or Typing Cursor. Each one is a full interface, not just a skin, and they react to your mic.
 - 🛠️ **Build your own Skills** — the agent can open apps, search the web, and more. Risky actions pause for Allow once / Always / Deny; your choice sticks per skill.
 - **Computer-use (off by default)** — with your OK, it can screenshot the desktop and drive mouse and keyboard. Any vision model works; every action goes through the same permission gate.
@@ -144,3 +146,11 @@ Electron · electron-vite · React 19 · Tailwind CSS 4 · Vercel AI SDK v6 · E
 ## License
 
 [MIT](LICENSE) — contributions welcome.
+
+## Additional workflows
+
+See the [contribution review guide](docs/CONTRIBUTION_REVIEW.md) for voice and
+desktop changes, setup, new skills, testing, and known limits. Feature guides cover
+[recordings](docs/RECORDINGS.md), [research](docs/RESEARCH.md),
+[usage estimates](docs/USAGE_AND_COSTS.md), [demos](docs/COOL_TRICKS.md), and
+[browser benchmarks](docs/BROWSER_BENCHMARK.md).

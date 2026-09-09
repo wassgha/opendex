@@ -17,6 +17,7 @@ state machine), see `AGENTS.md`.
 pnpm install
 pnpm dev          # run the app with HMR
 pnpm typecheck    # tsc --noEmit — run this before opening a PR
+pnpm test         # local regressions; no provider credentials required
 pnpm smoke:chat   # exercise the agent loop without launching Electron
 ```
 
@@ -198,7 +199,10 @@ and `OverlayTranscript` already do this for you.
 
 ## Conventions
 
-- **Run `pnpm typecheck` before a PR.** There's no separate lint/test gate yet.
+- **Run `pnpm typecheck`, `pnpm test`, and `pnpm build` before a PR.**
+  `pnpm test` initializes Electron once before parallel test workers; it does not
+  launch the app. Desktop UI checks are separate; see
+  [the review guide](docs/CONTRIBUTION_REVIEW.md#validation).
 - Match the surrounding code's comment density and naming. Comments explain
   *why*, not *what*.
 - Keep `meta.ts` dependency-free, and never import a skill's `skill.ts` from the

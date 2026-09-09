@@ -1,3 +1,6 @@
+import { ScreenIssueLink } from "@/components/screen-access-panel";
+import { useScreenHealth } from "@/lib/use-screen-health";
+import { taskProgress } from "@/lib/task-progress";
 import { useEffect, useState } from "react";
 import { CompactBar } from "@/components/compact-bar";
 import { StatusDot } from "@/components/status-bar";
@@ -6,22 +9,15 @@ import { getToolView } from "@skills/tool-views";
 import type { DexStatus } from "@/lib/dex/state";
 import type { SessionState } from "../../main/ipc/channels";
 
-// The latest sentence (or in-progress fragment) of `text`, so the one-line notch
-// shows the sentence currently being spoken from its start, advancing as TTS
-// progresses — instead of freezing on the opening or scrolling a long tail.
-function currentSentence(text: string): string {
-  const parts = text.match(/[^.!?]*[.!?]+|[^.!?]+$/g);
-  if (!parts) return text.trim();
-  const last = parts[parts.length - 1].trim();
-  return last || (parts.length > 1 ? parts[parts.length - 2].trim() : "");
-}
-
 // The notch bar runs in its own transparent, always-on-top window (see
 // createNotchWindow). It owns no session state: it reads the live snapshot the
 // main window publishes (status + latest caption), and relays user actions —
 // type, mute, expand — back to the main window's session via `view:command`.
 export function NotchApp() {
   const [state, setState] = useState<SessionState | null>(null);
+  const health = useScreenHealth();
+  const [dismissedCardIds, setDismissedCardIds] = useState<string[]>([]);
+  const [wakeWord, setWakeWord] = useState("Dex");
   const [agentName, setAgentName] = useState("");
   const [themeId, setThemeId] = useState<string>();
 
@@ -30,8 +26,9 @@ export function NotchApp() {
   // The notch owns no config; read the assistant name (for the type-field
   // prompt) and the active theme (for its status indicator), kept live.
   useEffect(() => {
-    const apply = (c: { config: { assistant: { name: string }; appearance: { theme: string } } }) => {
+    const apply = (c: { config: { assistant: { name: string; wakeWord: string }; appearance: { theme: string } } }) => {
       setAgentName(c.config.assistant.name);
+      setWakeWord(c.config.assistant.wakeWord);
       setThemeId(c.config.appearance.theme);
     };
     window.opendex.getConfig().then(apply);
@@ -48,17 +45,12 @@ export function NotchApp() {
   );
 
   const status = (state?.status ?? "idle") as DexStatus;
-  // Show the text *as it's spoken*: the current sentence of `spokenCaption`
-  // (which tracks TTS playback, lagging the faster token stream). It reads from
-  // the start and advances sentence-by-sentence, like live captions — rather
-  // than the full reply racing ahead, or the accumulated text scrolling its tail.
-  // While listening, show the user's live transcription instead.
-  const caption =
-    status === "thinking" || status === "speaking"
-      ? currentSentence(state?.spokenCaption || "")
-      : status === "active_listening" || status === "follow_up_listening"
-        ? state?.liveCaption || ""
-        : "";
+  // Display text as it arrives. Playback captions can trail by the whole audio queue.
+  const caption = status === "thinking" || status === "speaking"
+    ? state?.reply || state?.spokenCaption || ""
+    : status === "active_listening" || status === "follow_up_listening"
+      ? state?.reply || state?.spokenCaption || ""
+      : "";
 
   // Completed tool results that actually have a card (weather/clock/web-search).
   // Label-only tools (e.g. computer/open) are excluded so the notch doesn't open
@@ -74,13 +66,21 @@ export function NotchApp() {
     <CompactBar
       status={status}
       caption={caption}
-      toolInvocations={cards}
+      inputTranscript={state?.inputTranscript || state?.liveCaption || ""}
+      inputInterim={Boolean(state?.liveCaption)}
+      voiceFeedback={state?.voiceFeedback}
+      progress={taskProgress(status, state?.toolInvocations ?? [])}
+      toolInvocations={cards.filter(card => !dismissedCardIds.includes(card.id))}
       agentName={agentName}
+      wakeWord={wakeWord}
+      recovery={health?.state === "error" ? <ScreenIssueLink /> : undefined}
       StatusIndicator={StatusIndicator}
       isMuted={state?.muted ?? false}
       onSubmitText={(text) => window.opendex.sendViewCommand({ type: "submitText", text })}
       onToggleMute={() => window.opendex.sendViewCommand({ type: "toggleMute" })}
-      onNewConversation={() => window.opendex.sendViewCommand({ type: "newConversation" })}
+      // Dismiss only the current results on this surface. Never reset the voice
+      // session: the user may already be speaking their next command.
+      onDismissCards={() => setDismissedCardIds(cards.map(card => card.id))}
       onExpand={() => window.opendex.sendViewCommand({ type: "expand" })}
       onOpenSettings={() => window.opendex.openSettings()}
     />

@@ -1,0 +1,313 @@
+{
+  "asOf": "2026-09-08T22:00:24.164Z",
+  "source": "https://ai-gateway.vercel.sh/v1/models",
+  "rates": {
+    "anthropic/claude-haiku-4.5": {
+      "input": "0.000001",
+      "output": "0.000005",
+      "input_cache_read": "0.0000001",
+      "input_cache_write": "0.00000125",
+      "web_search": "10",
+      "regional": {
+        "eu": {
+          "input": "0.0000011",
+          "output": "0.0000055",
+          "input_cache_read": "0.00000011",
+          "input_cache_write": "0.000001375"
+        },
+        "us": {
+          "input": "0.0000011",
+          "output": "0.0000055",
+          "input_cache_read": "0.00000011",
+          "input_cache_write": "0.000001375"
+        }
+      }
+    },
+    "anthropic/claude-opus-4.8": {
+      "input": "0.000005",
+      "output": "0.000025",
+      "input_cache_read": "0.0000005",
+      "input_cache_write": "0.00000625",
+      "web_search": "10",
+      "fast": {
+        "input": "0.00001",
+        "output": "0.00005",
+        "input_cache_read": "0.000001",
+        "input_cache_write": "0.0000125"
+      },
+      "regional": {
+        "eu": {
+          "input": "0.0000055",
+          "output": "0.0000275",
+          "input_cache_read": "0.00000055",
+          "input_cache_write": "0.000006875"
+        },
+        "us": {
+          "input": "0.0000055",
+          "output": "0.0000275",
+          "input_cache_read": "0.00000055",
+          "input_cache_write": "0.000006875",
+          "fast": {
+            "input": "0.000011",
+            "output": "0.000055",
+            "input_cache_read": "0.0000011",
+            "input_cache_write": "0.00001375"
+          }
+        }
+      }
+    },
+    "anthropic/claude-sonnet-4.6": {
+      "input": "0.000003",
+      "output": "0.000015",
+      "input_cache_read": "0.0000003",
+      "input_cache_write": "0.00000375",
+      "web_search": "10",
+      "regional": {
+        "eu": {
+          "input": "0.0000033",
+          "output": "0.0000165",
+          "input_cache_read": "0.00000033",
+          "input_cache_write": "0.000004125"
+        },
+        "us": {
+          "input": "0.0000033",
+          "output": "0.0000165",
+          "input_cache_read": "0.00000033",
+          "input_cache_write": "0.000004125"
+        }
+      }
+    },
+    "google/gemini-2.5-pro": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.00001",
+      "output_tiers": [
+        {
+          "cost": "0.00001",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000015",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.000000125",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.000000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.00000025",
+          "min": 200001
+        }
+      ],
+      "web_search": "35",
+      "maps_search": "25",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000225",
+          "output": "0.000018",
+          "input_cache_read": "0.000000225",
+          "long_context": {
+            "threshold": 200001,
+            "input": "0.0000045",
+            "output": "0.000027",
+            "input_cache_read": "0.00000045"
+          }
+        },
+        "flex": {
+          "input": "0.000000625",
+          "output": "0.000005",
+          "long_context": {
+            "threshold": 200001,
+            "input": "0.00000125",
+            "output": "0.0000075"
+          }
+        }
+      },
+      "regional": {
+        "eu": {
+          "input": "0.00000125",
+          "input_tiers": [
+            {
+              "cost": "0.00000125",
+              "min": 0,
+              "max": 200001
+            },
+            {
+              "cost": "0.0000025",
+              "min": 200001
+            }
+          ],
+          "output": "0.00001",
+          "output_tiers": [
+            {
+              "cost": "0.00001",
+              "min": 0,
+              "max": 200001
+            },
+            {
+              "cost": "0.000015",
+              "min": 200001
+            }
+          ],
+          "input_cache_read": "0.000000125",
+          "input_cache_read_tiers": [
+            {
+              "cost": "0.000000125",
+              "min": 0,
+              "max": 200001
+            },
+            {
+              "cost": "0.00000025",
+              "min": 200001
+            }
+          ]
+        },
+        "us": {
+          "input": "0.00000125",
+          "input_tiers": [
+            {
+              "cost": "0.00000125",
+              "min": 0,
+              "max": 200001
+            },
+            {
+              "cost": "0.0000025",
+              "min": 200001
+            }
+          ],
+          "output": "0.00001",
+          "output_tiers": [
+            {
+              "cost": "0.00001",
+              "min": 0,
+              "max": 200001
+            },
+            {
+              "cost": "0.000015",
+              "min": 200001
+            }
+          ],
+          "input_cache_read": "0.000000125",
+          "input_cache_read_tiers": [
+            {
+              "cost": "0.000000125",
+              "min": 0,
+              "max": 200001
+            },
+            {
+              "cost": "0.00000025",
+              "min": 200001
+            }
+          ]
+        }
+      }
+    },
+    "openai/gpt-4.1": {
+      "input": "0.000002",
+      "output": "0.000008",
+      "input_cache_read": "0.0000005",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000035",
+          "output": "0.000014",
+          "input_cache_read": "0.000000875"
+        }
+      },
+      "fast": {
+        "input": "0.0000035",
+        "output": "0.000014",
+        "input_cache_read": "0.000000875"
+      }
+    },
+    "openai/gpt-4.1-mini": {
+      "input": "0.0000004",
+      "output": "0.0000016",
+      "input_cache_read": "0.0000001",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000007",
+          "output": "0.0000028",
+          "input_cache_read": "0.000000175"
+        }
+      },
+      "fast": {
+        "input": "0.0000007",
+        "output": "0.0000028",
+        "input_cache_read": "0.000000175"
+      }
+    },
+    "openai/gpt-5": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000025",
+          "output": "0.00002",
+          "input_cache_read": "0.00000025"
+        },
+        "flex": {
+          "input": "0.000000625",
+          "output": "0.000005",
+          "input_cache_read": "0.0000000625"
+        }
+      },
+      "varies_by_provider": true,
+      "fast": {
+        "input": "0.0000025",
+        "output": "0.00002",
+        "input_cache_read": "0.00000025"
+      }
+    },
+    "openai/gpt-5-mini": {
+      "input": "0.00000025",
+      "output": "0.000002",
+      "input_cache_read": "0.000000025",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000045",
+          "output": "0.0000036",
+          "input_cache_read": "0.000000045"
+        },
+        "flex": {
+          "input": "0.000000125",
+          "output": "0.000001",
+          "input_cache_read": "0.0000000125"
+        }
+      },
+      "varies_by_provider": true,
+      "fast": {
+        "input": "0.00000045",
+        "output": "0.0000036",
+        "input_cache_read": "0.000000045"
+      }
+    },
+    "openai/gpt-realtime-2": {
+      "input": "0.000004",
+      "output": "0.000024",
+      "input_cache_read": "0.0000004",
+      "web_search": "10",
+      "audio_input_token_cost": "0.000032",
+      "audio_output_token_cost": "0.000064"
+    }
+  }
+}

@@ -23,6 +23,8 @@ export interface ToolViewProps {
 }
 
 export interface ToolView {
+  /** Space needed for a scrollable result on the compact surface. */
+  notchHeight?: number;
   name: string;
   /** Short banner icon + label from the (possibly partial) call input. */
   label: (input: unknown) => { icon: string; label: string };

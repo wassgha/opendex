@@ -49,7 +49,8 @@ export class AudioMeter {
 
   /** Current mic loudness, 0..1 (RMS of the time-domain signal). */
   inputLevel(): number {
-    if (!this.analyser || !this.data) return 0;
+    if (!this.analyser || !this.data || this.ctx?.state !== "running" ||
+      !this.currentStream?.getAudioTracks().some(track => track.readyState === "live" && track.enabled && !track.muted)) return 0;
     this.analyser.getByteTimeDomainData(this.data);
     let sumSquares = 0;
     for (let i = 0; i < this.data.length; i++) {

@@ -2,7 +2,7 @@
 // doesn't declare a `types` entry, so TS can't resolve them automatically).
 declare module "vosk-browser" {
   export interface VoskResultMessage {
-    result?: { text?: string };
+    result?: { text?: string; result?: Array<{ word: string; conf: number; start: number; end: number }> };
   }
   export interface VoskPartialMessage {
     result?: { partial?: string };
