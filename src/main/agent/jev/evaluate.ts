@@ -3,6 +3,9 @@
  * the OpenAI-compatible Gateway endpoints and needs AI SDK 7's
  * `experimental_evaluate` — we call the Gateway `/v4/ai/evaluation-model`
  * route directly so the rest of OpenDex can stay on AI SDK 6 (realtime canary).
+ *
+ * Requires `AI_GATEWAY_API_KEY` in the environment. Callers that want a silent
+ * no-op when the key is missing should check first (see `routeDesktopIntent`).
  */
 
 const GATEWAY_EVAL_URL = "https://ai-gateway.vercel.sh/v4/ai/evaluation-model";

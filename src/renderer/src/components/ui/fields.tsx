@@ -182,23 +182,30 @@ export function SegmentedControl<T extends string>({
   value,
   options,
   onChange,
+  disabled,
 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-border bg-card/40 p-1">
+    <div
+      className={`inline-flex rounded-lg border border-border bg-card/40 p-1 ${
+        disabled ? "opacity-50" : ""
+      }`}
+    >
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
+          disabled={disabled}
           onClick={() => onChange(o.value)}
           className={`rounded-md px-3 py-1.5 text-sm transition ${
             value === o.value
               ? "bg-secondary text-secondary-foreground"
               : "text-muted-foreground hover:text-foreground"
-          }`}
+          } ${disabled ? "cursor-not-allowed" : ""}`}
         >
           {o.label}
         </button>

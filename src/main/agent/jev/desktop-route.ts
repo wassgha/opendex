@@ -71,7 +71,10 @@ export async function routeDesktopIntent(
     if (answer.type !== "choice") return null;
     const route = answer.choice as DesktopRoute;
     if (!DESKTOP_ROUTES.includes(route)) return null;
-    const probability = answer.probabilities?.[answer.choice] ?? 0;
+    // Native Jev returns a full distribution; if a provider omits it, trust the
+    // chosen option rather than treating missing mass as p=0 (which would skip
+    // every confident route under ROUTE_CONFIDENCE).
+    const probability = answer.probabilities?.[answer.choice] ?? 1;
     return { route, probability, latencyMs: Date.now() - started };
   } catch (err) {
     console.warn("[opendex jev] route failed, falling back to LLM", err);

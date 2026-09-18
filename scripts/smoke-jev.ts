@@ -6,26 +6,31 @@ import { config as loadEnv } from "dotenv";
 import {
   extractOpenTarget,
   routeDesktopIntent,
-  type DesktopRoute,
 } from "../src/main/agent/jev/desktop-route";
 
 loadEnv();
 
-const cases: Array<{ text: string; route: DesktopRoute; expect: string | null }> = [
+const cases: Array<{
+  text: string;
+  route: "open_app" | "open_url" | "open_path";
+  expect: string | null;
+}> = [
   { text: "open Safari", route: "open_app", expect: "Safari" },
   { text: "please launch Slack", route: "open_app", expect: "Slack" },
   { text: "can you open the Notes app", route: "open_app", expect: "Notes" },
+  { text: "open Google Chrome", route: "open_app", expect: "Google Chrome" },
   { text: "open https://example.com/foo", route: "open_url", expect: "https://example.com/foo" },
   { text: "go to github.com", route: "open_url", expect: "https://github.com" },
   { text: "open ~/Documents", route: "open_path", expect: "~/Documents" },
+  // Conjunctions / UI instructions → reject (fall through to LLM)
   { text: "open Chrome and click the first tab", route: "open_app", expect: null },
+  { text: "open Safari and then go to GitHub", route: "open_app", expect: null },
 ];
 
 async function main() {
   let failed = 0;
   console.log("[smoke:jev] extractor checks");
   for (const c of cases) {
-    if (c.route !== "open_app" && c.route !== "open_url" && c.route !== "open_path") continue;
     const got = extractOpenTarget(c.text, c.route);
     const value =
       got?.kind === "app" ? got.name : got?.kind === "url" ? got.url : got?.kind === "path" ? got.path : null;

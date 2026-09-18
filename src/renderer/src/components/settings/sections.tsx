@@ -344,6 +344,7 @@ function SkillsSection({ data, setConfig }: SectionProps) {
             { value: "on", label: "On" },
             { value: "off", label: "Off" },
           ]}
+          disabled={!secrets.AI_GATEWAY_API_KEY}
           onChange={(v) =>
             setConfig({
               skills: {
