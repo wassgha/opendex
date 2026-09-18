@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit",
     "smoke:chat": "tsx scripts/smoke-chat.ts",
     "smoke:realtime": "tsx scripts/smoke-realtime.ts",
+    "smoke:jev": "tsx scripts/smoke-jev.ts",
     "dist": "electron-vite build && electron-builder",
     "release": "electron-vite build && electron-builder --publish always",
     "cut:patch": "pnpm version patch -m \"Release v%s\" && git push --follow-tags",
