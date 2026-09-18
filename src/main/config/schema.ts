@@ -105,6 +105,12 @@ export interface OpenDexConfig {
     enabled: Record<string, boolean>;
     /** Standing permission decision per skill: ask each time / always / never. */
     permissions: Record<string, SkillPermission>;
+    /**
+     * Use TypeSafe Jev (via AI Gateway) to classify open/computer intents
+     * before the language-model loop. Clear "open Safari" commands skip the
+     * LLM entirely. Needs `AI_GATEWAY_API_KEY`.
+     */
+    jevFastPath: boolean;
   };
   computer: {
     /** Animate cursor moves (watchable) vs teleport instantly (fastest). */
@@ -177,6 +183,8 @@ export const DEFAULT_CONFIG: OpenDexConfig = {
     // `computer` is opt-in (off until the user enables it in Settings).
     enabled: { open: true, computer: false },
     permissions: { open: "ask", computer: "ask" },
+    // On by default — no-ops when the Gateway key is missing.
+    jevFastPath: true,
   },
   computer: { animateCursor: true },
   // Anonymous usage analytics, on by default (opt-out in onboarding/Settings).

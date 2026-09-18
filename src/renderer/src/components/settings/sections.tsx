@@ -327,9 +327,33 @@ function HotkeyField({
 }
 
 function SkillsSection({ data, setConfig }: SectionProps) {
-  const { config } = data;
+  const { config, secrets } = data;
   return (
     <>
+      <ToggleRow
+        title="Fast open (Jev)"
+        description={
+          secrets.AI_GATEWAY_API_KEY
+            ? "Classify open/launch commands with TypeSafe Jev before the language model. Clear 'open Safari' requests skip the slow LLM loop."
+            : "Needs a Vercel AI Gateway API key (same as the gateway LLM provider). Classifies open/launch commands so they skip the slow LLM loop."
+        }
+      >
+        <SegmentedControl
+          value={config.skills.jevFastPath ? "on" : "off"}
+          options={[
+            { value: "on", label: "On" },
+            { value: "off", label: "Off" },
+          ]}
+          onChange={(v) =>
+            setConfig({
+              skills: {
+                ...config.skills,
+                jevFastPath: v === "on",
+              },
+            })
+          }
+        />
+      </ToggleRow>
       {SKILL_METAS.map((skill) => {
         const enabled = skill.optIn
           ? config.skills.enabled[skill.id] === true

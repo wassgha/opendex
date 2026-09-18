@@ -49,7 +49,7 @@ export function skillSystemPrompts(config: OpenDexConfig): string[] {
  * Assemble the tool set for a chat turn: every enabled skill's tools. Sensitive
  * skills' tools are wrapped so each call passes through the permission gate
  * first. `include` narrows the set further (realtime sessions pass only their
- * direct, non-image skills).
+ * direct, non-image skills; the Jev fast-path can pin the set to `open`).
  */
 export function buildToolSet({
   config,

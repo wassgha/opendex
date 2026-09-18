@@ -23,6 +23,7 @@ import {
 } from "./ipc/channels";
 import { streamChat } from "./agent/chat";
 import { resolveModel, checkAppleAvailability } from "./agent/llm/resolve-model";
+import { tryJevDesktopFastPath } from "./agent/jev/fast-open";
 import { buildRealtimeInstructions, buildSystemPrompt } from "./agent/system-prompt";
 import {
   endRealtimeSession,
@@ -31,7 +32,9 @@ import {
 } from "./agent/realtime/session-host";
 import { buildRealtimeToolDefs, directRealtimeSkills } from "./agent/realtime/realtime-tools";
 import { getRealtimeModelMeta } from "./config/realtime-models";
-import { buildToolSet, skillSystemPrompts } from "../skills/registry";
+import { buildToolSet, isSkillEnabled, skillSystemPrompts } from "../skills/registry";
+import { meta as openMeta } from "../skills/open/meta";
+import { meta as computerMeta } from "../skills/computer/meta";
 import {
   makePermissionRequester,
   pendingPermissions,
@@ -521,6 +524,24 @@ function stripImageOutput(output: unknown): unknown {
   return output;
 }
 
+/** Latest user utterance as plain text (for Jev routing). */
+function lastUserText(messages: ChatStartPayload["messages"]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "user") continue;
+    if (typeof m.content === "string") return m.content.trim() || null;
+    if (Array.isArray(m.content)) {
+      const text = m.content
+        .filter((p): p is { type: "text"; text: string } => p.type === "text" && typeof p.text === "string")
+        .map((p) => p.text)
+        .join(" ")
+        .trim();
+      return text || null;
+    }
+  }
+  return null;
+}
+
 function registerIpc() {
   const inFlight = new Map<string, AbortController>();
 
@@ -532,16 +553,89 @@ function registerIpc() {
     const config = getConfig();
     const briefing = mode === "briefing";
     track("command_run", { mode: briefing ? "briefing" : "command" });
-    const system = buildSystemPrompt({
-      config,
-      briefing,
-      skillPrompts: briefing ? [] : skillSystemPrompts(config),
-    });
-    const tools = buildToolSet({
-      config,
-      requestPermission: makePermissionRequester(sender),
-    });
+    const requestPermission = makePermissionRequester(sender);
+
+    const emitDelta = (delta: string) => {
+      if (!ac.signal.aborted && !sender.isDestroyed()) {
+        sender.send(IPC.chatDelta(requestId), delta);
+      }
+    };
+    const emitToolCall = (call: { toolCallId: string; toolName: string; input: unknown }) => {
+      track("tool_used", { tool_name: call.toolName });
+      if (!ac.signal.aborted && !sender.isDestroyed()) {
+        sender.send(IPC.chatTool(requestId), call);
+      }
+    };
+    const emitToolResult = (result: {
+      toolCallId: string;
+      toolName: string;
+      output: unknown;
+    }) => {
+      if (!ac.signal.aborted && !sender.isDestroyed()) {
+        sender.send(IPC.chatToolResult(requestId), {
+          ...result,
+          output: stripImageOutput(result.output),
+        });
+      }
+    };
+
     try {
+      // Jev fast path: classify open/computer intents before the LLM loop.
+      // Clear "open Safari" commands skip the language model entirely.
+      let systemAddendum = "";
+      let skillFilter: string[] | undefined;
+      if (!briefing && config.skills.jevFastPath) {
+        const utterance = lastUserText(messages);
+        if (utterance) {
+          const fast = await tryJevDesktopFastPath({
+            utterance,
+            openEnabled: isSkillEnabled(openMeta, config),
+            computerEnabled: isSkillEnabled(computerMeta, config),
+            requestPermission,
+            signal: ac.signal,
+            handlers: {
+              onDelta: emitDelta,
+              onToolCall: emitToolCall,
+              onToolResult: emitToolResult,
+            },
+          });
+          if (fast.kind === "handled") {
+            track("jev_fast_path", {
+              route: fast.route.route,
+              latency_ms: fast.route.latencyMs,
+              handled: true,
+            });
+            if (!sender.isDestroyed()) {
+              sender.send(IPC.chatDone(requestId), fast.messages);
+            }
+            return;
+          }
+          if (fast.kind === "hint") {
+            track("jev_fast_path", {
+              route: fast.route.route,
+              latency_ms: fast.route.latencyMs,
+              handled: false,
+            });
+            systemAddendum = fast.systemAddendum;
+            skillFilter = fast.skillFilter;
+          }
+        }
+      }
+
+      const system =
+        buildSystemPrompt({
+          config,
+          briefing,
+          skillPrompts: briefing ? [] : skillSystemPrompts(config),
+        }) + (systemAddendum ? `\n\n${systemAddendum}` : "");
+      const tools = buildToolSet({
+        config,
+        requestPermission,
+        include: skillFilter
+          ? (skill) => skillFilter!.includes(skill.id)
+          : undefined,
+      });
+
       // Resolve the configured provider to a model (may throw for an unset key,
       // an unavailable Apple model, or the not-yet-built subscription). The
       // catch below turns it into a spoken apology.
@@ -553,28 +647,9 @@ function registerIpc() {
         tools,
         briefing,
         signal: ac.signal,
-        onDelta: (delta) => {
-          if (!ac.signal.aborted && !sender.isDestroyed()) {
-            sender.send(IPC.chatDelta(requestId), delta);
-          }
-        },
-        onToolCall: (call) => {
-          // Tool name only — never the input args.
-          track("tool_used", { tool_name: call.toolName });
-          if (!ac.signal.aborted && !sender.isDestroyed()) {
-            sender.send(IPC.chatTool(requestId), call);
-          }
-        },
-        onToolResult: (result) => {
-          if (!ac.signal.aborted && !sender.isDestroyed()) {
-            sender.send(IPC.chatToolResult(requestId), {
-              ...result,
-              // Computer-use returns full screenshots; don't ship megabytes of
-              // base64 to the activity UI (which never renders them as cards).
-              output: stripImageOutput(result.output),
-            });
-          }
-        },
+        onDelta: emitDelta,
+        onToolCall: emitToolCall,
+        onToolResult: emitToolResult,
       });
       if (!sender.isDestroyed()) {
         sender.send(IPC.chatDone(requestId), responseMessages);
